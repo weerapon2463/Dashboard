@@ -8,6 +8,9 @@ const VIEW_TITLES = {
   capacity: "Capacity Planning",
   schedule: "Master Schedule",
   makeorbuy: "Make-or-Buy Decision Support",
+  resource: "การบริหารทรัพยากรการผลิต (คน / เครื่องจักร / เครื่องมือ)",
+  procurement: "จัดซื้อ (PR / PO / ซัพพลายเออร์)",
+  workorder: "ใบสั่งผลิต & BOM",
 };
 
 function switchView(view) {
@@ -19,10 +22,15 @@ function switchView(view) {
   });
   document.getElementById("viewTitle").textContent = VIEW_TITLES[view] || "";
 
+  // Re-render the relevant chart in case it needs a resize/redraw
+  // (canvas charts drawn while display:none report zero size)
   if (view === "priority") renderPriorityMatrix();
   if (view === "capacity") renderCapacityChart(document.getElementById("capacityLineFilter").value);
   if (view === "schedule") renderMasterSchedule();
   if (view === "makeorbuy") runMobCalculation();
+  if (view === "resource") renderResource();
+  if (view === "procurement") renderProcurement();
+  if (view === "workorder") renderWorkOrders();
 }
 
 function initNav() {
@@ -34,6 +42,7 @@ function initNav() {
 function initThemeToggle() {
   const btn = document.getElementById("themeToggle");
   if (!btn) return;
+  const stored = null; // no persistent storage in this demo; session-only via in-memory var
   let manualTheme = null;
 
   btn.addEventListener("click", () => {
@@ -46,6 +55,7 @@ function initThemeToggle() {
       root.setAttribute("data-theme", "dark");
       manualTheme = "dark";
     }
+    // Redraw charts so canvas colors (read from CSS vars) update
     refreshAllCharts();
   });
 }
@@ -56,15 +66,24 @@ function refreshAllCharts() {
   renderCapacityChart(lineSelect ? lineSelect.value : undefined);
   renderMasterSchedule();
   if (document.getElementById("mobResult").innerHTML.trim()) runMobCalculation();
+  renderResource();
+  renderProcurement();
+  renderWorkOrders();
+  renderAlerts();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   initNav();
   initThemeToggle();
   populateCapacityFilter();
+  populateBOMFilter();
 
   renderPriorityMatrix();
   renderCapacityChart(CAPACITY_LINES[0]);
   renderMasterSchedule();
   initMakeOrBuy();
+  renderResource();
+  renderProcurement();
+  renderWorkOrders();
+  renderAlerts();
 });
