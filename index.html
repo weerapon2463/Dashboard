@@ -34,6 +34,15 @@
         <button class="nav-item" data-view="makeorbuy">
           <span class="nav-icon">◆</span> Make-or-Buy
         </button>
+        <button class="nav-item" data-view="resource">
+          <span class="nav-icon">◆</span> ทรัพยากรการผลิต
+        </button>
+        <button class="nav-item" data-view="procurement">
+          <span class="nav-icon">◆</span> จัดซื้อ / ซัพพลายเออร์
+        </button>
+        <button class="nav-item" data-view="workorder">
+          <span class="nav-icon">◆</span> ใบสั่งผลิต &amp; BOM
+        </button>
       </nav>
       <div class="sidebar-footer">
         <div class="footer-label">PS Innovation Award 2026</div>
@@ -74,13 +83,42 @@
             <div class="stat-value" id="statBuyRec">-</div>
             <div class="stat-note">จาก Make-or-Buy</div>
           </div>
+          <div class="stat-tile">
+            <div class="stat-label">ไลน์ที่ขาดกำลังคน</div>
+            <div class="stat-value" id="statLaborGap">-</div>
+            <div class="stat-note">จาก Resource Management</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">เครื่องจักรที่ต้องซ่อมบำรุง</div>
+            <div class="stat-value" id="statMachineIssue">-</div>
+            <div class="stat-note">จาก Resource Management</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>แจ้งเตือนความล่าช้าและความเสี่ยง</h3>
+            <p class="card-sub">รวมทุกความเสี่ยงจากทุกโมดูล — PO/PR ล่าช้าหรือรออนุมัติ ใบสั่งผลิตล่าช้า เครื่องมือเกินสอบเทียบ เครื่องจักรผิดปกติ และกำลังคนขาด</p>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="alertsTable">
+              <thead>
+                <tr>
+                  <th>ประเภท</th>
+                  <th>รายละเอียด</th>
+                  <th>ระดับ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <p class="muted-note" id="alertsEmptyNote" style="display:none;">ไม่มีรายการแจ้งเตือนในขณะนี้</p>
+          </div>
         </div>
         <div class="card">
           <div class="card-header">
             <h3>เกี่ยวกับ Dashboard นี้</h3>
           </div>
           <div class="card-body">
-            <p>Production Dashboard เป็นเครื่องมือสนับสนุนการตัดสินใจสำหรับฝ่ายผลิต Y2J Machinery ให้ผู้บริหารเห็นข้อมูลจากหน้างานจริง ประกอบด้วย 4 โมดูลหลัก: การจัดลำดับความสำคัญงาน (Priority Matrix), การวางแผนกำลังการผลิต (Capacity Planning), ตารางแผนการผลิตรวม (Master Schedule) และเครื่องมือช่วยตัดสินใจผลิตเองหรือซื้อ (Make-or-Buy Decision Support)</p>
+            <p>Production Dashboard เป็นเครื่องมือสนับสนุนการตัดสินใจสำหรับฝ่ายผลิต Y2J Machinery ให้ผู้บริหารเห็นข้อมูลจากหน้างานจริงแบบครอบคลุมทุกมิติของการบริหารการผลิตทั้งบริษัท — งาน กำลังการผลิต แผนงาน ต้นทุน คน เครื่องจักร เครื่องมือ และการจัดซื้อ ประกอบด้วย 7 โมดูลหลัก: การจัดลำดับความสำคัญงาน (Priority Matrix), การวางแผนกำลังการผลิต (Capacity Planning), ตารางแผนการผลิตรวม (Master Schedule), เครื่องมือช่วยตัดสินใจผลิตเองหรือซื้อ (Make-or-Buy Decision Support), การบริหารทรัพยากรการผลิต — คน เครื่องจักร และเครื่องมือวัด (Resource Management), การจัดซื้อ — PR / PO / ซัพพลายเออร์ (Procurement) และใบสั่งผลิตที่จัดกลุ่มเป็นโปรเจกต์ตาม PO พร้อม Master BOM และการเบิกวัสดุประกอบ (Work Orders &amp; BOM)</p>
             <p class="muted-note">เวอร์ชันนี้ใช้ข้อมูลตัวอย่าง (mock data) สำหรับสาธิตแนวคิด — ขั้นต่อไปคือเชื่อมข้อมูลจริงจากหน้างานและระบบ Stock/BOM</p>
           </div>
         </div>
@@ -123,7 +161,7 @@
       <section class="view" id="view-capacity">
         <div class="card">
           <div class="card-header">
-            <h3>Capacity Planning — กำลังการผลิตต่อไลน์ (8 สัปดาห์ข้างหน้า)</h3>
+            <h3>Capacity Planning — กำลังการผลิตต่อไลน์ (10 สัปดาห์ข้างหน้า)</h3>
             <p class="card-sub">Utilization = ชั่วโมงที่วางแผนผลิต ÷ ชั่วโมงกำลังการผลิตที่มี</p>
           </div>
           <div class="card-body">
@@ -252,6 +290,263 @@
           </div>
         </div>
       </section>
+
+      <!-- Resource Management: คน / เครื่องจักร / เครื่องมือ -->
+      <section class="view" id="view-resource">
+        <div class="stat-grid">
+          <div class="stat-tile">
+            <div class="stat-label">ไลน์ที่ขาดกำลังคน</div>
+            <div class="stat-value" id="resStatLaborGap">-</div>
+            <div class="stat-note">จากทั้งหมด 6 ไลน์ผลิต</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">เครื่องจักรที่ต้องดูแล</div>
+            <div class="stat-value" id="resStatMachineIssue">-</div>
+            <div class="stat-note">ซ่อมบำรุง / เสีย</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">เครื่องมือเกินกำหนดสอบเทียบ</div>
+            <div class="stat-value" id="resStatToolOverdue">-</div>
+            <div class="stat-note">ต้องดำเนินการก่อน</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>กำลังคน (Labor) รายไลน์ผลิต</h3>
+            <p class="card-sub">เปรียบเทียบจำนวนที่ต้องการกับจำนวนพนักงานจริงในแต่ละไลน์</p>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="laborTable">
+              <thead>
+                <tr>
+                  <th>ไลน์ผลิต</th>
+                  <th>ต้องการ (คน)</th>
+                  <th>มีจริง (คน)</th>
+                  <th>ผลต่าง</th>
+                  <th>กะการทำงาน</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>เครื่องจักร / อุปกรณ์การผลิต</h3>
+            <p class="card-sub">สถานะเครื่องจักรหลักที่ใช้ในการผลิต ไม่ใช่รุ่นรถตัดอ้อยที่ผลิตออกมา</p>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="machineTable">
+              <thead>
+                <tr>
+                  <th>เครื่องจักร / อุปกรณ์</th>
+                  <th>สถานะ</th>
+                  <th>Utilization</th>
+                  <th>หมายเหตุ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>เครื่องมือวัด / การสอบเทียบ (Calibration)</h3>
+            <p class="card-sub">ติดตามกำหนดสอบเทียบเครื่องมือวัดเพื่อรักษามาตรฐาน QC</p>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="toolTable">
+              <thead>
+                <tr>
+                  <th>เครื่องมือวัด</th>
+                  <th>สอบเทียบล่าสุด</th>
+                  <th>ครบกำหนดถัดไป</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Procurement: PR / PO / Supplier -->
+      <section class="view" id="view-procurement">
+        <div class="stat-grid">
+          <div class="stat-tile">
+            <div class="stat-label">PR รออนุมัติ</div>
+            <div class="stat-value" id="procStatPRPending">-</div>
+            <div class="stat-note">Purchase Requisition</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">PO ล่าช้า</div>
+            <div class="stat-value" id="procStatPOLate">-</div>
+            <div class="stat-note">Purchase Order</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">ซัพพลายเออร์ Active</div>
+            <div class="stat-value" id="procStatSupplierActive">-</div>
+            <div class="stat-note">พร้อมสั่งซื้อ</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>ใบขอซื้อ (Purchase Requisition — PR)</h3>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="prTable">
+              <thead>
+                <tr>
+                  <th>เลขที่ PR</th>
+                  <th>รายการ</th>
+                  <th>ผู้ขอ</th>
+                  <th>วันที่ขอ</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>ใบสั่งซื้อ (Purchase Order — PO)</h3>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="poTable">
+              <thead>
+                <tr>
+                  <th>เลขที่ PO</th>
+                  <th>ซัพพลายเออร์</th>
+                  <th>รายการ</th>
+                  <th>มูลค่า</th>
+                  <th>วันที่สั่ง</th>
+                  <th>กำหนดส่งมอบ</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>ซัพพลายเออร์</h3>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="supplierTable">
+              <thead>
+                <tr>
+                  <th>ซัพพลายเออร์</th>
+                  <th>ประเภทชิ้นส่วน</th>
+                  <th>Lead Time เฉลี่ย</th>
+                  <th>คะแนน</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Work Orders (ใบสั่งผลิตตาม PO) + Master BOM + การเบิกวัสดุประกอบ -->
+      <section class="view" id="view-workorder">
+        <div class="stat-grid">
+          <div class="stat-tile">
+            <div class="stat-label">ใบสั่งผลิตทั้งหมด</div>
+            <div class="stat-value" id="woStatTotal">-</div>
+            <div class="stat-note">โปรเจกต์ที่กำลังติดตาม</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">ใบสั่งผลิตล่าช้า</div>
+            <div class="stat-value" id="woStatLate">-</div>
+            <div class="stat-note">ต้องเร่งติดตาม</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">เบิกวัสดุแล้วเฉลี่ย</div>
+            <div class="stat-value" id="woStatAvgIssued">-</div>
+            <div class="stat-note">ทุกใบสั่งผลิต</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>ใบสั่งผลิต (Work Orders) — จัดกลุ่มเป็นโปรเจกต์ตามใบสั่งซื้อ (PO)</h3>
+            <p class="card-sub">แต่ละใบสั่งผลิตอ้างอิงกับ PO ในโมดูลจัดซื้อ เพื่อติดตามได้ว่าโปรเจกต์ไหนรออะไหล่จาก PO ใด</p>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="woTable">
+              <thead>
+                <tr>
+                  <th>เลขที่ใบสั่งผลิต</th>
+                  <th>อ้างอิง PO</th>
+                  <th>รุ่นเครื่องจักร</th>
+                  <th>จำนวน (คัน)</th>
+                  <th>เบิกวัสดุแล้ว</th>
+                  <th>กำหนดส่งมอบ</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>Master BOM ตามรุ่นเครื่องจักร</h3>
+            <p class="card-sub">รายการชิ้นส่วนหลักต่อเครื่อง 1 คัน อ้างอิงชิ้นส่วนชุดเดียวกับโมดูล Make-or-Buy</p>
+          </div>
+          <div class="card-body">
+            <div class="filter-row">
+              <label for="bomModelFilter">รุ่นเครื่องจักร:</label>
+              <select id="bomModelFilter"></select>
+            </div>
+            <div class="table-scroll">
+              <table class="data-table" id="bomTable">
+                <thead>
+                  <tr>
+                    <th>ชิ้นส่วน</th>
+                    <th>จำนวน/คัน</th>
+                    <th>หน่วย</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>การเบิกวัสดุประกอบ (Material Issuance)</h3>
+            <p class="card-sub">ติดตามการเบิกชิ้นส่วนตามใบสั่งผลิต เทียบจำนวนที่ต้องการกับที่เบิกได้จริง</p>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="issuanceTable">
+              <thead>
+                <tr>
+                  <th>เลขที่ใบสั่งผลิต</th>
+                  <th>ชิ้นส่วน</th>
+                  <th>ต้องการ</th>
+                  <th>เบิกแล้ว</th>
+                  <th>คงค้าง</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
@@ -260,6 +555,10 @@
   <script src="capacity-planning.js"></script>
   <script src="master-schedule.js"></script>
   <script src="make-or-buy.js"></script>
+  <script src="resource.js"></script>
+  <script src="procurement.js"></script>
+  <script src="workorder.js"></script>
+  <script src="alerts.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
