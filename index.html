@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Production Dashboard | Y2J Machinery</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">Y2J</div>
+        <div class="brand-text">
+          <div class="brand-title">Production Dashboard</div>
+          <div class="brand-sub">ระบบสนับสนุนการตัดสินใจด้านการผลิต</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-view="overview">
+          <span class="nav-icon">◆</span> ภาพรวม
+        </button>
+        <button class="nav-item" data-view="priority">
+          <span class="nav-icon">◆</span> Priority Matrix
+        </button>
+        <button class="nav-item" data-view="capacity">
+          <span class="nav-icon">◆</span> Capacity Planning
+        </button>
+        <button class="nav-item" data-view="schedule">
+          <span class="nav-icon">◆</span> Master Schedule
+        </button>
+        <button class="nav-item" data-view="makeorbuy">
+          <span class="nav-icon">◆</span> Make-or-Buy
+        </button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="footer-label">PS Innovation Award 2026</div>
+        <div class="footer-sub">Y2J Machinery Co., Ltd.</div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-title" id="viewTitle">ภาพรวมการผลิต</div>
+        <div class="topbar-actions">
+          <span class="data-badge">ข้อมูลตัวอย่าง (Sample Data)</span>
+          <button class="theme-toggle" id="themeToggle" title="สลับโหมดสี">🌓</button>
+        </div>
+      </header>
+
+      <!-- Overview -->
+      <section class="view active" id="view-overview">
+        <div class="stat-grid">
+          <div class="stat-tile">
+            <div class="stat-label">งานที่ต้องทำก่อน (Do First)</div>
+            <div class="stat-value" id="statDoFirst">-</div>
+            <div class="stat-note">จาก Priority Matrix</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">Utilization เฉลี่ยทุกไลน์</div>
+            <div class="stat-value" id="statUtil">-</div>
+            <div class="stat-note">สัปดาห์นี้</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">โครงการที่กำลังผลิต</div>
+            <div class="stat-value" id="statActiveProjects">-</div>
+            <div class="stat-note">จาก Master Schedule</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">ชิ้นส่วนแนะนำให้ "ซื้อ"</div>
+            <div class="stat-value" id="statBuyRec">-</div>
+            <div class="stat-note">จาก Make-or-Buy</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>เกี่ยวกับ Dashboard นี้</h3>
+          </div>
+          <div class="card-body">
+            <p>Production Dashboard เป็นเครื่องมือสนับสนุนการตัดสินใจสำหรับฝ่ายผลิต Y2J Machinery ให้ผู้บริหารเห็นข้อมูลจากหน้างานจริง ประกอบด้วย 4 โมดูลหลัก: การจัดลำดับความสำคัญงาน (Priority Matrix), การวางแผนกำลังการผลิต (Capacity Planning), ตารางแผนการผลิตรวม (Master Schedule) และเครื่องมือช่วยตัดสินใจผลิตเองหรือซื้อ (Make-or-Buy Decision Support)</p>
+            <p class="muted-note">เวอร์ชันนี้ใช้ข้อมูลตัวอย่าง (mock data) สำหรับสาธิตแนวคิด — ขั้นต่อไปคือเชื่อมข้อมูลจริงจากหน้างานและระบบ Stock/BOM</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Priority Matrix -->
+      <section class="view" id="view-priority">
+        <div class="card">
+          <div class="card-header">
+            <h3>Priority Matrix — จัดลำดับความสำคัญงานผลิต</h3>
+            <p class="card-sub">แกน X = ความเร่งด่วน (Urgency) · แกน Y = ผลกระทบต่อธุรกิจ (Impact)</p>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap chart-wrap-lg">
+              <canvas id="priorityChart"></canvas>
+            </div>
+            <div class="legend-row" id="priorityLegend"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>รายการงาน</h3></div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="priorityTable">
+              <thead>
+                <tr>
+                  <th>งาน / โครงการ</th>
+                  <th>รุ่นเครื่องจักร</th>
+                  <th>ความเร่งด่วน</th>
+                  <th>ผลกระทบ</th>
+                  <th>ควอดแรนท์</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Capacity Planning -->
+      <section class="view" id="view-capacity">
+        <div class="card">
+          <div class="card-header">
+            <h3>Capacity Planning — กำลังการผลิตต่อไลน์ (8 สัปดาห์ข้างหน้า)</h3>
+            <p class="card-sub">Utilization = ชั่วโมงที่วางแผนผลิต ÷ ชั่วโมงกำลังการผลิตที่มี</p>
+          </div>
+          <div class="card-body">
+            <div class="filter-row">
+              <label for="capacityLineFilter">ไลน์ผลิต:</label>
+              <select id="capacityLineFilter"></select>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="capacityChart"></canvas>
+            </div>
+            <div class="status-legend">
+              <span class="status-chip status-good">● ปกติ (&lt;90%)</span>
+              <span class="status-chip status-warning">● เกือบเต็ม (90–100%)</span>
+              <span class="status-chip status-critical">● เกินกำลัง (&gt;100%)</span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>สรุปกำลังการผลิตรายไลน์</h3></div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="capacityTable">
+              <thead>
+                <tr>
+                  <th>ไลน์ผลิต</th>
+                  <th>กำลังการผลิต (ชม./สัปดาห์)</th>
+                  <th>แผนผลิตเฉลี่ย (ชม./สัปดาห์)</th>
+                  <th>Utilization เฉลี่ย</th>
+                  <th>สถานะ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- Master Schedule -->
+      <section class="view" id="view-schedule">
+        <div class="card">
+          <div class="card-header">
+            <h3>Master Schedule — แผนการผลิตรวมทุกรุ่น</h3>
+            <p class="card-sub">มุมมองรายสัปดาห์ ตามขั้นตอน: ออกแบบ → จัดซื้อ → ประกอบ → ทดสอบ → ส่งมอบ</p>
+          </div>
+          <div class="card-body">
+            <div class="gantt-wrap">
+              <div id="ganttChart" class="gantt"></div>
+            </div>
+            <div class="legend-row" id="ganttLegend"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Make or Buy -->
+      <section class="view" id="view-makeorbuy">
+        <div class="card">
+          <div class="card-header">
+            <h3>Make-or-Buy Decision Support</h3>
+            <p class="card-sub">เปรียบเทียบต้นทุนผลิตเอง vs ซื้อจากซัพพลายเออร์ พร้อมจุดคุ้มทุน (Break-even)</p>
+          </div>
+          <div class="card-body">
+            <form id="mobForm" class="mob-form">
+              <div class="form-grid">
+                <div class="form-field">
+                  <label>ชื่อชิ้นส่วน</label>
+                  <input type="text" id="mobPartName" value="ใบมีดตัดอ้อย (Cane Blade)">
+                </div>
+                <div class="form-field">
+                  <label>ต้นทุนวัสดุ/หน่วย (บาท)</label>
+                  <input type="number" id="mobMaterialCost" value="850">
+                </div>
+                <div class="form-field">
+                  <label>ต้นทุนแรงงาน+OH/หน่วย (บาท)</label>
+                  <input type="number" id="mobLaborCost" value="420">
+                </div>
+                <div class="form-field">
+                  <label>ต้นทุนคงที่ (เครื่องมือ/แม่พิมพ์) (บาท)</label>
+                  <input type="number" id="mobFixedCost" value="45000">
+                </div>
+                <div class="form-field">
+                  <label>ราคาซื้อจากซัพพลายเออร์/หน่วย (บาท)</label>
+                  <input type="number" id="mobBuyPrice" value="1650">
+                </div>
+                <div class="form-field">
+                  <label>ค่าขนส่ง/หน่วย (บาท)</label>
+                  <input type="number" id="mobShipping" value="60">
+                </div>
+                <div class="form-field">
+                  <label>ปริมาณที่ต้องการ (ชิ้น)</label>
+                  <input type="number" id="mobVolume" value="200">
+                </div>
+                <div class="form-field">
+                  <label>Lead time ผลิตเอง (วัน)</label>
+                  <input type="number" id="mobLeadMake" value="25">
+                </div>
+                <div class="form-field">
+                  <label>Lead time ซื้อ (วัน)</label>
+                  <input type="number" id="mobLeadBuy" value="10">
+                </div>
+              </div>
+              <button type="submit" class="btn-primary">คำนวณ</button>
+            </form>
+
+            <div class="mob-result" id="mobResult"></div>
+
+            <div class="chart-wrap chart-wrap-md">
+              <canvas id="mobChart"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3>ตัวอย่างชิ้นส่วนอื่น ๆ</h3></div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="mobSampleTable">
+              <thead>
+                <tr>
+                  <th>ชิ้นส่วน</th>
+                  <th>ปริมาณ (ชิ้น)</th>
+                  <th>ต้นทุนรวมผลิตเอง</th>
+                  <th>ต้นทุนรวมซื้อ</th>
+                  <th>คำแนะนำ</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="data.js"></script>
+  <script src="priority-matrix.js"></script>
+  <script src="capacity-planning.js"></script>
+  <script src="master-schedule.js"></script>
+  <script src="make-or-buy.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
