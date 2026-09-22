@@ -4,6 +4,29 @@
 
 let mobChartInstance = null;
 
+const MOB_STORAGE_KEY = "y2j-mob-inputs-v1";
+
+function saveMobForm(p) {
+  try { localStorage.setItem(MOB_STORAGE_KEY, JSON.stringify(p)); } catch (e) { /* ignore */ }
+}
+
+function restoreMobForm() {
+  try {
+    const raw = localStorage.getItem(MOB_STORAGE_KEY);
+    if (!raw) return;
+    const p = JSON.parse(raw);
+    const fields = {
+      mobPartName: p.name, mobMaterialCost: p.material, mobLaborCost: p.labor,
+      mobFixedCost: p.fixed, mobBuyPrice: p.buyPrice, mobShipping: p.shipping,
+      mobVolume: p.volume, mobLeadMake: p.leadMake, mobLeadBuy: p.leadBuy,
+    };
+    Object.keys(fields).forEach((id) => {
+      const el = document.getElementById(id);
+      if (el && fields[id] !== undefined && fields[id] !== null) el.value = fields[id];
+    });
+  } catch (e) { /* ignore — form just keeps its default sample values */ }
+}
+
 function readMobForm() {
   return {
     name: document.getElementById("mobPartName").value || "ชิ้นส่วน",
@@ -86,6 +109,7 @@ function renderMobChart(p, result) {
 
 function runMobCalculation() {
   const p = readMobForm();
+  saveMobForm(p);
   const result = computeMakeOrBuy(p);
   renderMobResult(p, result);
   renderMobChart(p, result);
@@ -121,6 +145,7 @@ function renderMobSampleTable() {
 function initMakeOrBuy() {
   const form = document.getElementById("mobForm");
   if (!form) return;
+  restoreMobForm();
   form.addEventListener("submit", (e) => {
     e.preventDefault();
     runMobCalculation();
