@@ -56,7 +56,8 @@
   .brand-title{ font-weight:700; font-size:16px; line-height:1.2; }
   .brand-sub{ font-size:12.5px; color:var(--muted); margin-top:2px; }
 
-  .controls{ display:flex; flex-wrap:wrap; gap:12px; }
+  .controls{ display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end; }
+  .settings-btn{ white-space:nowrap; }
   .controls label{ font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
   select, input{
     font:inherit; font-size:13.5px; color:var(--text); background:var(--surface-2);
@@ -128,6 +129,7 @@
   .row-del:hover{ background:var(--bad-bg); color:var(--bad); }
 
   .note{ font-size:12px; color:var(--muted); margin:10px 2px 0; }
+  .settings-company-list{ display:flex; flex-direction:column; gap:10px; }
   .empty{ color:var(--muted); font-size:13px; padding:18px 4px; text-align:center; }
 
   .modal-backdrop{
@@ -174,6 +176,7 @@
       <label>แผนก
         <select id="deptSelect"></select>
       </label>
+      <button id="settingsBtn" class="btn-secondary settings-btn" type="button">ตั้งค่าชื่อกลุ่ม/บริษัท</button>
     </div>
   </header>
 
@@ -259,12 +262,51 @@
   </div>
 </div>
 
+<div class="modal-backdrop" id="settingsBackdrop">
+  <div class="modal">
+    <h3>ตั้งค่าชื่อกลุ่ม/บริษัท</h3>
+    <label>ชื่อกลุ่มบริษัท
+      <input id="settingsGroupInput" type="text" />
+    </label>
+    <div id="settingsCompanyList" class="settings-company-list"></div>
+    <p class="note">เปลี่ยนชื่อแล้ว งานที่มีอยู่แล้วในระบบจะอัปเดตชื่อบริษัทให้ตรงกันอัตโนมัติ ไม่ต้องแก้โค้ด</p>
+    <div class="modal-actions">
+      <button id="settingsCancelBtn" class="btn-secondary">ยกเลิก</button>
+      <button id="settingsSaveBtn" class="btn-primary">บันทึก</button>
+    </div>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
 
-  var GROUP = "Khon Kaen Sugar Group";
-  var COMPANIES = ["Y2J Machinery", "โรงงานน้ำตาล KK1", "โรงงานน้ำตาล KK2"];
+  var DEFAULT_GROUP = "กลุ่มน้ำตาลลิน";
+  var DEFAULT_COMPANIES = ["Y2J Machinery", "บริษัท น้ำตาลพิษณุโลก จำกัด"];
+  var DEFAULT_PL_VALUES = [{ revenue: 42.5, cost: 33.8 }, { revenue: 210.0, cost: 168.4 }];
+  var SETTINGS_STORAGE_KEY = "y2j-demo-settings-v1";
+
+  function loadSettings(){
+    try {
+      var raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed.group !== "string" || !Array.isArray(parsed.companies)) return null;
+      return parsed;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveSettings(){
+    try {
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify({ group: GROUP, companies: COMPANIES }));
+    } catch (e) { /* ignore — settings simply won't persist across reloads */ }
+  }
+
+  var storedSettings = loadSettings();
+  var GROUP = storedSettings ? storedSettings.group : DEFAULT_GROUP;
+  var COMPANIES = storedSettings ? storedSettings.companies.slice() : DEFAULT_COMPANIES.slice();
   var DEPTS = ["R&D", "Production", "Procurement", "Finance"];
   var ROLES = [
     { id:"operator",  label:"Operator (พนักงาน)",        scope:"self" },
@@ -356,11 +398,10 @@
     dept: "ALL"
   };
 
-  var PL = {
-    "Y2J Machinery":     { revenue: 42.5, cost: 33.8 },
-    "โรงงานน้ำตาล KK1":  { revenue: 210.0, cost: 168.4 },
-    "โรงงานน้ำตาล KK2":  { revenue: 176.2, cost: 151.9 }
-  };
+  var PL = {};
+  COMPANIES.forEach(function(name, i){
+    PL[name] = DEFAULT_PL_VALUES[i] || { revenue: 0, cost: 0 };
+  });
 
   var roleSelect = document.getElementById("roleSelect");
   var companySelect = document.getElementById("companySelect");
@@ -649,6 +690,69 @@
       e.target.value = "";
     };
     reader.readAsText(file);
+  });
+
+  var settingsBackdrop = document.getElementById("settingsBackdrop");
+  document.getElementById("settingsBtn").addEventListener("click", function(){
+    document.getElementById("settingsGroupInput").value = GROUP;
+    var list = document.getElementById("settingsCompanyList");
+    list.innerHTML = "";
+    COMPANIES.forEach(function(name, i){
+      var label = document.createElement("label");
+      label.textContent = "บริษัทที่ " + (i + 1);
+      var input = document.createElement("input");
+      input.type = "text";
+      input.value = name;
+      input.dataset.index = i;
+      label.appendChild(input);
+      list.appendChild(label);
+    });
+    settingsBackdrop.classList.add("open");
+  });
+  document.getElementById("settingsCancelBtn").addEventListener("click", function(){
+    settingsBackdrop.classList.remove("open");
+  });
+  settingsBackdrop.addEventListener("click", function(e){
+    if (e.target === settingsBackdrop) settingsBackdrop.classList.remove("open");
+  });
+
+  document.getElementById("settingsSaveBtn").addEventListener("click", function(){
+    var newGroup = document.getElementById("settingsGroupInput").value.trim() || GROUP;
+    var inputs = document.getElementById("settingsCompanyList").querySelectorAll("input");
+    var oldCompanies = COMPANIES.slice();
+    var newCompanies = [];
+    Array.prototype.forEach.call(inputs, function(inp){
+      var v = inp.value.trim();
+      newCompanies.push(v || oldCompanies[Number(inp.dataset.index)]);
+    });
+
+    var rename = {};
+    oldCompanies.forEach(function(oldName, i){
+      if (newCompanies[i] && newCompanies[i] !== oldName) rename[oldName] = newCompanies[i];
+    });
+
+    if (Object.keys(rename).length){
+      state.tasks.forEach(function(t){
+        if (rename[t.company]) t.company = rename[t.company];
+      });
+      var newPL = {};
+      oldCompanies.forEach(function(oldName, i){
+        newPL[newCompanies[i]] = PL[oldName];
+      });
+      PL = newPL;
+      if (rename[state.company]) state.company = rename[state.company];
+    }
+
+    GROUP = newGroup;
+    COMPANIES = newCompanies;
+
+    saveSettings();
+    saveTasks();
+    fillCompanyOptions(companySelect, true);
+    fillCompanyOptions(document.getElementById("formCompany"), false);
+    companySelect.value = state.company;
+    settingsBackdrop.classList.remove("open");
+    renderAll();
   });
 
   markInitialStatus(!!storedTasks);
