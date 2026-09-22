@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Command Center Concept — Y2J Dashboard</title>
+<meta name="description" content="เดโม่แนวคิด (concept mockup) ระบบ Production Dashboard เวอร์ชันใช้งานจริงตามแผนสถาปัตยกรรม Power Platform">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+  :root{
+    --bg:#f3f5f8; --surface:#ffffff; --surface-2:#eef1f6; --border:#dbe1ea;
+    --text:#1a2230; --muted:#5b6b82; --accent:#215f9a; --accent-strong:#164a7d;
+    --amber:#b9720c; --good:#187a44; --warn:#b9720c; --bad:#bf2c2c;
+    --good-bg:#e6f4ea; --warn-bg:#fbeed9; --bad-bg:#fbe6e6;
+    --shadow: 0 1px 2px rgba(20,30,45,.06), 0 8px 24px -12px rgba(20,30,45,.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#10151d; --surface:#171e29; --surface-2:#1e2733; --border:#2b3644;
+      --text:#e7ecf3; --muted:#93a1b5; --accent:#5b9bd8; --accent-strong:#7fb2e6;
+      --amber:#e2a13d; --good:#4bbd7d; --warn:#e2a13d; --bad:#ea6a6a;
+      --good-bg:#123424; --warn-bg:#3a2c10; --bad-bg:#3a1616;
+      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px -12px rgba(0,0,0,.6);
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{ height:auto; }
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:"IBM Plex Sans Thai","IBM Plex Sans",system-ui,-apple-system,sans-serif;
+    padding-left:16px; padding-right:16px;
+  }
+  .app{ max-width:1180px; margin:0 auto; padding-top:20px; padding-bottom:48px; }
+  h1,h2,h3{ font-weight:600; text-wrap:balance; }
+  table{ font-variant-numeric: tabular-nums; }
+  .mono{ font-family:"IBM Plex Mono",monospace; }
+
+  .backlink{
+    display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--accent);
+    text-decoration:none; margin-bottom:14px; font-weight:600;
+  }
+  .backlink:hover{ text-decoration:underline; }
+
+  .topbar{
+    display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between;
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:14px 18px; box-shadow:var(--shadow); margin-bottom:14px;
+  }
+  .brand{ display:flex; align-items:center; gap:12px; }
+  .brand-mark{
+    display:inline-flex; align-items:center; justify-content:center;
+    width:40px; height:40px; border-radius:10px; background:var(--accent-strong);
+    color:#fff; font-family:"IBM Plex Mono",monospace; font-weight:600; font-size:14px; flex:none;
+  }
+  .brand-title{ font-weight:700; font-size:16px; line-height:1.2; }
+  .brand-sub{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+
+  .controls{ display:flex; flex-wrap:wrap; gap:12px; }
+  .controls label{ font-size:12px; color:var(--muted); display:flex; flex-direction:column; gap:4px; }
+  select, input{
+    font:inherit; font-size:13.5px; color:var(--text); background:var(--surface-2);
+    border:1px solid var(--border); border-radius:8px; padding:7px 10px; min-width:150px;
+  }
+  select:focus, input:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+
+  .banner{
+    background:var(--warn-bg); color:var(--text); border:1px solid var(--border);
+    border-left:4px solid var(--amber); border-radius:10px; padding:10px 14px;
+    font-size:13px; margin-bottom:18px; line-height:1.6;
+  }
+
+  main{ display:flex; flex-direction:column; gap:20px; }
+
+  .kpi-row{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+  .kpi-card{
+    background:var(--surface); border:1px solid var(--border); border-radius:12px;
+    padding:14px 16px; box-shadow:var(--shadow);
+  }
+  .kpi-label{ font-size:12px; color:var(--muted); margin-bottom:6px; }
+  .kpi-value{ font-size:26px; font-weight:700; font-family:"IBM Plex Mono",monospace; }
+  .kpi-value.good{ color:var(--good); } .kpi-value.warn{ color:var(--warn); } .kpi-value.bad{ color:var(--bad); }
+
+  .panel{
+    background:var(--surface); border:1px solid var(--border); border-radius:14px;
+    padding:16px 18px 18px; box-shadow:var(--shadow);
+  }
+  .panel-head{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .panel-head h2{ font-size:15px; margin:0; }
+
+  .btn-primary, .btn-secondary{
+    font:inherit; font-size:13px; font-weight:600; border-radius:8px; padding:8px 14px; cursor:pointer; border:1px solid transparent;
+  }
+  .btn-primary{ background:var(--accent); color:#fff; }
+  .btn-primary:hover{ background:var(--accent-strong); }
+  .btn-secondary{ background:var(--surface-2); color:var(--text); border-color:var(--border); }
+  .btn-primary:disabled{ background:var(--surface-2); color:var(--muted); cursor:not-allowed; }
+
+  .table-wrap{ overflow-x:auto; }
+  .data-table{ width:100%; border-collapse:collapse; font-size:13px; }
+  .data-table th{
+    text-align:left; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em;
+    color:var(--muted); padding:8px 10px; border-bottom:1px solid var(--border); white-space:nowrap;
+  }
+  .data-table td{ padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .data-table tr:last-child td{ border-bottom:none; }
+  .data-table tr.subtotal td{ background:var(--surface-2); font-weight:600; }
+  .data-table tr.grandtotal td{ background:var(--surface-2); font-weight:700; border-top:2px solid var(--border); }
+
+  .pill{ display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:600; padding:3px 9px; border-radius:999px; white-space:nowrap; }
+  .pill.good{ background:var(--good-bg); color:var(--good); }
+  .pill.warn{ background:var(--warn-bg); color:var(--warn); }
+  .pill.bad{ background:var(--bad-bg); color:var(--bad); }
+
+  .bar-track{ width:100%; height:8px; background:var(--surface-2); border-radius:99px; overflow:hidden; min-width:80px; }
+  .bar-fill{ height:100%; background:var(--accent); border-radius:99px; }
+
+  .row-del{ background:transparent; border:none; color:var(--muted); cursor:pointer; font-size:15px; padding:2px 6px; border-radius:6px; }
+  .row-del:hover{ background:var(--bad-bg); color:var(--bad); }
+
+  .note{ font-size:12px; color:var(--muted); margin:10px 2px 0; }
+  .empty{ color:var(--muted); font-size:13px; padding:18px 4px; text-align:center; }
+
+  .modal-backdrop{
+    display:none; position:fixed; inset:0; background:rgba(10,14,20,.5);
+    align-items:center; justify-content:center; padding:16px; z-index:20;
+  }
+  .modal-backdrop.open{ display:flex; }
+  .modal{
+    background:var(--surface); border-radius:14px; padding:20px; width:100%; max-width:380px;
+    display:flex; flex-direction:column; gap:12px; box-shadow:var(--shadow);
+  }
+  .modal h3{ margin:0 0 4px; font-size:16px; }
+  .modal label{ font-size:12.5px; color:var(--muted); display:flex; flex-direction:column; gap:5px; }
+  .modal select, .modal input{ min-width:0; width:100%; }
+  .modal-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:4px; }
+
+  @media (max-width:640px){
+    .topbar{ flex-direction:column; align-items:stretch; }
+    .controls{ justify-content:space-between; }
+    .controls label{ flex:1 1 30%; }
+    select, input{ min-width:0; width:100%; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <a class="backlink" href="./index.html">← กลับไปหน้า Production Dashboard จริง</a>
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">Y2J</span>
+      <div>
+        <div class="brand-title">Production Command Center</div>
+        <div class="brand-sub">Concept demo — สาธิตแนวคิดระบบใช้งานจริงตามแผนสถาปัตยกรรม (Power Platform)</div>
+      </div>
+    </div>
+    <div class="controls">
+      <label>บทบาทผู้ใช้ (Role)
+        <select id="roleSelect"></select>
+      </label>
+      <label>บริษัท
+        <select id="companySelect"></select>
+      </label>
+      <label>แผนก
+        <select id="deptSelect"></select>
+      </label>
+    </div>
+  </header>
+
+  <div class="banner">
+    นี่คือ <strong>เดโม่แนวคิด (concept mockup)</strong> จำลองการทำงานของระบบใช้งานจริงตามแผนสถาปัตยกรรมข้อมูล — ข้อมูลทั้งหมดเป็นข้อมูลสมมติเพื่อการสื่อสารและทดลองปรับแต่งมุมมอง ไม่ใช่ระบบที่เชื่อมกับฐานข้อมูลจริง และไม่ได้บันทึกข้อมูลถาวร ไม่ใช่ dashboard ที่ใช้ส่งประกวด
+  </div>
+
+  <main>
+    <section class="kpi-row" id="kpiRow"></section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2 id="scopeTitle">รายการงานตามขอบเขตที่เลือก</h2>
+        <button id="addBtn" class="btn-primary">+ เพิ่มรายการงาน</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>รหัสงาน</th><th>ชื่องาน</th><th>บริษัท</th><th>แผนก</th><th>สถานะ</th><th>ความสำคัญ</th><th>กำหนดเสร็จ</th><th></th>
+            </tr>
+          </thead>
+          <tbody id="taskBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head"><h2>สรุปยอดรวม — Subtotal / Grand Total</h2></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>ระดับ</th><th>งานทั้งหมด</th><th>เสร็จแล้ว</th><th>ล่าช้า</th><th>ความคืบหน้า</th></tr></thead>
+          <tbody id="rollupBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="panel" id="execPanel" hidden>
+      <div class="panel-head"><h2>มุมมองผู้บริหาร — กำไร/ขาดทุนโดยประมาณ (Executive P&amp;L)</h2></div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>บริษัท</th><th>รายได้ (ลบ.)</th><th>ต้นทุน (ลบ.)</th><th>กำไร/ขาดทุน (ลบ.)</th><th>สถานะความเสี่ยง</th></tr></thead>
+          <tbody id="plBody"></tbody>
+        </table>
+      </div>
+      <p class="note">* ตัวเลขสมมติสำหรับสาธิตเท่านั้น ระบบจริงจะดึงจาก Dataverse ผ่าน Power BI ตามหัวข้อ “รายงานภาพรวมผู้บริหารและกำไรขาดทุน” ในแผนสถาปัตยกรรม</p>
+    </section>
+  </main>
+</div>
+
+<div class="modal-backdrop" id="modalBackdrop">
+  <div class="modal">
+    <h3>เพิ่มรายการงานใหม่</h3>
+    <label>ชื่องาน
+      <input id="formName" type="text" placeholder="เช่น ผลิตชิ้นส่วน A-102" />
+    </label>
+    <label>บริษัท
+      <select id="formCompany"></select>
+    </label>
+    <label>แผนก
+      <select id="formDept"></select>
+    </label>
+    <label>ความสำคัญ
+      <select id="formPriority">
+        <option>สูง</option><option selected>กลาง</option><option>ต่ำ</option>
+      </select>
+    </label>
+    <label>กำหนดเสร็จ
+      <input id="formDue" type="date" />
+    </label>
+    <div class="modal-actions">
+      <button id="cancelBtn" class="btn-secondary">ยกเลิก</button>
+      <button id="saveBtn" class="btn-primary">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var GROUP = "Khon Kaen Sugar Group";
+  var COMPANIES = ["Y2J Machinery", "โรงงานน้ำตาล KK1", "โรงงานน้ำตาล KK2"];
+  var DEPTS = ["R&D", "Production", "Procurement", "Finance"];
+  var ROLES = [
+    { id:"operator",  label:"Operator (พนักงาน)",        scope:"self" },
+    { id:"depthead",  label:"หัวหน้าแผนก",                scope:"dept" },
+    { id:"plant",     label:"ผู้จัดการโรงงาน/บริษัท",       scope:"company" },
+    { id:"group",     label:"ผู้บริหารระดับกลุ่ม",          scope:"group" }
+  ];
+  var STATUSES = ["กำลังดำเนินการ","เสร็จสิ้น","ล่าช้า"];
+
+  function seedTasks(){
+    var names = ["ผลิตชิ้นส่วน A-102","ตรวจสอบคุณภาพสาย 2","สั่งซื้อวัตถุดิบเหล็ก","วางแผนกำลังผลิต Q4",
+      "ประกอบชุดเกียร์ B-07","ทดสอบต้นแบบ R&D-19","ปิดงบต้นทุนเดือน","ซ่อมบำรุงเครื่องจักร L3",
+      "จัดทำ BOM รุ่นใหม่","ตรวจนับสต๊อกอะไหล่","เจรจาราคาผู้ผลิตเหล็ก","อบรมพนักงานใหม่สายผลิต",
+      "วิเคราะห์ต้นทุนวัตถุดิบ","ตรวจสอบ Work Order ค้าง","ออกแบบชิ้นงาน C-33"];
+    var out = [], id = 1;
+    for (var i=0;i<names.length;i++){
+      var company = COMPANIES[i % COMPANIES.length];
+      var dept = DEPTS[(i*2) % DEPTS.length];
+      var status = STATUSES[(i*3+ (company.length)) % STATUSES.length];
+      var pr = ["สูง","กลาง","ต่ำ"][(i*5) % 3];
+      var day = 3 + (i*4) % 24;
+      out.push({
+        id: "WO-" + String(1000+id),
+        name: names[i], company: company, dept: dept,
+        status: status, priority: pr,
+        due: "2026-10-" + String(day).padStart(2,"0")
+      });
+      id++;
+    }
+    return out;
+  }
+
+  var state = {
+    tasks: seedTasks(),
+    role: "group",
+    company: "ALL",
+    dept: "ALL"
+  };
+
+  var PL = {
+    "Y2J Machinery":     { revenue: 42.5, cost: 33.8 },
+    "โรงงานน้ำตาล KK1":  { revenue: 210.0, cost: 168.4 },
+    "โรงงานน้ำตาล KK2":  { revenue: 176.2, cost: 151.9 }
+  };
+
+  var roleSelect = document.getElementById("roleSelect");
+  var companySelect = document.getElementById("companySelect");
+  var deptSelect = document.getElementById("deptSelect");
+  var kpiRow = document.getElementById("kpiRow");
+  var taskBody = document.getElementById("taskBody");
+  var rollupBody = document.getElementById("rollupBody");
+  var plBody = document.getElementById("plBody");
+  var execPanel = document.getElementById("execPanel");
+  var scopeTitle = document.getElementById("scopeTitle");
+  var addBtn = document.getElementById("addBtn");
+
+  ROLES.forEach(function(r){
+    var o = document.createElement("option");
+    o.value = r.id; o.textContent = r.label;
+    roleSelect.appendChild(o);
+  });
+  roleSelect.value = state.role;
+
+  function fillCompanyOptions(sel, withAll){
+    sel.innerHTML = "";
+    if (withAll){
+      var all = document.createElement("option");
+      all.value = "ALL"; all.textContent = "ทุกบริษัท (กลุ่ม " + GROUP + ")";
+      sel.appendChild(all);
+    }
+    COMPANIES.forEach(function(c){
+      var o = document.createElement("option");
+      o.value = c; o.textContent = c;
+      sel.appendChild(o);
+    });
+  }
+  function fillDeptOptions(sel, withAll){
+    sel.innerHTML = "";
+    if (withAll){
+      var all = document.createElement("option");
+      all.value = "ALL"; all.textContent = "ทุกแผนก";
+      sel.appendChild(all);
+    }
+    DEPTS.forEach(function(d){
+      var o = document.createElement("option");
+      o.value = d; o.textContent = d;
+      sel.appendChild(o);
+    });
+  }
+
+  fillCompanyOptions(companySelect, true);
+  fillDeptOptions(deptSelect, true);
+  fillCompanyOptions(document.getElementById("formCompany"), false);
+  fillDeptOptions(document.getElementById("formDept"), false);
+  companySelect.value = "ALL";
+  deptSelect.value = "ALL";
+
+  function currentRole(){
+    for (var i=0;i<ROLES.length;i++) if (ROLES[i].id === state.role) return ROLES[i];
+    return ROLES[0];
+  }
+
+  function applyRoleConstraints(){
+    var role = currentRole();
+    if (role.scope === "self" || role.scope === "dept"){
+      companySelect.value = state.company === "ALL" ? COMPANIES[0] : state.company;
+      state.company = companySelect.value;
+      companySelect.disabled = true;
+    } else {
+      companySelect.disabled = false;
+    }
+    if (role.scope === "self"){
+      deptSelect.value = state.dept === "ALL" ? DEPTS[0] : state.dept;
+      state.dept = deptSelect.value;
+      deptSelect.disabled = true;
+    } else {
+      deptSelect.disabled = false;
+    }
+    addBtn.hidden = (role.id === "group");
+    execPanel.hidden = (role.scope !== "group" && role.scope !== "company");
+  }
+
+  function filteredTasks(){
+    return state.tasks.filter(function(t){
+      if (state.company !== "ALL" && t.company !== state.company) return false;
+      if (state.dept !== "ALL" && t.dept !== state.dept) return false;
+      return true;
+    });
+  }
+
+  function pillFor(status){
+    if (status === "เสร็จสิ้น") return '<span class="pill good">เสร็จสิ้น</span>';
+    if (status === "ล่าช้า") return '<span class="pill bad">ล่าช้า</span>';
+    return '<span class="pill warn">กำลังดำเนินการ</span>';
+  }
+  function priorityPill(p){
+    if (p === "สูง") return '<span class="pill bad">สูง</span>';
+    if (p === "กลาง") return '<span class="pill warn">กลาง</span>';
+    return '<span class="pill good">ต่ำ</span>';
+  }
+
+  function renderKPI(){
+    var list = filteredTasks();
+    var total = list.length;
+    var done = list.filter(function(t){ return t.status === "เสร็จสิ้น"; }).length;
+    var late = list.filter(function(t){ return t.status === "ล่าช้า"; }).length;
+    var pct = total ? Math.round(done/total*100) : 0;
+    kpiRow.innerHTML =
+      '<div class="kpi-card"><div class="kpi-label">งานทั้งหมดในขอบเขตนี้</div><div class="kpi-value">' + total + '</div></div>' +
+      '<div class="kpi-card"><div class="kpi-label">เสร็จแล้ว</div><div class="kpi-value good">' + done + '</div></div>' +
+      '<div class="kpi-card"><div class="kpi-label">ล่าช้า</div><div class="kpi-value ' + (late>0 ? "bad" : "good") + '">' + late + '</div></div>' +
+      '<div class="kpi-card"><div class="kpi-label">ความคืบหน้ารวม</div><div class="kpi-value">' + pct + '%</div></div>';
+  }
+
+  function renderTasks(){
+    var list = filteredTasks();
+    var role = currentRole();
+    var canEdit = role.id !== "group";
+    if (list.length === 0){
+      taskBody.innerHTML = '<tr><td colspan="8" class="empty">ไม่มีรายการงานในขอบเขตที่เลือก</td></tr>';
+      return;
+    }
+    taskBody.innerHTML = list.map(function(t){
+      return '<tr>' +
+        '<td class="mono">' + t.id + '</td>' +
+        '<td>' + t.name + '</td>' +
+        '<td>' + t.company + '</td>' +
+        '<td>' + t.dept + '</td>' +
+        '<td>' + pillFor(t.status) + '</td>' +
+        '<td>' + priorityPill(t.priority) + '</td>' +
+        '<td class="mono">' + t.due + '</td>' +
+        '<td>' + (canEdit ? '<button class="row-del" data-id="'+t.id+'" title="ลบรายการ" aria-label="ลบรายการ">✕</button>' : '') + '</td>' +
+      '</tr>';
+    }).join("");
+
+    if (canEdit){
+      Array.prototype.forEach.call(taskBody.querySelectorAll(".row-del"), function(btn){
+        btn.addEventListener("click", function(){
+          var id = btn.getAttribute("data-id");
+          state.tasks = state.tasks.filter(function(t){ return t.id !== id; });
+          renderAll();
+        });
+      });
+    }
+  }
+
+  function statsFor(list){
+    var total = list.length;
+    var done = list.filter(function(t){ return t.status === "เสร็จสิ้น"; }).length;
+    var late = list.filter(function(t){ return t.status === "ล่าช้า"; }).length;
+    var pct = total ? Math.round(done/total*100) : 0;
+    return { total:total, done:done, late:late, pct:pct };
+  }
+
+  function rollupRow(label, stats, cls){
+    return '<tr class="' + (cls||"") + '"><td>' + label + '</td><td class="mono">' + stats.total +
+      '</td><td class="mono">' + stats.done + '</td><td class="mono">' + stats.late +
+      '</td><td><div style="display:flex;align-items:center;gap:8px;"><div class="bar-track"><div class="bar-fill" style="width:' + stats.pct + '%"></div></div><span class="mono">' + stats.pct + '%</span></div></td></tr>';
+  }
+
+  function renderRollup(){
+    var role = currentRole();
+    var rows = "";
+    if (state.dept === "ALL" && state.company !== "ALL"){
+      DEPTS.forEach(function(d){
+        var list = state.tasks.filter(function(t){ return t.company === state.company && t.dept === d; });
+        rows += rollupRow(d, statsFor(list), "subtotal");
+      });
+      rows += rollupRow(state.company + " (รวมบริษัท)", statsFor(state.tasks.filter(function(t){ return t.company === state.company; })), "grandtotal");
+    } else if (state.company === "ALL"){
+      COMPANIES.forEach(function(c){
+        var list = state.tasks.filter(function(t){ return t.company === c; });
+        rows += rollupRow(c, statsFor(list), "subtotal");
+      });
+      rows += rollupRow(GROUP + " (รวมทั้งกลุ่ม)", statsFor(state.tasks), "grandtotal");
+    } else {
+      rows += rollupRow(state.company + " / " + state.dept, statsFor(filteredTasks()), "grandtotal");
+    }
+    rollupBody.innerHTML = rows;
+  }
+
+  function renderPL(){
+    var rows = "";
+    var totalRev = 0, totalCost = 0;
+    var companiesToShow = state.company === "ALL" ? COMPANIES : [state.company];
+    companiesToShow.forEach(function(c){
+      var p = PL[c];
+      var profit = p.revenue - p.cost;
+      totalRev += p.revenue; totalCost += p.cost;
+      var riskPill = profit > 20 ? '<span class="pill good">ปกติ</span>' : (profit > 0 ? '<span class="pill warn">เฝ้าระวัง</span>' : '<span class="pill bad">ขาดทุน</span>');
+      rows += '<tr><td>' + c + '</td><td class="mono">' + p.revenue.toFixed(1) + '</td><td class="mono">' + p.cost.toFixed(1) +
+        '</td><td class="mono">' + (profit>=0?"+":"") + profit.toFixed(1) + '</td><td>' + riskPill + '</td></tr>';
+    });
+    if (companiesToShow.length > 1){
+      var totalProfit = totalRev - totalCost;
+      rows += '<tr class="grandtotal"><td>' + GROUP + ' (รวม)</td><td class="mono">' + totalRev.toFixed(1) +
+        '</td><td class="mono">' + totalCost.toFixed(1) + '</td><td class="mono">' + (totalProfit>=0?"+":"") + totalProfit.toFixed(1) +
+        '</td><td>' + (totalProfit>20 ? '<span class="pill good">ปกติ</span>' : '<span class="pill warn">เฝ้าระวัง</span>') + '</td></tr>';
+    }
+    plBody.innerHTML = rows;
+  }
+
+  function renderScopeTitle(){
+    var role = currentRole();
+    var parts = [];
+    parts.push(state.company === "ALL" ? "ทุกบริษัท" : state.company);
+    parts.push(state.dept === "ALL" ? "ทุกแผนก" : state.dept);
+    scopeTitle.textContent = "รายการงาน — " + parts.join(" / ") + "  ·  มุมมอง: " + role.label;
+  }
+
+  function renderAll(){
+    applyRoleConstraints();
+    renderScopeTitle();
+    renderKPI();
+    renderTasks();
+    renderRollup();
+    renderPL();
+  }
+
+  roleSelect.addEventListener("change", function(){ state.role = roleSelect.value; renderAll(); });
+  companySelect.addEventListener("change", function(){ state.company = companySelect.value; renderAll(); });
+  deptSelect.addEventListener("change", function(){ state.dept = deptSelect.value; renderAll(); });
+
+  var modal = document.getElementById("modalBackdrop");
+  addBtn.addEventListener("click", function(){
+    var fc = document.getElementById("formCompany");
+    var fd = document.getElementById("formDept");
+    fc.value = state.company === "ALL" ? COMPANIES[0] : state.company;
+    fd.value = state.dept === "ALL" ? DEPTS[0] : state.dept;
+    document.getElementById("formName").value = "";
+    document.getElementById("formDue").value = "";
+    modal.classList.add("open");
+  });
+  document.getElementById("cancelBtn").addEventListener("click", function(){ modal.classList.remove("open"); });
+  document.getElementById("saveBtn").addEventListener("click", function(){
+    var name = document.getElementById("formName").value.trim();
+    if (!name){ document.getElementById("formName").focus(); return; }
+    var due = document.getElementById("formDue").value || "2026-10-31";
+    var newTask = {
+      id: "WO-" + String(2000 + Math.floor(Math.random()*900)),
+      name: name,
+      company: document.getElementById("formCompany").value,
+      dept: document.getElementById("formDept").value,
+      status: "กำลังดำเนินการ",
+      priority: document.getElementById("formPriority").value,
+      due: due
+    };
+    state.tasks.unshift(newTask);
+    modal.classList.remove("open");
+    renderAll();
+  });
+  modal.addEventListener("click", function(e){ if (e.target === modal) modal.classList.remove("open"); });
+
+  renderAll();
+})();
+</script>
+</body>
+</html>
