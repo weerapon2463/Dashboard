@@ -490,10 +490,14 @@
         </div>
 
         <div class="card">
-          <div class="card-header">
-            <h3>ใบสั่งผลิต (Work Orders) — จัดกลุ่มเป็นโปรเจกต์ตามใบสั่งซื้อ (PO)</h3>
-            <p class="card-sub">แต่ละใบสั่งผลิตอ้างอิงกับ PO ในโมดูลจัดซื้อ เพื่อติดตามได้ว่าโปรเจกต์ไหนรออะไหล่จาก PO ใด</p>
+          <div class="card-header wo-card-header">
+            <div>
+              <h3>ใบสั่งผลิต (Work Orders) — จัดกลุ่มเป็นโปรเจกต์ตามใบสั่งซื้อ (PO)</h3>
+              <p class="card-sub">แต่ละใบสั่งผลิตอ้างอิงกับ PO ในโมดูลจัดซื้อ เพื่อติดตามได้ว่าโปรเจกต์ไหนรออะไหล่จาก PO ใด — รับงาน อัปเดตความคืบหน้า และเพิ่มใบสั่งผลิตใหม่ได้ตามสิทธิ์ของแต่ละบทบาท</p>
+            </div>
+            <button id="woAddBtn" class="btn-primary" type="button" hidden>+ เพิ่มใบสั่งผลิตใหม่</button>
           </div>
+          <div class="save-status" id="woSaveStatus"></div>
           <div class="card-body table-scroll">
             <div class="filter-row">
               <label for="woLineFilter">แผนก/ไลน์ผลิต:</label>
@@ -510,6 +514,8 @@
                   <th>เบิกวัสดุแล้ว</th>
                   <th>กำหนดส่งมอบ</th>
                   <th>สถานะ</th>
+                  <th>ผู้รับผิดชอบ</th>
+                  <th>การดำเนินการ</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -565,6 +571,67 @@
         </div>
       </section>
     </main>
+  </div>
+
+  <div class="modal-backdrop" id="woAddBackdrop">
+    <div class="modal">
+      <h3>เพิ่มใบสั่งผลิตใหม่</h3>
+      <div class="form-field">
+        <label for="woFormPo">อ้างอิง PO</label>
+        <input type="text" id="woFormPo" placeholder="เช่น PO-2026-0330">
+      </div>
+      <div class="form-field">
+        <label for="woFormModel">รุ่นเครื่องจักร</label>
+        <select id="woFormModel"></select>
+      </div>
+      <div class="form-field">
+        <label for="woFormDept">แผนก/ไลน์ผลิต</label>
+        <select id="woFormDept"></select>
+      </div>
+      <div class="form-field">
+        <label for="woFormQty">จำนวน (คัน)</label>
+        <input type="number" id="woFormQty" min="1" value="1">
+      </div>
+      <div class="form-field">
+        <label for="woFormDue">กำหนดส่งมอบ</label>
+        <input type="date" id="woFormDue">
+      </div>
+      <div class="modal-actions">
+        <button id="woAddCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="woAddSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="woClaimBackdrop">
+    <div class="modal">
+      <h3>รับงาน</h3>
+      <p class="card-sub" id="woClaimWoLabel"></p>
+      <div class="form-field">
+        <label for="woClaimName">ชื่อผู้รับงาน</label>
+        <input type="text" id="woClaimName" placeholder="ชื่อ-นามสกุล หรือรหัสพนักงาน">
+      </div>
+      <div class="modal-actions">
+        <button id="woClaimCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="woClaimSaveBtn" class="btn-primary" type="button">รับงานนี้</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="woUpdateBackdrop">
+    <div class="modal">
+      <h3>อัปเดตความคืบหน้า</h3>
+      <p class="card-sub" id="woUpdateWoLabel"></p>
+      <div class="form-field">
+        <label for="woUpdatePct">เบิกวัสดุแล้ว (%)</label>
+        <input type="number" id="woUpdatePct" min="0" max="100" step="5">
+      </div>
+      <div class="modal-actions">
+        <button id="woUpdateCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="woUpdateCompleteBtn" class="btn-secondary" type="button">ทำเครื่องหมายเสร็จสมบูรณ์</button>
+        <button id="woUpdateSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
   </div>
 
   <script src="data.js"></script>

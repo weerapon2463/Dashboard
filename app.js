@@ -99,6 +99,8 @@ function initRoleSelect() {
       localStorage.setItem(ROLE_STORAGE_KEY, select.value);
     } catch (e) { /* ignore — role choice simply won't persist across reloads */ }
     applyModuleAccess(select.value);
+    // Claim/update/add buttons on Work Orders depend on the selected role
+    if (typeof renderWorkOrders === "function") renderWorkOrders();
   });
 }
 
@@ -137,6 +139,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initNav();
   initRoleSelect();
   initThemeToggle();
+  const hadStoredWorkOrders = initWorkOrderData();
+  initWorkOrderInteractions();
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();
@@ -150,4 +154,5 @@ document.addEventListener("DOMContentLoaded", () => {
   renderProcurement();
   renderWorkOrders();
   renderAlerts();
+  markWOInitialStatus(hadStoredWorkOrders);
 });
