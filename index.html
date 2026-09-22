@@ -22,6 +22,9 @@
         <button class="nav-item active" data-view="overview">
           <span class="nav-icon">◆</span> ภาพรวม
         </button>
+        <button class="nav-item" data-view="mytasks">
+          <span class="nav-icon">◆</span> งานของฉัน
+        </button>
         <button class="nav-item" data-view="priority">
           <span class="nav-icon">◆</span> Priority Matrix
         </button>
@@ -124,6 +127,59 @@
           <div class="card-body">
             <p>Production Dashboard เป็นเครื่องมือสนับสนุนการตัดสินใจสำหรับฝ่ายผลิต Y2J Machinery ให้ผู้บริหารเห็นข้อมูลจากหน้างานจริงแบบครอบคลุมทุกมิติของการบริหารการผลิตทั้งบริษัท — งาน กำลังการผลิต แผนงาน ต้นทุน คน เครื่องจักร เครื่องมือ และการจัดซื้อ ประกอบด้วย 7 โมดูลหลัก: การจัดลำดับความสำคัญงาน (Priority Matrix), การวางแผนกำลังการผลิต (Capacity Planning), ตารางแผนการผลิตรวม (Master Schedule), เครื่องมือช่วยตัดสินใจผลิตเองหรือซื้อ (Make-or-Buy Decision Support), การบริหารทรัพยากรการผลิต — คน เครื่องจักร และเครื่องมือวัด (Resource Management), การจัดซื้อ — PR / PO / ซัพพลายเออร์ (Procurement) และใบสั่งผลิตที่จัดกลุ่มเป็นโปรเจกต์ตาม PO พร้อม Master BOM และการเบิกวัสดุประกอบ (Work Orders &amp; BOM)</p>
             <p class="muted-note">เวอร์ชันนี้ใช้ข้อมูลตัวอย่าง (mock data) สำหรับสาธิตแนวคิด — ขั้นต่อไปคือเชื่อมข้อมูลจริงจากหน้างานและระบบ Stock/BOM</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- My Tasks (per-person workspace, filtered to what this person claimed) -->
+      <section class="view" id="view-mytasks">
+        <div class="card">
+          <div class="card-header card-header-actions">
+            <div>
+              <h3>งานของฉัน</h3>
+              <p class="card-sub" id="myTasksIdentityLabel">ยังไม่ได้ระบุชื่อ</p>
+            </div>
+            <button id="myTasksIdentityBtn" class="btn-secondary" type="button">ระบุชื่อ / เปลี่ยนชื่อ</button>
+          </div>
+          <div class="card-body">
+            <div class="stat-grid">
+              <div class="stat-tile">
+                <div class="stat-label">งานที่รับผิดชอบ</div>
+                <div class="stat-value" id="myTasksStatTotal">-</div>
+                <div class="stat-note">ทั้งหมดที่รับไว้</div>
+              </div>
+              <div class="stat-tile">
+                <div class="stat-label">กำลังทำ</div>
+                <div class="stat-value" id="myTasksStatActive">-</div>
+                <div class="stat-note">ยังไม่เสร็จ</div>
+              </div>
+              <div class="stat-tile">
+                <div class="stat-label">เสร็จแล้ว</div>
+                <div class="stat-value" id="myTasksStatDone">-</div>
+                <div class="stat-note">ทำเครื่องหมายเสร็จสมบูรณ์แล้ว</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header"><h3>รายการงานที่ฉันรับผิดชอบ</h3></div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="myTasksTable">
+              <thead>
+                <tr>
+                  <th>เลขที่ใบสั่งผลิต</th>
+                  <th>รุ่นเครื่องจักร</th>
+                  <th>แผนก/ไลน์ผลิต</th>
+                  <th>เบิกวัสดุแล้ว</th>
+                  <th>กำหนดส่งมอบ</th>
+                  <th>สถานะ</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+            <p class="muted-note" id="myTasksEmptyNote" style="display:none;">ยังไม่มีงานที่รับไว้ — ไปที่ "ใบสั่งผลิต &amp; BOM" แล้วกด "รับงาน" ได้เลย</p>
           </div>
         </div>
       </section>

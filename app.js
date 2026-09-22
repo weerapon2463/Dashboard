@@ -4,6 +4,7 @@
 
 const VIEW_TITLES = {
   overview: "ภาพรวมการผลิต",
+  mytasks: "งานของฉัน",
   priority: "Priority Matrix",
   capacity: "Capacity Planning",
   schedule: "Master Schedule",
@@ -21,9 +22,9 @@ const ROLES = [
 ];
 
 const MODULE_ACCESS = {
-  operator: ["overview", "workorder"],
-  depthead: ["overview", "priority", "workorder", "resource"],
-  plant: ["overview", "priority", "capacity", "schedule", "makeorbuy", "resource", "procurement", "workorder"],
+  operator: ["overview", "mytasks", "workorder"],
+  depthead: ["overview", "mytasks", "priority", "workorder", "resource"],
+  plant: ["overview", "mytasks", "priority", "capacity", "schedule", "makeorbuy", "resource", "procurement", "workorder"],
   group: ["overview", "capacity", "schedule", "makeorbuy"],
 };
 
@@ -41,6 +42,7 @@ function switchView(view) {
 
   // Re-render the relevant chart in case it needs a resize/redraw
   // (canvas charts drawn while display:none report zero size)
+  if (view === "mytasks") renderMyTasks();
   if (view === "priority") renderPriorityMatrix();
   if (view === "capacity") renderCapacityChart(document.getElementById("capacityLineFilter").value);
   if (view === "schedule") renderMasterSchedule();
@@ -132,6 +134,7 @@ function refreshAllCharts() {
   renderResource();
   renderProcurement();
   renderWorkOrders();
+  renderMyTasks();
   renderAlerts();
 }
 
@@ -153,6 +156,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderResource();
   renderProcurement();
   renderWorkOrders();
+  renderMyTasks();
   renderAlerts();
   markWOInitialStatus(hadStoredWorkOrders);
 });

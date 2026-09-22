@@ -5,6 +5,7 @@
    ========================================================================== */
 
 const WO_STORAGE_KEY = "y2j-workorders-v1";
+const MY_NAME_STORAGE_KEY = "y2j-my-name-v1";
 const TH_MONTHS = ["ม.ค.", "ก.พ.", "มี.ค.", "เม.ย.", "พ.ค.", "มิ.ย.", "ก.ค.", "ส.ค.", "ก.ย.", "ต.ค.", "พ.ย.", "ธ.ค."];
 
 let woPendingId = null;
@@ -81,7 +82,83 @@ function afterWOMutation() {
   saveWorkOrders();
   populateWOLineFilter();
   renderWorkOrders();
+  renderMyTasks();
   if (typeof renderAlerts === "function") renderAlerts();
+}
+
+/* ---- "งานของฉัน" — personal workspace filtered to claimed work orders ---- */
+
+function getMyName() {
+  try { return localStorage.getItem(MY_NAME_STORAGE_KEY) || ""; } catch (e) { return ""; }
+}
+
+function setMyName(name) {
+  try { localStorage.setItem(MY_NAME_STORAGE_KEY, name); } catch (e) { /* ignore */ }
+}
+
+function renderMyTasks() {
+  const label = document.getElementById("myTasksIdentityLabel");
+  const tbody = document.querySelector("#myTasksTable tbody");
+  if (!label || !tbody) return; // view not present (shouldn't happen, but keep this file usable standalone)
+
+  const name = getMyName();
+  label.textContent = name ? `คุณคือ: ${name}` : `ยังไม่ได้ระบุชื่อ — กด "ระบุชื่อ / เปลี่ยนชื่อ" เพื่อดูงานของคุณ`;
+
+  const mine = name
+    ? WORK_ORDERS.filter((w) => (w.assignee || "").trim().toLowerCase() === name.trim().toLowerCase())
+    : [];
+  const done = mine.filter((w) => w.status === "เสร็จสมบูรณ์").length;
+
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+  set("myTasksStatTotal", mine.length);
+  set("myTasksStatActive", mine.length - done);
+  set("myTasksStatDone", done);
+
+  tbody.innerHTML = "";
+  const emptyNote = document.getElementById("myTasksEmptyNote");
+  if (!name) {
+    if (emptyNote) { emptyNote.style.display = "block"; emptyNote.textContent = "ระบุชื่อก่อนเพื่อดูงานของคุณ"; }
+    return;
+  }
+  if (mine.length === 0) {
+    if (emptyNote) {
+      emptyNote.style.display = "block";
+      emptyNote.textContent = 'ยังไม่มีงานที่รับไว้ — ไปที่ "ใบสั่งผลิต & BOM" แล้วกด "รับงาน" ได้เลย';
+    }
+    return;
+  }
+  if (emptyNote) emptyNote.style.display = "none";
+
+  mine.forEach((wo) => {
+    const pillClass = WO_STATUS_META[wo.status] || "pill-good";
+    const canUpdate = wo.status !== "เสร็จสมบูรณ์";
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td>${escapeHtml(wo.wo)}</td>
+      <td>${escapeHtml(wo.model)}</td>
+      <td>${escapeHtml(wo.department)}</td>
+      <td>${wo.issuedPct}%</td>
+      <td>${escapeHtml(wo.dueDate)}</td>
+      <td><span class="pill ${pillClass}">${escapeHtml(wo.status)}</span></td>
+      <td>${canUpdate ? `<button class="btn-chip" data-action="update" data-wo="${escapeHtml(wo.wo)}">อัปเดต</button>` : "—"}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll("[data-action='update']").forEach((btn) => {
+    btn.addEventListener("click", () => openUpdateModal(btn.getAttribute("data-wo")));
+  });
+}
+
+function initMyTasksIdentity() {
+  const btn = document.getElementById("myTasksIdentityBtn");
+  if (!btn) return;
+  btn.addEventListener("click", () => {
+    const next = window.prompt("ชื่อของคุณ (ใช้กรองงานที่คุณรับผิดชอบในหน้า \"งานของฉัน\")", getMyName());
+    if (next === null) return;
+    setMyName(next.trim());
+    renderMyTasks();
+  });
 }
 
 /* ---- rendering -------------------------------------------------------- */
@@ -274,6 +351,7 @@ function closeModal(id) {
 
 function initWorkOrderInteractions() {
   populateWOFormSelects();
+  initMyTasksIdentity();
 
   const addBtn = document.getElementById("woAddBtn");
   if (addBtn) {

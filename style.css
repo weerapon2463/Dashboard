@@ -326,7 +326,7 @@ html, body {
 .mob-result .recommend.buy { color: var(--series-2); }
 
 /* Work Orders — role actions, toolbar, save status, modals */
-.wo-card-header { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.wo-card-header, .card-header-actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; justify-content: space-between; }
 .save-status {
   display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary);
   margin: -6px 0 12px;
