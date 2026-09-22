@@ -87,6 +87,15 @@
   }
   .panel-head{ display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; margin-bottom:12px; }
   .panel-head h2{ font-size:15px; margin:0; }
+  .toolbar{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  .file-btn{ display:inline-flex; align-items:center; }
+
+  .save-status{
+    display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted);
+    margin:-4px 0 12px;
+  }
+  .save-status .dot{ width:7px; height:7px; border-radius:99px; background:var(--good); flex:none; }
+  .save-status.stale .dot{ background:var(--warn); }
 
   .btn-primary, .btn-secondary{
     font:inherit; font-size:13px; font-weight:600; border-radius:8px; padding:8px 14px; cursor:pointer; border:1px solid transparent;
@@ -178,8 +187,16 @@
     <section class="panel">
       <div class="panel-head">
         <h2 id="scopeTitle">รายการงานตามขอบเขตที่เลือก</h2>
-        <button id="addBtn" class="btn-primary">+ เพิ่มรายการงาน</button>
+        <div class="toolbar">
+          <label class="btn-secondary file-btn">นำเข้าข้อมูล
+            <input type="file" id="importFile" accept="application/json" hidden>
+          </label>
+          <button id="exportBtn" class="btn-secondary">ส่งออกข้อมูล (.json)</button>
+          <button id="resetBtn" class="btn-secondary">รีเซ็ตเป็นข้อมูลตัวอย่าง</button>
+          <button id="addBtn" class="btn-primary">+ เพิ่มรายการงาน</button>
+        </div>
       </div>
+      <div class="save-status" id="saveStatus"></div>
       <div class="table-wrap">
         <table class="data-table">
           <thead>
@@ -280,8 +297,60 @@
     return out;
   }
 
+  var STORAGE_KEY = "y2j-demo-tasks-v1";
+
+  function loadTasks(){
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return null;
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function saveTasks(){
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state.tasks));
+      markSaved();
+    } catch (e) {
+      markSaveFailed();
+    }
+  }
+
+  function markSaved(){
+    var el = document.getElementById("saveStatus");
+    if (!el) return;
+    var now = new Date();
+    var hh = String(now.getHours()).padStart(2, "0");
+    var mm = String(now.getMinutes()).padStart(2, "0");
+    var ss = String(now.getSeconds()).padStart(2, "0");
+    el.classList.remove("stale");
+    el.innerHTML = '<span class="dot"></span>บันทึกอัตโนมัติในเบราว์เซอร์นี้แล้ว — โหลดหน้าใหม่ข้อมูลยังอยู่ (ล่าสุด ' + hh + ':' + mm + ':' + ss + ')';
+  }
+
+  function markSaveFailed(){
+    var el = document.getElementById("saveStatus");
+    if (!el) return;
+    el.classList.add("stale");
+    el.innerHTML = '<span class="dot"></span>บันทึกไม่สำเร็จ (เบราว์เซอร์บล็อก local storage) — ข้อมูลจะหายเมื่อโหลดหน้าใหม่';
+  }
+
+  function markInitialStatus(hasStored){
+    var el = document.getElementById("saveStatus");
+    if (!el) return;
+    if (hasStored){
+      el.innerHTML = '<span class="dot"></span>โหลดข้อมูลที่บันทึกไว้ในเบราว์เซอร์นี้ — แก้ไข/เพิ่ม/ลบจะบันทึกอัตโนมัติ';
+    } else {
+      el.classList.add("stale");
+      el.innerHTML = '<span class="dot"></span>ยังไม่มีข้อมูลที่บันทึกไว้ — กำลังแสดงข้อมูลตัวอย่าง (แก้ไข/เพิ่ม/ลบจะเริ่มบันทึกอัตโนมัติ)';
+    }
+  }
+
+  var storedTasks = loadTasks();
   var state = {
-    tasks: seedTasks(),
+    tasks: storedTasks || seedTasks(),
     role: "group",
     company: "ALL",
     dept: "ALL"
@@ -428,6 +497,7 @@
         btn.addEventListener("click", function(){
           var id = btn.getAttribute("data-id");
           state.tasks = state.tasks.filter(function(t){ return t.id !== id; });
+          saveTasks();
           renderAll();
         });
       });
@@ -536,11 +606,52 @@
       due: due
     };
     state.tasks.unshift(newTask);
+    saveTasks();
     modal.classList.remove("open");
     renderAll();
   });
   modal.addEventListener("click", function(e){ if (e.target === modal) modal.classList.remove("open"); });
 
+  document.getElementById("exportBtn").addEventListener("click", function(){
+    var blob = new Blob([JSON.stringify(state.tasks, null, 2)], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    var stamp = new Date().toISOString().slice(0,10);
+    a.href = url;
+    a.download = "y2j-tasks-" + stamp + ".json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  });
+
+  document.getElementById("resetBtn").addEventListener("click", function(){
+    if (!confirm("รีเซ็ตกลับเป็นข้อมูลตัวอย่าง? ข้อมูลที่บันทึกไว้ในเบราว์เซอร์นี้จะถูกแทนที่")) return;
+    state.tasks = seedTasks();
+    saveTasks();
+    renderAll();
+  });
+
+  document.getElementById("importFile").addEventListener("change", function(e){
+    var file = e.target.files && e.target.files[0];
+    if (!file) return;
+    var reader = new FileReader();
+    reader.onload = function(){
+      try {
+        var parsed = JSON.parse(reader.result);
+        if (!Array.isArray(parsed)) throw new Error("ไฟล์ต้องเป็น array ของรายการงาน");
+        state.tasks = parsed;
+        saveTasks();
+        renderAll();
+      } catch (err) {
+        alert("นำเข้าไม่สำเร็จ: ไฟล์ไม่ใช่ JSON ที่ถูกต้อง");
+      }
+      e.target.value = "";
+    };
+    reader.readAsText(file);
+  });
+
+  markInitialStatus(!!storedTasks);
   renderAll();
 })();
 </script>
