@@ -224,6 +224,8 @@ html, body {
 .chart-wrap-lg { height: 420px; }
 .chart-wrap-md { height: 260px; }
 
+.overview-charts { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+
 .legend-row {
   display: flex; flex-wrap: wrap; gap: 14px;
   margin-top: 10px; font-size: 12.5px; color: var(--text-secondary);
@@ -396,9 +398,14 @@ html, body {
 }
 
 /* Responsive */
+.topbar { flex-wrap: wrap; row-gap: 10px; }
+
 @media (max-width: 980px) {
   .stat-grid { grid-template-columns: repeat(2, 1fr); }
   .form-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 860px) {
+  .overview-charts { grid-template-columns: 1fr; }
 }
 @media (max-width: 720px) {
   .app-shell { flex-direction: column; }
@@ -409,4 +416,13 @@ html, body {
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .main { padding: 16px; }
+  .topbar-actions { width: 100%; justify-content: space-between; }
+  .role-picker select { max-width: 140px; }
+}
+@media (max-width: 480px) {
+  .data-badge { display: none; }
+  .stat-grid { grid-template-columns: 1fr; }
+  .role-picker span, .role-picker { font-size: 11px; }
+  .wo-search { min-width: 0; flex: 1 1 160px; }
+  .modal { max-width: 100%; }
 }

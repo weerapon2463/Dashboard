@@ -56,6 +56,7 @@ function switchView(view) {
 
   // Re-render the relevant chart in case it needs a resize/redraw
   // (canvas charts drawn while display:none report zero size)
+  if (view === "overview") renderOverviewCharts();
   if (view === "mytasks") renderMyTasks();
   if (view === "priority") renderPriorityMatrix();
   if (view === "capacity") renderCapacityChart(document.getElementById("capacityLineFilter").value);
@@ -150,6 +151,7 @@ function refreshAllCharts() {
   renderProcurement();
   renderWorkOrders();
   renderMyTasks();
+  renderOverviewCharts();
   renderAlerts();
 }
 
@@ -173,6 +175,7 @@ document.addEventListener("DOMContentLoaded", () => {
   renderProcurement();
   renderWorkOrders();
   renderMyTasks();
+  renderOverviewCharts();
   renderAlerts();
   markWOInitialStatus(hadStoredWorkOrders);
   markProcInitialStatus(hadStoredProcurement);

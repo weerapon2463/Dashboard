@@ -101,6 +101,32 @@
             <div class="stat-note">จาก Resource Management</div>
           </div>
         </div>
+
+        <div class="overview-charts">
+          <div class="card">
+            <div class="card-header">
+              <h3>สถานะใบสั่งผลิตทั้งหมด</h3>
+              <p class="card-sub">นับทุกใบสั่งผลิต แบ่งตามสถานะปัจจุบัน</p>
+            </div>
+            <div class="card-body">
+              <div class="chart-wrap chart-wrap-md">
+                <canvas id="woStatusChart"></canvas>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>Utilization รายไลน์ผลิต — สัปดาห์นี้</h3>
+              <p class="card-sub">เส้นประ = 100% ของกำลังการผลิต ดูรายละเอียด 10 สัปดาห์ล่วงหน้าได้ที่ Capacity Planning</p>
+            </div>
+            <div class="card-body">
+              <div class="chart-wrap chart-wrap-md">
+                <canvas id="capacitySnapshotChart"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-header">
             <h3>แจ้งเตือนความล่าช้าและความเสี่ยง</h3>
@@ -709,6 +735,7 @@
   <script src="procurement.js"></script>
   <script src="workorder.js"></script>
   <script src="alerts.js"></script>
+  <script src="overview-charts.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
