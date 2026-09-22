@@ -465,7 +465,9 @@
         <div class="card">
           <div class="card-header">
             <h3>ใบขอซื้อ (Purchase Requisition — PR)</h3>
+            <p class="card-sub">หัวหน้าแผนก/ผู้จัดการโรงงานอนุมัติหรือปฏิเสธคำขอซื้อได้โดยตรงจากตารางนี้</p>
           </div>
+          <div class="save-status" id="prSaveStatus"></div>
           <div class="card-body table-scroll">
             <table class="data-table" id="prTable">
               <thead>
@@ -475,6 +477,7 @@
                   <th>ผู้ขอ</th>
                   <th>วันที่ขอ</th>
                   <th>สถานะ</th>
+                  <th>การดำเนินการ</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -485,6 +488,7 @@
         <div class="card">
           <div class="card-header">
             <h3>ใบสั่งซื้อ (Purchase Order — PO)</h3>
+            <p class="card-sub">กดรับของแล้วเมื่อของถึงจริง สถานะและแจ้งเตือนความล่าช้าจะอัปเดตให้ทันที</p>
           </div>
           <div class="card-body table-scroll">
             <table class="data-table" id="poTable">
@@ -497,6 +501,7 @@
                   <th>วันที่สั่ง</th>
                   <th>กำหนดส่งมอบ</th>
                   <th>สถานะ</th>
+                  <th>การดำเนินการ</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -558,6 +563,9 @@
             <div class="filter-row">
               <label for="woLineFilter">แผนก/ไลน์ผลิต:</label>
               <select id="woLineFilter"></select>
+              <label for="woSearchInput">ค้นหา:</label>
+              <input type="text" id="woSearchInput" class="wo-search" placeholder="เลขที่ใบสั่งผลิต / รุ่น / PO / ผู้รับผิดชอบ">
+              <button id="woExportBtn" class="btn-secondary" type="button">ส่งออก CSV</button>
             </div>
             <table class="data-table" id="woTable">
               <thead>
@@ -689,6 +697,8 @@
       </div>
     </div>
   </div>
+
+  <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
   <script src="data.js"></script>
   <script src="priority-matrix.js"></script>

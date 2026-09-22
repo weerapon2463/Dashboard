@@ -208,14 +208,29 @@ function populateWOLineFilter() {
   select.addEventListener("change", () => renderWOTable(select.value));
 }
 
+function woMatchesSearch(wo, term) {
+  if (!term) return true;
+  const haystack = [wo.wo, wo.po, wo.model, wo.department, wo.assignee || ""].join(" ").toLowerCase();
+  return haystack.includes(term);
+}
+
 function renderWOTable(lineFilter) {
   const tbody = document.querySelector("#woTable tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
   const role = currentRole();
-  const list = lineFilter && lineFilter !== "__all__"
+  const searchInput = document.getElementById("woSearchInput");
+  const term = searchInput ? searchInput.value.trim().toLowerCase() : "";
+  const list = (lineFilter && lineFilter !== "__all__"
     ? WORK_ORDERS.filter((w) => w.department === lineFilter)
-    : WORK_ORDERS;
+    : WORK_ORDERS
+  ).filter((w) => woMatchesSearch(w, term));
+
+  if (list.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="10" class="muted-note" style="text-align:center;padding:18px 4px;">ไม่พบใบสั่งผลิตที่ตรงกับคำค้นหา</td></tr>`;
+    return;
+  }
+
   list.forEach((wo) => {
     const pillClass = WO_STATUS_META[wo.status] || "pill-good";
     const tr = document.createElement("tr");
@@ -349,9 +364,52 @@ function closeModal(id) {
   if (el) el.classList.remove("open");
 }
 
+function exportWorkOrdersCSV() {
+  const lineFilter = document.getElementById("woLineFilter");
+  const searchInput = document.getElementById("woSearchInput");
+  const term = searchInput ? searchInput.value.trim().toLowerCase() : "";
+  const lineVal = lineFilter ? lineFilter.value : "__all__";
+  const list = (lineVal && lineVal !== "__all__" ? WORK_ORDERS.filter((w) => w.department === lineVal) : WORK_ORDERS)
+    .filter((w) => woMatchesSearch(w, term));
+
+  const headers = ["เลขที่ใบสั่งผลิต", "อ้างอิง PO", "รุ่นเครื่องจักร", "แผนก/ไลน์ผลิต", "จำนวน", "เบิกวัสดุแล้ว(%)", "กำหนดส่งมอบ", "สถานะ", "ผู้รับผิดชอบ"];
+  const rows = list.map((w) => [w.wo, w.po, w.model, w.department, w.qty, w.issuedPct, w.dueDate, w.status, w.assignee || ""]);
+  const csvLines = [headers, ...rows].map((row) => row.map((cell) => {
+    const s = String(cell);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  }).join(","));
+  const csv = "﻿" + csvLines.join("\r\n"); // BOM so Excel reads Thai text correctly
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const stamp = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `work-orders-${stamp}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
 function initWorkOrderInteractions() {
   populateWOFormSelects();
   initMyTasksIdentity();
+
+  const searchInput = document.getElementById("woSearchInput");
+  if (searchInput) {
+    searchInput.addEventListener("input", () => {
+      const lineFilter = document.getElementById("woLineFilter");
+      renderWOTable(lineFilter ? lineFilter.value : "__all__");
+    });
+  }
+
+  const exportBtn = document.getElementById("woExportBtn");
+  if (exportBtn) {
+    exportBtn.addEventListener("click", () => {
+      exportWorkOrdersCSV();
+      showToast("ส่งออกไฟล์ CSV แล้ว", "good");
+    });
+  }
 
   const addBtn = document.getElementById("woAddBtn");
   if (addBtn) {
@@ -371,8 +429,9 @@ function initWorkOrderInteractions() {
       const department = document.getElementById("woFormDept").value;
       const qty = Math.max(1, Number(document.getElementById("woFormQty").value) || 1);
       const dueIso = document.getElementById("woFormDue").value;
+      const newWoId = generateWONumber();
       WORK_ORDERS.unshift({
-        wo: generateWONumber(),
+        wo: newWoId,
         po: po || "-",
         model,
         department,
@@ -383,6 +442,7 @@ function initWorkOrderInteractions() {
       });
       afterWOMutation();
       closeModal("woAddBackdrop");
+      showToast(`เพิ่มใบสั่งผลิต ${newWoId} แล้ว`, "good");
     });
   }
 
@@ -397,6 +457,7 @@ function initWorkOrderInteractions() {
       wo.status = "กำลังผลิต";
       afterWOMutation();
       closeModal("woClaimBackdrop");
+      showToast(`รับงาน ${wo.wo} แล้ว — เริ่มผลิตได้เลย`, "good");
     });
   }
 
@@ -413,6 +474,7 @@ function initWorkOrderInteractions() {
       else if (wo.status === "เสร็จสมบูรณ์") wo.status = "กำลังผลิต";
       afterWOMutation();
       closeModal("woUpdateBackdrop");
+      showToast(`อัปเดต ${wo.wo} เป็น ${pct}% แล้ว`, pct >= 100 ? "good" : undefined);
     });
   }
 
@@ -425,6 +487,7 @@ function initWorkOrderInteractions() {
       wo.status = "เสร็จสมบูรณ์";
       afterWOMutation();
       closeModal("woUpdateBackdrop");
+      showToast(`${wo.wo} เสร็จสมบูรณ์แล้ว`, "good");
     });
   }
 

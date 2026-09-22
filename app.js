@@ -31,6 +31,20 @@ const MODULE_ACCESS = {
 const ROLE_STORAGE_KEY = "y2j-role-v1";
 const THEME_STORAGE_KEY = "y2j-theme-v1";
 
+function showToast(message, type) {
+  const container = document.getElementById("toastContainer");
+  if (!container) return;
+  const el = document.createElement("div");
+  el.className = `toast${type ? " toast-" + type : ""}`;
+  el.textContent = message;
+  container.appendChild(el);
+  requestAnimationFrame(() => el.classList.add("show"));
+  setTimeout(() => {
+    el.classList.remove("show");
+    setTimeout(() => el.remove(), 250);
+  }, 2600);
+}
+
 function switchView(view) {
   document.querySelectorAll(".nav-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === view);
@@ -101,8 +115,9 @@ function initRoleSelect() {
       localStorage.setItem(ROLE_STORAGE_KEY, select.value);
     } catch (e) { /* ignore — role choice simply won't persist across reloads */ }
     applyModuleAccess(select.value);
-    // Claim/update/add buttons on Work Orders depend on the selected role
+    // Role-gated action buttons (Work Orders, Procurement) need a refresh
     if (typeof renderWorkOrders === "function") renderWorkOrders();
+    if (typeof renderProcurement === "function") renderProcurement();
   });
 }
 
@@ -144,6 +159,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initThemeToggle();
   const hadStoredWorkOrders = initWorkOrderData();
   initWorkOrderInteractions();
+  const hadStoredProcurement = initProcurementData();
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();
@@ -159,4 +175,5 @@ document.addEventListener("DOMContentLoaded", () => {
   renderMyTasks();
   renderAlerts();
   markWOInitialStatus(hadStoredWorkOrders);
+  markProcInitialStatus(hadStoredProcurement);
 });
