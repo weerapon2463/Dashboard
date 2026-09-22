@@ -4,9 +4,10 @@
    ========================================================================== */
 
 function renderWorkOrders() {
-  renderWOTable();
-  const filter = document.getElementById("bomModelFilter");
-  renderBOMTable(filter ? filter.value : MACHINE_MODELS[0]);
+  const lineFilter = document.getElementById("woLineFilter");
+  renderWOTable(lineFilter ? lineFilter.value : "__all__");
+  const bomFilter = document.getElementById("bomModelFilter");
+  renderBOMTable(bomFilter ? bomFilter.value : MACHINE_MODELS[0]);
   renderIssuanceTable();
   updateWorkOrderStats();
 }
@@ -24,17 +25,39 @@ function populateBOMFilter() {
   select.addEventListener("change", () => renderBOMTable(select.value));
 }
 
-function renderWOTable() {
+function populateWOLineFilter() {
+  const select = document.getElementById("woLineFilter");
+  if (!select) return;
+  const lines = Array.from(new Set(WORK_ORDERS.map((w) => w.department))).sort();
+  select.innerHTML = "";
+  const allOpt = document.createElement("option");
+  allOpt.value = "__all__";
+  allOpt.textContent = "ทั้งหมด (ทุกไลน์)";
+  select.appendChild(allOpt);
+  lines.forEach((l) => {
+    const opt = document.createElement("option");
+    opt.value = l;
+    opt.textContent = l;
+    select.appendChild(opt);
+  });
+  select.addEventListener("change", () => renderWOTable(select.value));
+}
+
+function renderWOTable(lineFilter) {
   const tbody = document.querySelector("#woTable tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
-  WORK_ORDERS.forEach((wo) => {
+  const list = lineFilter && lineFilter !== "__all__"
+    ? WORK_ORDERS.filter((w) => w.department === lineFilter)
+    : WORK_ORDERS;
+  list.forEach((wo) => {
     const pillClass = WO_STATUS_META[wo.status] || "pill-good";
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${wo.wo}</td>
       <td>${wo.po}</td>
       <td>${wo.model}</td>
+      <td>${wo.department}</td>
       <td>${wo.qty}</td>
       <td>${wo.issuedPct}%</td>
       <td>${wo.dueDate}</td>
@@ -81,6 +104,7 @@ function renderIssuanceTable() {
 }
 
 function updateWorkOrderStats() {
+  // สถิติในหน้าภาพรวมนับจากใบสั่งผลิตทั้งหมดของทุกไลน์ ไม่ผูกกับตัวกรองแผนกในตาราง
   const lateCount = WORK_ORDERS.filter((w) => w.status === "ล่าช้า").length;
   const avgIssuedPct = Math.round(WORK_ORDERS.reduce((s, w) => s + w.issuedPct, 0) / WORK_ORDERS.length);
 

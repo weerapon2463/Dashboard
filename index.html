@@ -141,11 +141,16 @@
         <div class="card">
           <div class="card-header"><h3>รายการงาน</h3></div>
           <div class="card-body table-scroll">
+            <div class="filter-row">
+              <label for="priorityDeptFilter">แผนก/ส่วนงาน:</label>
+              <select id="priorityDeptFilter"></select>
+            </div>
             <table class="data-table" id="priorityTable">
               <thead>
                 <tr>
                   <th>งาน / โครงการ</th>
                   <th>รุ่นเครื่องจักร</th>
+                  <th>แผนก/ส่วนงาน</th>
                   <th>ความเร่งด่วน</th>
                   <th>ผลกระทบ</th>
                   <th>ควอดแรนท์</th>
@@ -279,6 +284,7 @@
               <thead>
                 <tr>
                   <th>ชิ้นส่วน</th>
+                  <th>หมวดหมู่</th>
                   <th>ปริมาณ (ชิ้น)</th>
                   <th>ต้นทุนรวมผลิตเอง</th>
                   <th>ต้นทุนรวมซื้อ</th>
@@ -297,7 +303,7 @@
           <div class="stat-tile">
             <div class="stat-label">ไลน์ที่ขาดกำลังคน</div>
             <div class="stat-value" id="resStatLaborGap">-</div>
-            <div class="stat-note">จากทั้งหมด 6 ไลน์ผลิต</div>
+            <div class="stat-note">จากทั้งหมด 8 แผนก/ไลน์ผลิต</div>
           </div>
           <div class="stat-tile">
             <div class="stat-label">เครื่องจักรที่ต้องดูแล</div>
@@ -343,6 +349,7 @@
               <thead>
                 <tr>
                   <th>เครื่องจักร / อุปกรณ์</th>
+                  <th>แผนก/ไลน์</th>
                   <th>สถานะ</th>
                   <th>Utilization</th>
                   <th>หมายเหตุ</th>
@@ -363,6 +370,7 @@
               <thead>
                 <tr>
                   <th>เครื่องมือวัด</th>
+                  <th>แผนก</th>
                   <th>สอบเทียบล่าสุด</th>
                   <th>ครบกำหนดถัดไป</th>
                   <th>สถานะ</th>
@@ -483,12 +491,17 @@
             <p class="card-sub">แต่ละใบสั่งผลิตอ้างอิงกับ PO ในโมดูลจัดซื้อ เพื่อติดตามได้ว่าโปรเจกต์ไหนรออะไหล่จาก PO ใด</p>
           </div>
           <div class="card-body table-scroll">
+            <div class="filter-row">
+              <label for="woLineFilter">แผนก/ไลน์ผลิต:</label>
+              <select id="woLineFilter"></select>
+            </div>
             <table class="data-table" id="woTable">
               <thead>
                 <tr>
                   <th>เลขที่ใบสั่งผลิต</th>
                   <th>อ้างอิง PO</th>
                   <th>รุ่นเครื่องจักร</th>
+                  <th>แผนก/ไลน์ผลิต</th>
                   <th>จำนวน (คัน)</th>
                   <th>เบิกวัสดุแล้ว</th>
                   <th>กำหนดส่งมอบ</th>

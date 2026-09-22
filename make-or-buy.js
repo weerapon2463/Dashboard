@@ -108,6 +108,7 @@ function renderMobSampleTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${p.name}</td>
+      <td>${p.category}</td>
       <td>${p.volume.toLocaleString("th-TH")}</td>
       <td>${fmtBaht(result.makeTotal)}</td>
       <td>${fmtBaht(result.buyTotal)}</td>

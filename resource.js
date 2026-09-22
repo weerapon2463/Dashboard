@@ -42,6 +42,7 @@ function renderMachineTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${m.name}</td>
+      <td>${m.department}</td>
       <td><span class="pill ${pillClass}">${m.status}</span></td>
       <td>${m.util}%</td>
       <td>${m.note}</td>
@@ -60,6 +61,7 @@ function renderToolTable() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td>${t.name}</td>
+      <td>${t.department}</td>
       <td>${t.lastCal}</td>
       <td>${t.nextCal}</td>
       <td><span class="pill ${pillClass}">${t.status}</span></td>

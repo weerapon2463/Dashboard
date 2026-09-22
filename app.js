@@ -77,6 +77,8 @@ document.addEventListener("DOMContentLoaded", () => {
   initThemeToggle();
   populateCapacityFilter();
   populateBOMFilter();
+  populatePriorityDeptFilter();
+  populateWOLineFilter();
 
   renderPriorityMatrix();
   renderCapacityChart(CAPACITY_LINES[0]);

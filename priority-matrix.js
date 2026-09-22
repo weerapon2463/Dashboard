@@ -8,14 +8,40 @@ function cssVar(name) {
 
 let priorityChartInstance = null;
 
+function populatePriorityDeptFilter() {
+  const select = document.getElementById("priorityDeptFilter");
+  if (!select) return;
+  const depts = Array.from(new Set(PRIORITY_JOBS.map((j) => j.department))).sort();
+  select.innerHTML = "";
+  const allOpt = document.createElement("option");
+  allOpt.value = "__all__";
+  allOpt.textContent = "ทั้งหมด (ทุกแผนก)";
+  select.appendChild(allOpt);
+  depts.forEach((d) => {
+    const opt = document.createElement("option");
+    opt.value = d;
+    opt.textContent = d;
+    select.appendChild(opt);
+  });
+  select.addEventListener("change", () => renderPriorityMatrix());
+}
+
+function currentPriorityDept() {
+  const select = document.getElementById("priorityDeptFilter");
+  return select ? select.value : "__all__";
+}
+
 function renderPriorityMatrix() {
   const canvas = document.getElementById("priorityChart");
   if (!canvas) return;
 
+  const dept = currentPriorityDept();
+  const jobs = dept && dept !== "__all__" ? PRIORITY_JOBS.filter((j) => j.department === dept) : PRIORITY_JOBS;
+
   const byQuadrant = { doFirst: [], schedule: [], delegate: [], eliminate: [] };
-  PRIORITY_JOBS.forEach((job) => {
+  jobs.forEach((job) => {
     const q = classifyQuadrant(job.urgency, job.impact);
-    byQuadrant[q].push({ x: job.urgency, y: job.impact, label: job.name, model: job.model });
+    byQuadrant[q].push({ x: job.urgency, y: job.impact, label: job.name, model: job.model, department: job.department });
   });
 
   const colorMap = {
@@ -66,7 +92,7 @@ function renderPriorityMatrix() {
           callbacks: {
             label: (ctx) => {
               const d = ctx.raw;
-              return `${d.label} (${d.model}) — เร่งด่วน ${d.x}, ผลกระทบ ${d.y}`;
+              return `${d.label} (${d.model} · ${d.department}) — เร่งด่วน ${d.x}, ผลกระทบ ${d.y}`;
             },
           },
         },
@@ -94,15 +120,16 @@ function renderPriorityMatrix() {
     }],
   });
 
-  renderPriorityTable();
+  renderPriorityTable(jobs);
   updatePriorityStat();
 }
 
-function renderPriorityTable() {
+function renderPriorityTable(jobs) {
   const tbody = document.querySelector("#priorityTable tbody");
   if (!tbody) return;
+  const list = jobs || PRIORITY_JOBS;
   tbody.innerHTML = "";
-  PRIORITY_JOBS
+  list
     .slice()
     .sort((a, b) => (b.urgency + b.impact) - (a.urgency + a.impact))
     .forEach((job) => {
@@ -112,6 +139,7 @@ function renderPriorityTable() {
       tr.innerHTML = `
         <td>${job.name}</td>
         <td>${job.model}</td>
+        <td>${job.department}</td>
         <td>${job.urgency}</td>
         <td>${job.impact}</td>
         <td><span class="pill ${meta.pillClass}">${meta.label}</span></td>
@@ -121,6 +149,7 @@ function renderPriorityTable() {
 }
 
 function updatePriorityStat() {
+  // สถิติในหน้าภาพรวมนับจากงานทั้งหมดของทุกแผนก ไม่ผูกกับตัวกรองแผนกในหน้า Priority Matrix
   const count = PRIORITY_JOBS.filter((j) => classifyQuadrant(j.urgency, j.impact) === "doFirst").length;
   const el = document.getElementById("statDoFirst");
   if (el) el.textContent = count;
