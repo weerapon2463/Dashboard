@@ -116,10 +116,12 @@ function initRoleSelect() {
       localStorage.setItem(ROLE_STORAGE_KEY, select.value);
     } catch (e) { /* ignore — role choice simply won't persist across reloads */ }
     applyModuleAccess(select.value);
-    // Role-gated action buttons (Work Orders, Procurement) need a refresh
+    // Role-gated action buttons need a refresh
     if (typeof renderWorkOrders === "function") renderWorkOrders();
     if (typeof renderProcurement === "function") renderProcurement();
     if (typeof renderMasterSchedule === "function") renderMasterSchedule();
+    if (typeof renderPriorityMatrix === "function") renderPriorityMatrix();
+    if (typeof renderResource === "function") renderResource();
   });
 }
 
@@ -165,6 +167,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const hadStoredProcurement = initProcurementData();
   const hadStoredSchedule = initScheduleData();
   initScheduleInteractions();
+  const hadStoredPriority = initPriorityData();
+  initPriorityInteractions();
+  const hadStoredResource = initResourceData();
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();
@@ -183,4 +188,6 @@ document.addEventListener("DOMContentLoaded", () => {
   markWOInitialStatus(hadStoredWorkOrders);
   markProcInitialStatus(hadStoredProcurement);
   markMSInitialStatus(hadStoredSchedule);
+  markPMInitialStatus(hadStoredPriority);
+  markResInitialStatus(hadStoredResource);
 });

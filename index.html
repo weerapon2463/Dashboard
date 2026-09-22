@@ -225,7 +225,11 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><h3>รายการงาน</h3></div>
+          <div class="card-header card-header-actions">
+            <h3>รายการงาน</h3>
+            <button id="pmAddBtn" class="btn-primary" type="button" hidden>+ เพิ่มงานใหม่</button>
+          </div>
+          <div class="save-status" id="pmSaveStatus"></div>
           <div class="card-body table-scroll">
             <div class="filter-row">
               <label for="priorityDeptFilter">แผนก/ส่วนงาน:</label>
@@ -240,6 +244,7 @@
                   <th>ความเร่งด่วน</th>
                   <th>ผลกระทบ</th>
                   <th>ควอดแรนท์</th>
+                  <th>การดำเนินการ</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -407,10 +412,12 @@
           </div>
         </div>
 
+        <div class="save-status" id="resSaveStatus"></div>
+
         <div class="card">
           <div class="card-header">
             <h3>กำลังคน (Labor) รายไลน์ผลิต</h3>
-            <p class="card-sub">เปรียบเทียบจำนวนที่ต้องการกับจำนวนพนักงานจริงในแต่ละไลน์</p>
+            <p class="card-sub">เปรียบเทียบจำนวนที่ต้องการกับจำนวนพนักงานจริงในแต่ละไลน์ — หัวหน้าแผนก/ผู้จัดการโรงงานปรับจำนวนที่มีจริงวันนี้ได้ตรงในตาราง</p>
           </div>
           <div class="card-body table-scroll">
             <table class="data-table" id="laborTable">
@@ -432,7 +439,7 @@
         <div class="card">
           <div class="card-header">
             <h3>เครื่องจักร / อุปกรณ์การผลิต</h3>
-            <p class="card-sub">สถานะเครื่องจักรหลักที่ใช้ในการผลิต ไม่ใช่รุ่นรถตัดอ้อยที่ผลิตออกมา</p>
+            <p class="card-sub">สถานะเครื่องจักรหลักที่ใช้ในการผลิต ไม่ใช่รุ่นรถตัดอ้อยที่ผลิตออกมา — ทุกคนแจ้งสถานะเครื่องจักรได้ตรงในตาราง</p>
           </div>
           <div class="card-body table-scroll">
             <table class="data-table" id="machineTable">
@@ -453,7 +460,7 @@
         <div class="card">
           <div class="card-header">
             <h3>เครื่องมือวัด / การสอบเทียบ (Calibration)</h3>
-            <p class="card-sub">ติดตามกำหนดสอบเทียบเครื่องมือวัดเพื่อรักษามาตรฐาน QC</p>
+            <p class="card-sub">ติดตามกำหนดสอบเทียบเครื่องมือวัดเพื่อรักษามาตรฐาน QC — กดยืนยันเมื่อสอบเทียบเสร็จแล้ว ระบบตั้งรอบถัดไปให้อัตโนมัติ</p>
           </div>
           <div class="card-body table-scroll">
             <table class="data-table" id="toolTable">
@@ -464,6 +471,7 @@
                   <th>สอบเทียบล่าสุด</th>
                   <th>ครบกำหนดถัดไป</th>
                   <th>สถานะ</th>
+                  <th>การดำเนินการ</th>
                 </tr>
               </thead>
               <tbody></tbody>
@@ -724,6 +732,37 @@
         <button id="woUpdateCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
         <button id="woUpdateCompleteBtn" class="btn-secondary" type="button">ทำเครื่องหมายเสร็จสมบูรณ์</button>
         <button id="woUpdateSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="pmFormBackdrop">
+    <div class="modal">
+      <h3 id="pmFormTitle">เพิ่มงานใหม่</h3>
+      <div class="form-field">
+        <label for="pmFormName">ชื่องาน/โครงการ</label>
+        <input type="text" id="pmFormName" placeholder="เช่น ตรวจสอบคุณภาพสาย 2">
+      </div>
+      <div class="form-field">
+        <label for="pmFormModel">รุ่นเครื่องจักร</label>
+        <input type="text" id="pmFormModel" placeholder="เช่น YT3000">
+      </div>
+      <div class="form-field">
+        <label for="pmFormDept">แผนก/ส่วนงาน</label>
+        <input type="text" id="pmFormDept" placeholder="เช่น ไลน์ประกอบ 1">
+      </div>
+      <div class="form-field">
+        <label for="pmFormUrgency">ความเร่งด่วน — <span id="pmUrgencyValue">5</span> / 10</label>
+        <input type="range" id="pmFormUrgency" min="0" max="10" step="1" value="5">
+      </div>
+      <div class="form-field">
+        <label for="pmFormImpact">ผลกระทบต่อธุรกิจ — <span id="pmImpactValue">5</span> / 10</label>
+        <input type="range" id="pmFormImpact" min="0" max="10" step="1" value="5">
+      </div>
+      <div class="modal-actions">
+        <button id="pmDeleteBtn" class="btn-secondary" type="button" hidden>ลบงานนี้</button>
+        <button id="pmFormCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="pmFormSaveBtn" class="btn-primary" type="button">บันทึก</button>
       </div>
     </div>
   </div>

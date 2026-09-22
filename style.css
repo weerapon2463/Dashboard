@@ -312,6 +312,10 @@ html, body {
   background: var(--surface-1); color: var(--text-primary); font-family: inherit; font-size: 13.5px;
   width: 100%;
 }
+.form-field input[type="range"] {
+  padding: 0; border: none; background: transparent; accent-color: var(--series-1); height: 20px;
+}
+.form-field label span { font-weight: 700; color: var(--text-primary); }
 .btn-primary {
   background: var(--series-1); color: white; border: none;
   padding: 10px 22px; border-radius: 8px; font-size: 14px; font-weight: 600;
