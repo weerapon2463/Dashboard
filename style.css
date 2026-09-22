@@ -325,7 +325,7 @@ html, body {
   .sidebar { width: 100%; flex-direction: row; overflow-x: auto; align-items: center; }
   .brand { border-bottom: none; margin-bottom: 0; }
   .nav { flex-direction: row; }
-  .sidebar-footer { display: none; }
+  .footer-label, .footer-sub { display: none; }
   .stat-grid { grid-template-columns: 1fr 1fr; }
   .form-grid { grid-template-columns: 1fr; }
   .main { padding: 16px; }
