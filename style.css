@@ -275,12 +275,15 @@ html, body {
 
 /* Gantt */
 .gantt-wrap { overflow-x: auto; }
-.gantt { min-width: 760px; }
-.gantt-row { display: grid; grid-template-columns: 150px 1fr; align-items: center; min-height: 40px; }
+.gantt { min-width: 800px; }
+.gantt-row { display: grid; grid-template-columns: 176px 1fr; align-items: center; min-height: 40px; }
 .gantt-row-label {
   font-size: 12.5px; font-weight: 600; color: var(--text-primary);
   padding-right: 10px; position: sticky; left: 0; background: var(--surface-card);
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
 }
+.gantt-row-label span { min-width: 0; }
+.ms-row-edit { margin: 0; flex: none; }
 .gantt-track {
   position: relative; height: 26px; background: var(--surface-1);
   border-radius: 6px; border: 1px solid var(--gridline);
@@ -291,7 +294,7 @@ html, body {
   padding: 0 6px; white-space: nowrap; overflow: hidden;
   cursor: default;
 }
-.gantt-header { display: grid; grid-template-columns: 150px 1fr; margin-bottom: 6px; }
+.gantt-header { display: grid; grid-template-columns: 176px 1fr; margin-bottom: 6px; }
 .gantt-header-weeks { display: grid; font-size: 10.5px; color: var(--text-muted); }
 .gantt-week-tick { border-left: 1px dashed var(--gridline); padding-left: 4px; }
 

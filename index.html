@@ -292,10 +292,14 @@
       <!-- Master Schedule -->
       <section class="view" id="view-schedule">
         <div class="card">
-          <div class="card-header">
-            <h3>Master Schedule — แผนการผลิตรวมทุกรุ่น</h3>
-            <p class="card-sub">มุมมองรายสัปดาห์ ตามขั้นตอน: ออกแบบ → จัดซื้อ → ประกอบ → ทดสอบ → ส่งมอบ</p>
+          <div class="card-header card-header-actions">
+            <div>
+              <h3>Master Schedule — แผนการผลิตรวมทุกรุ่น</h3>
+              <p class="card-sub">มุมมองรายสัปดาห์ ตามขั้นตอน: ออกแบบ → จัดซื้อ → ประกอบ → ทดสอบ → ส่งมอบ</p>
+            </div>
+            <button id="msAddBtn" class="btn-primary" type="button" hidden>+ เพิ่มโครงการใหม่</button>
           </div>
+          <div class="save-status" id="msSaveStatus"></div>
           <div class="card-body">
             <div class="gantt-wrap">
               <div id="ganttChart" class="gantt"></div>
@@ -720,6 +724,45 @@
         <button id="woUpdateCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
         <button id="woUpdateCompleteBtn" class="btn-secondary" type="button">ทำเครื่องหมายเสร็จสมบูรณ์</button>
         <button id="woUpdateSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="msFormBackdrop">
+    <div class="modal">
+      <h3 id="msFormTitle">เพิ่มโครงการใหม่</h3>
+      <div class="form-field">
+        <label for="msFormModel">รุ่น/ล็อตการผลิต</label>
+        <input type="text" id="msFormModel" placeholder="เช่น YT3000 (ล็อต 3)">
+      </div>
+      <div class="form-field">
+        <label for="msFormStart">เริ่มสัปดาห์ที่ (ออกแบบ)</label>
+        <input type="number" id="msFormStart" min="0" max="23" value="0">
+      </div>
+      <div class="form-field">
+        <label for="msFormDurDesign">ระยะเวลา — ออกแบบ (สัปดาห์)</label>
+        <input type="number" id="msFormDurDesign" min="1" value="1">
+      </div>
+      <div class="form-field">
+        <label for="msFormDurProcure">ระยะเวลา — จัดซื้อ (สัปดาห์)</label>
+        <input type="number" id="msFormDurProcure" min="1" value="2">
+      </div>
+      <div class="form-field">
+        <label for="msFormDurAssemble">ระยะเวลา — ประกอบ (สัปดาห์)</label>
+        <input type="number" id="msFormDurAssemble" min="1" value="4">
+      </div>
+      <div class="form-field">
+        <label for="msFormDurTest">ระยะเวลา — ทดสอบ (สัปดาห์)</label>
+        <input type="number" id="msFormDurTest" min="1" value="2">
+      </div>
+      <div class="form-field">
+        <label for="msFormDurDeliver">ระยะเวลา — ส่งมอบ (สัปดาห์)</label>
+        <input type="number" id="msFormDurDeliver" min="1" value="1">
+      </div>
+      <div class="modal-actions">
+        <button id="msDeleteBtn" class="btn-secondary" type="button" hidden>ลบโครงการนี้</button>
+        <button id="msFormCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="msFormSaveBtn" class="btn-primary" type="button">บันทึก</button>
       </div>
     </div>
   </div>

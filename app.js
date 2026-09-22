@@ -119,6 +119,7 @@ function initRoleSelect() {
     // Role-gated action buttons (Work Orders, Procurement) need a refresh
     if (typeof renderWorkOrders === "function") renderWorkOrders();
     if (typeof renderProcurement === "function") renderProcurement();
+    if (typeof renderMasterSchedule === "function") renderMasterSchedule();
   });
 }
 
@@ -162,6 +163,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const hadStoredWorkOrders = initWorkOrderData();
   initWorkOrderInteractions();
   const hadStoredProcurement = initProcurementData();
+  const hadStoredSchedule = initScheduleData();
+  initScheduleInteractions();
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();
@@ -179,4 +182,5 @@ document.addEventListener("DOMContentLoaded", () => {
   renderAlerts();
   markWOInitialStatus(hadStoredWorkOrders);
   markProcInitialStatus(hadStoredProcurement);
+  markMSInitialStatus(hadStoredSchedule);
 });
