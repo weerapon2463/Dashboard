@@ -50,6 +50,21 @@ const DOC_SAMPLES = {
     { no: "MR-2026-001", status: "จ่ายของแล้ว", title: "ใบมีดตัดอ้อย (Cane Blade)", wo: "WO-2026-081", qty: 2, line: "ไลน์ประกอบ 1", owner: "ช่างประกอบ ไลน์ 1", date: "2026-09-22" },
     { no: "MR-2026-002", status: "รออนุมัติ", title: "ปลอกสายไฮดรอลิก (Hydraulic Hose Fitting)", wo: "WO-2026-083", qty: 22, line: "ไลน์ประกอบ 1", owner: "ช่างประกอบ ไลน์ 1", date: "2026-09-23" },
     { no: "MR-2026-003", status: "อนุมัติ", title: "ชุดซีลกระบอกไฮดรอลิก", wo: "WO-2026-087", qty: 6, line: "ไลน์ประกอบ 2", owner: "ช่างประกอบ ไลน์ 2", date: "2026-09-24" },
+    { no: "MR-2026-004", status: "จ่ายบางส่วน", title: "ใบมีดตัดอ้อย SK5 และอีก 2 รายการ", wo: "WO-2026-082", model: "YT6500", purpose: "ผลิต", qty: 39, line: "ไลน์ประกอบ 2", owner: "ช่างประกอบ ไลน์ 2", date: "2026-09-22",
+      items: [
+        { key: "BL-1001B", code: "BL-1001B", part: "ใบมีดตัดอ้อย (Cane Blade)", unit: "ชิ้น", req: 6, issued: 6, ret: 0, log: [{ at: "2026-09-22T09:10:00", by: "คลังสินค้า", kind: "จ่าย", qty: 6 }] },
+        { key: "CV-5001", code: "CV-5001", part: "โซ่ลำเลียงอ้อย (Conveyor Chain)", unit: "เส้น", req: 3, issued: 1, ret: 0, log: [{ at: "2026-09-22T09:10:00", by: "คลังสินค้า", kind: "จ่าย", qty: 1 }] },
+        { key: "HY-3001", code: "HY-3001", part: "ปลอกสายไฮดรอลิก (Hydraulic Hose Fitting)", unit: "ชิ้น", req: 30, issued: 30, ret: 0, log: [{ at: "2026-09-22T09:12:00", by: "คลังสินค้า", kind: "จ่าย", qty: 30 }] },
+      ] },
+    { no: "MR-2026-005", status: "อนุมัติ", title: "ขั้วต่อสายไฟชุดควบคุม (อะไหล่งานบริการ)", wo: "SV-2026-002", model: "W250", purpose: "บริการ", qty: 3, line: "", owner: "ช่างบริการ 1", date: "2026-09-20",
+      items: [{ key: "EL-6001", code: "EL-6001", part: "ขั้วต่อสายไฟชุดควบคุม (Wiring Harness Connector Set)", unit: "ชุด", req: 3, issued: 0, ret: 0, log: [] }] },
+    { no: "MR-2026-006", status: "รออนุมัติ", title: "ชุดยึดเครื่องยนต์ และอีก 1 รายการ", wo: "WO-2026-085", model: "YT3000", purpose: "ผลิต", qty: 54, line: "ไลน์ประกอบ 1", owner: "ช่างประกอบ ไลน์ 1", date: "2026-09-24",
+      items: [
+        { key: "FR-4010", code: "FR-4010", part: "ชุดยึดเครื่องยนต์ (Engine Mount Bracket)", unit: "ชุด", req: 6, issued: 0, ret: 0, log: [] },
+        { key: "HY-3001", code: "HY-3001", part: "ปลอกสายไฮดรอลิก (Hydraulic Hose Fitting)", unit: "ชิ้น", req: 48, issued: 0, ret: 0, log: [] },
+      ] },
+    { no: "MR-2026-007", status: "จ่ายของแล้ว", title: "ใบมีดตัดอ้อย SK5 (เคลมประกัน)", wo: "SV-2026-001", model: "YT6500", purpose: "บริการ", qty: 2, line: "", owner: "ช่างบริการ 1", date: "2026-09-01",
+      items: [{ key: "BL-1001B", code: "BL-1001B", part: "ใบมีดตัดอ้อย (Cane Blade)", unit: "ชิ้น", req: 2, issued: 2, ret: 0, log: [{ at: "2026-09-01T14:00:00", by: "คลังสินค้า", kind: "จ่าย", qty: 2 }] }] },
   ],
   saf: [
     { no: "SAF-2026-001", status: "ปิดแล้ว", title: "เศษโลหะกระเด็นเข้าตาขณะเจียรรอยเชื่อม", line: "ไลน์เชื่อม", severity: "บาดเจ็บเล็กน้อย", owner: "หัวหน้าไลน์เชื่อม", date: "2026-09-05", detail: "อบรมการใช้ PPE ทั้งไลน์ เปลี่ยนแว่นเป็นแบบครอบ (PR-2026-0149)" },
@@ -116,6 +131,20 @@ const DOC_SAMPLES = {
     { no: "CC-2026-002", status: "กำลังแก้ไข", title: "ขั้วต่อสายไฟชื้นน้ำหลังล้างเครื่อง", customer: "ไร่อ้อยเอกชน จ.กาญจนบุรี", model: "W250", owner: "ฝ่ายขาย", date: "2026-09-19", detail: "ส่งต่อวิศวกรรม → ECR-2026-003" },
     { no: "CC-2026-003", status: "รับเรื่อง", title: "ขอคู่มือบำรุงรักษาฉบับภาษาไทย", customer: "สหกรณ์ชาวไร่อ้อย จ.นครสวรรค์", model: "YT3000", owner: "ฝ่ายขาย", date: "2026-09-24", detail: "" },
   ],
+  mc: [
+    { no: "MC-2025-011", status: "อยู่ระหว่างซ่อม", title: "YT6500-2410-003", model: "YT6500", customer: "ไร่ส่งเสริม จ.พิษณุโลก", location: "อ.วังทอง จ.พิษณุโลก", delivered: "2025-01-15", warranty: "2026-01-15", rev: "A", so: "", wo: "", hours: 1850, owner: "ฝ่ายขาย", date: "2025-01-15" },
+    { no: "MC-2026-001", status: "ใช้งานปกติ", title: "YT6500-2503-001", model: "YT6500", customer: "ลูกค้าไร่อ้อย จ.กำแพงเพชร", location: "อ.ขาณุวรลักษบุรี จ.กำแพงเพชร", delivered: "2026-03-20", warranty: "2027-03-20", rev: "A", so: "", wo: "", hours: 420, owner: "ฝ่ายขาย", date: "2026-03-20" },
+    { no: "MC-2026-002", status: "ใช้งานปกติ", title: "YT3000-2502-004", model: "YT3000", customer: "สหกรณ์ชาวไร่อ้อย จ.นครสวรรค์", location: "อ.ตาคลี จ.นครสวรรค์", delivered: "2026-02-10", warranty: "", rev: "A", so: "", wo: "", hours: 610, owner: "ฝ่ายขาย", date: "2026-02-10" },
+    { no: "MC-2026-003", status: "อยู่ระหว่างซ่อม", title: "W250-2504-002", model: "W250", customer: "ไร่อ้อยเอกชน จ.กาญจนบุรี", location: "อ.ท่าม่วง จ.กาญจนบุรี", delivered: "2026-04-05", warranty: "", rev: "A", so: "", wo: "", hours: 380, owner: "ฝ่ายขาย", date: "2026-04-05" },
+    { no: "MC-2026-004", status: "ใช้งานปกติ", title: "AX5000-2506-001", model: "AX5000", customer: "กลุ่มเกษตรกร จ.สุพรรณบุรี", location: "อ.ด่านช้าง จ.สุพรรณบุรี", delivered: "2026-06-30", warranty: "", rev: "A", so: "", wo: "WO-2026-084", hours: 95, owner: "ฝ่ายขาย", date: "2026-06-30" },
+  ],
+  svc: [
+    { no: "SV-2026-001", status: "ปิดงาน", title: "เปลี่ยนใบมีดเป็น SK5 ตาม EO-2026-001 (ใบมีดสึกเร็ว)", machine: "MC-2026-001", customer: "", model: "", kind: "เคลมประกัน", priority: "ด่วน", tech: "ช่างบริการ 1", appt: "2026-09-01", date: "2026-08-28", cost: 0, cc: "CC-2026-001", claimCause: "การออกแบบ", supplier: "", claimStatus: "ไม่เคลมผู้ขาย (รับผิดชอบเอง)", claimRef: "", claimAmount: 0, detail: "เปลี่ยนใบมีด 2 ใบ (MR-2026-007) ลูกค้ารับรองผล 2 ก.ย." },
+    { no: "SV-2026-002", status: "รออะไหล่", title: "ขั้วต่อสายไฟชื้นน้ำ เครื่องดับเป็นช่วงหลังล้างเครื่อง", machine: "MC-2026-003", customer: "", model: "", kind: "เคลมประกัน", priority: "ด่วนมาก (เครื่องหยุด)", tech: "ช่างบริการ 1", appt: "2026-09-21", date: "2026-09-19", cost: 0, cc: "CC-2026-002", claimCause: "ชิ้นส่วนจากผู้ขาย", supplier: "บจก. ไทยไวร์ริ่ง ซัพพลาย", claimStatus: "ส่งเคลมผู้ขายแล้ว", claimRef: "TW-CLM-0925", claimAmount: 4500, detail: "รอขั้วต่อชุดใหม่ (MR-2026-005) — วิศวกรรมกำลังเปลี่ยนเป็นแบบกันน้ำตาม ECR-2026-003" },
+    { no: "SV-2026-003", status: "นัดหมายแล้ว", title: "ตรวจเช็คก่อนเปิดฤดูหีบ 2569/70", machine: "MC-2026-002", customer: "", model: "", kind: "ตรวจเช็คก่อนฤดูหีบ", priority: "ปกติ", tech: "ช่างบริการ 2", appt: "2026-10-05", date: "2026-09-20", cost: 3500, cc: "", detail: "" },
+    { no: "SV-2026-004", status: "กำลังดำเนินการ", title: "โซ่ลำเลียงหย่อน มีเสียงดังขณะทำงาน", machine: "MC-2025-011", customer: "", model: "", kind: "ซ่อม (Breakdown)", priority: "ด่วน", tech: "ช่างบริการ 2", appt: "2026-09-23", date: "2026-09-22", cost: 8500, cc: "", detail: "นอกประกัน — เสนอราคาเปลี่ยนโซ่ 1 เส้น ลูกค้าอนุมัติแล้ว" },
+    { no: "SV-2026-005", status: "รับแจ้ง", title: "ขออบรมการใช้งานให้พนักงานขับใหม่ 3 คน", machine: "MC-2026-004", customer: "", model: "", kind: "อบรมการใช้งาน", priority: "ปกติ", tech: "", appt: "", date: "2026-09-24", cost: 0, cc: "", detail: "" },
+  ],
 };
 
 // Part codes for the built-in BOMs (Make/Buy is derived from the Make-or-Buy calculation)
@@ -157,4 +186,32 @@ const BOM_SAMPLE_META = {
       { rev: "C", date: "2026-09-23", note: "เตรียมเปลี่ยนแคลมป์ยึดสายไฮดรอลิก — รอ ECR อนุมัติ", ref: "ECR-2026-002" },
     ],
   },
+};
+
+// Sub-parts for the built-in assemblies (multi-level BOM example) — keyed by the parent part code
+const BOM_SAMPLE_CHILDREN = {
+  "FR-4001": [
+    { code: "FR-4001-01", part: "แผ่นเหล็กฐาน SS400 หนา 6 มม.", qty: 4, unit: "แผ่น", source: "ซื้อ", station: "ไลน์เชื่อม", op: "ตัด/พับ" },
+    { code: "FR-4001-02", part: "ท่อเหล็กเหลี่ยม 100x100 หนา 4 มม.", qty: 6, unit: "เส้น", source: "ซื้อ", station: "ไลน์เชื่อม", op: "ตัด/เชื่อม" },
+    { code: "FR-4001-03", part: "ชุดโบลท์ยึดโครง M16 เกรด 8.8", qty: 24, unit: "ตัว", source: "ซื้อ", station: "ไลน์ประกอบ 1", op: "ประกอบโครง" },
+    { code: "FR-4001-04", part: "สีรองพื้นกันสนิม", qty: 3, unit: "ลิตร", source: "ซื้อ", station: "ไลน์พ่นสี", op: "พ่นสี" },
+  ],
+  "GR-2001": [
+    { code: "GR-2001-01", part: "เฟืองขับหลัก (Main Gear)", qty: 1, unit: "ชิ้น", source: "ผลิตเอง", station: "ไลน์ประกอบ 2", op: "ประกอบชุดขับ" },
+    { code: "GR-2001-02", part: "เพลาขับ (Drive Shaft)", qty: 1, unit: "ชิ้น", source: "ผลิตเอง", station: "ไลน์ประกอบ 2", op: "ประกอบชุดขับ" },
+    { code: "GR-2001-03", part: "ตลับลูกปืน 6208-2RS", qty: 2, unit: "ชิ้น", source: "ซื้อ", station: "ไลน์ประกอบ 2", op: "ประกอบชุดขับ" },
+    { code: "GR-2001-04", part: "ซีลน้ำมัน 40x62x8", qty: 2, unit: "ชิ้น", source: "ซื้อ", station: "ไลน์ประกอบ 2", op: "ประกอบชุดขับ" },
+  ],
+};
+
+// Where each top-level part is used on the line (who takes it next) — sample defaults
+const BOM_SAMPLE_STATION = { FR: "ไลน์เชื่อม", BL: "ไลน์ประกอบ 1", GR: "ไลน์ประกอบ 2", CV: "ไลน์ประกอบ 2", HY: "ไลน์ประกอบ 3", EL: "ไลน์ทดสอบ" };
+
+// Stock on hand (sample) — warehouse keeps it current on the BOM & requisition page
+const STOCK_SAMPLE = {
+  "BL-1001": { qty: 6, loc: "A-01-1" }, "BL-1001B": { qty: 4, loc: "A-01-2" }, "GR-2001": { qty: 3, loc: "B-02-1" },
+  "GR-2001-01": { qty: 5, loc: "B-02-2" }, "GR-2001-02": { qty: 5, loc: "B-02-3" }, "GR-2001-03": { qty: 20, loc: "B-03-1" }, "GR-2001-04": { qty: 16, loc: "B-03-2" },
+  "HY-3001": { qty: 60, loc: "C-01-1" }, "HY-3005": { qty: 5, loc: "C-01-3" }, "FR-4001": { qty: 1, loc: "ลานโครง" },
+  "FR-4001-01": { qty: 30, loc: "ลานเหล็ก" }, "FR-4001-02": { qty: 40, loc: "ลานเหล็ก" }, "FR-4001-03": { qty: 300, loc: "D-01-1" }, "FR-4001-04": { qty: 12, loc: "ห้องสี" },
+  "FR-4010": { qty: 2, loc: "B-04-1" }, "CV-5001": { qty: 0, loc: "E-01-1" }, "EL-6001": { qty: 1, loc: "F-01-1" },
 };

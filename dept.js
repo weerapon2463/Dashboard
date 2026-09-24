@@ -422,6 +422,11 @@ function closeDeptModal() {
   deptEditing = null;
 }
 
+function deptRefreshOtherPages() {
+  if (typeof renderBomx === "function") renderBomx();
+  if (typeof renderService === "function") renderService();
+}
+
 function saveDeptModal() {
   if (!deptEditing) return;
   const { type, index } = deptEditing;
@@ -459,6 +464,7 @@ function saveDeptModal() {
   saveDeptDocs();
   closeDeptModal();
   renderDept();
+  deptRefreshOtherPages();
   showToast(index === null ? `สร้าง ${entry.no} แล้ว` : `บันทึก ${DEPT_DOCS[type][index].no} แล้ว`, "good");
 }
 
@@ -472,6 +478,7 @@ function deleteDeptDoc() {
   saveDeptDocs();
   closeDeptModal();
   renderDept();
+  deptRefreshOtherPages();
   showToast(`ลบ ${doc.no} แล้ว`, "warn");
 }
 

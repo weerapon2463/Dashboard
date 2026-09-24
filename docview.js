@@ -337,6 +337,9 @@ function openDocView(type, index) {
       ${linkHtml}
     </div>
     ${longFields.map((f) => `<div class="paper-section-title">${escapeHtml(f.label)}</div><div class="paper-textbox">${doc[f.key] ? escapeHtml(doc[f.key]).replace(/\n/g, "<br>") : '<span class="paper-empty">—</span>'}</div>`).join("")}
+    ${Array.isArray(doc.items) ? `<div class="paper-section-title">รายการเบิก${doc.receiver || doc.requestedBy ? ` — สั่งเบิกโดย ${escapeHtml(doc.requestedBy || "")} · ผู้รับของ ${escapeHtml(doc.owner || "")}` : ""}</div>
+      <table class="paper-table"><thead><tr><th>ข้อ BOM</th><th>รหัส</th><th>รายการ</th><th class="num">ขอ</th><th class="num">จ่าย</th><th class="num">คืน</th><th>หน่วย</th></tr></thead>
+      <tbody>${doc.items.map((it) => `<tr><td>${escapeHtml(it.item || "")}</td><td class="mono-cell">${escapeHtml(it.code || "")}</td><td>${escapeHtml(it.part || "")}</td><td class="num">${escapeHtml(String(it.req ?? ""))}</td><td class="num">${escapeHtml(String(it.issued ?? 0))}</td><td class="num">${escapeHtml(String(it.ret ?? 0))}</td><td>${escapeHtml(it.unit || "")}</td></tr>`).join("")}</tbody></table>` : ""}
     ${type === "dwg" ? `<div class="paper-section-title">แบบ (Drawing)</div><div id="dwgPreview" class="dwg-preview"><span class="paper-empty">${(doc.files || []).length ? "กำลังโหลดไฟล์แบบ…" : "ยังไม่ได้แนบไฟล์แบบ — กด \"แนบไฟล์\" ด้านล่าง"}</span></div>` : ""}
     ${relatedHtml}
     <div class="paper-section-title">ไฟล์แนบ</div>

@@ -43,13 +43,68 @@ function initBomData() {
     }
   } catch (e) { /* keep built-in sample BOMs */ }
   if (!hadStored) bomApplySamples();
+  if (!hadStored) { MACHINE_MODELS.forEach((m) => { if (MASTER_BOM[m]) bomEnsureStructure(m); }); bomAddSampleChildren(); }
   MACHINE_MODELS.forEach((m) => {
     if (!MASTER_BOM[m]) MASTER_BOM[m] = [];
     if (!BOM_META[m]) BOM_META[m] = bomDefaultMeta(m);
+    bomEnsureStructure(m);
   });
   bomModel = MACHINE_MODELS[0] || null;
   return hadStored;
 }
+
+/* ---- multi-level structure ------------------------------------------------ */
+
+const BOM_GROUP_BY_PREFIX = {
+  FR: "โครงสร้างและตัวถัง (Frame)", BL: "ชุดตัด (Cutting)", GR: "ระบบขับเคลื่อน (Drive)",
+  CV: "ระบบลำเลียง (Conveyor)", HY: "ระบบไฮดรอลิก (Hydraulic)", EL: "ระบบไฟฟ้าและควบคุม (Electrical)",
+};
+const BOM_GROUP_DEFAULT = "ทั่วไป";
+
+function bomNewLineId() { return "L" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+
+function bomGroupForCode(code) {
+  return BOM_GROUP_BY_PREFIX[String(code || "").slice(0, 2).toUpperCase()] || BOM_GROUP_DEFAULT;
+}
+
+// Older flat BOMs: give every line a stable id (index-based so every device derives the same ids
+// before the first save), no parent, and a group from its part-code prefix.
+function bomEnsureStructure(model) {
+  const lines = MASTER_BOM[model] || [];
+  const used = new Set(lines.map((l) => l.id).filter(Boolean));
+  lines.forEach((l, i) => {
+    if (!l.id) {
+      let id = `L${i + 1}`;
+      while (used.has(id)) id += "x";
+      l.id = id;
+      used.add(id);
+    }
+    if (l.parent === undefined || l.parent === null) l.parent = "";
+    if (l.parent && !lines.some((p) => p.id === l.parent)) l.parent = "";
+    if (!l.parent && !l.group) l.group = bomGroupForCode(l.code);
+    if (l.station === undefined) l.station = "";
+  });
+}
+
+// Add the sample sub-parts under matching assemblies (all models) — returns how many lines were added
+function bomAddSampleChildren(onlyModel) {
+  if (typeof BOM_SAMPLE_CHILDREN === "undefined") return 0;
+  let added = 0;
+  MACHINE_MODELS.filter((m) => !onlyModel || m === onlyModel).forEach((m) => {
+    const lines = MASTER_BOM[m] || [];
+    lines.slice().forEach((l) => {
+      if (!l.parent && !l.station && typeof BOM_SAMPLE_STATION !== "undefined") l.station = BOM_SAMPLE_STATION[String(l.code || "").slice(0, 2)] || "";
+      const kids = BOM_SAMPLE_CHILDREN[l.code];
+      if (!kids || lines.some((c) => c.parent === l.id)) return;
+      const at = lines.indexOf(l) + 1;
+      lines.splice(at, 0, ...kids.map((k) => Object.assign({ id: bomNewLineId(), parent: l.id, note: "" }, k)));
+      added += kids.length;
+    });
+  });
+  return added;
+}
+
+function bomHasChildren(model, id) { return (MASTER_BOM[model] || []).some((l) => l.parent === id); }
 
 function bomApplySamples() {
   const mobByName = {};
@@ -100,6 +155,7 @@ function afterBomMutation() {
   bomSyncOtherViews();
   renderBomEditor();
   if (typeof renderDeptDocGrid === "function") renderDeptDocGrid();
+  if (typeof renderBomx === "function") renderBomx();
 }
 
 function bomSummaryText() {
@@ -110,6 +166,18 @@ function bomSummaryText() {
 function bomNextRev(rev) {
   if (/^[A-Y]$/.test(rev)) return String.fromCharCode(rev.charCodeAt(0) + 1);
   return rev + "1";
+}
+
+function bomDeleteLine(model, i) {
+  const lines = MASTER_BOM[model];
+  const gone = lines[i];
+  lines.splice(i, 1);
+  lines.forEach((l) => {
+    if (gone.id && l.parent === gone.id) {
+      l.parent = gone.parent || "";
+      if (!l.parent) l.group = gone.group || bomGroupForCode(l.code);
+    }
+  });
 }
 
 /* ---- rendering --------------------------------------------------------- */
@@ -157,12 +225,14 @@ function renderBomEditor() {
 
   const tbody = document.querySelector("#bomEdTable tbody");
   tbody.innerHTML = "";
+  const itemNos = typeof bxItemNumbers === "function" ? bxItemNumbers(bomModel) : {};
   lines.forEach((l, i) => {
     const tr = document.createElement("tr");
+    const no = itemNos[l.id] ? `<span class="bx-itemno">${escapeHtml(itemNos[l.id])}</span>` : i + 1;
     if (editable) {
       const opts = (list, v) => list.map((o) => `<option${o === v ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
       tr.innerHTML = `
-        <td>${i + 1}</td>
+        <td>${no}</td>
         <td><input class="bom-inline bom-code" data-i="${i}" data-k="code" value="${escapeHtml(l.code || "")}" placeholder="รหัส" aria-label="รหัสชิ้นส่วน"></td>
         <td><input class="bom-inline bom-part" data-i="${i}" data-k="part" value="${escapeHtml(l.part || "")}" aria-label="ชื่อชิ้นส่วน"></td>
         <td><input class="bom-inline bom-qty" type="number" min="0" step="any" data-i="${i}" data-k="qty" value="${escapeHtml(String(l.qty ?? ""))}" aria-label="จำนวนต่อคัน"></td>
@@ -174,7 +244,7 @@ function renderBomEditor() {
       `;
     } else {
       tr.innerHTML = `
-        <td>${i + 1}</td>
+        <td>${no}</td>
         <td class="mono-cell">${escapeHtml(l.code || "—")}</td>
         <td>${escapeHtml(l.part || "")}</td>
         <td>${escapeHtml(String(l.qty ?? ""))}</td>
@@ -205,7 +275,7 @@ function renderBomEditor() {
     const i = Number(b.dataset.del);
     const name = MASTER_BOM[bomModel][i].part || `รายการที่ ${i + 1}`;
     if (!confirm(`ลบ "${name}" ออกจาก BOM ${bomModel}?`)) return;
-    MASTER_BOM[bomModel].splice(i, 1);
+    bomDeleteLine(bomModel, i);
     bomAudit("ลบรายการ BOM", `Rev.${BOM_META[bomModel].rev}: ${name}`);
     afterBomMutation();
   }));
@@ -331,7 +401,7 @@ function initBomInteractions() {
   document.getElementById("bomExportBtn").addEventListener("click", exportBomCsv);
   document.getElementById("bomSheetBtn").addEventListener("click", () => openBomSheet(bomModel));
   document.getElementById("bomAddLineBtn").addEventListener("click", () => {
-    MASTER_BOM[bomModel].push({ code: "", part: "", qty: 1, unit: "ชิ้น", source: "ซื้อ", note: "" });
+    MASTER_BOM[bomModel].push({ id: bomNewLineId(), parent: "", group: BOM_GROUP_DEFAULT, station: "", code: "", part: "", qty: 1, unit: "ชิ้น", source: "ซื้อ", note: "" });
     bomAudit("เพิ่มรายการ BOM", `Rev.${BOM_META[bomModel].rev} แถว ${MASTER_BOM[bomModel].length}`);
     afterBomMutation();
     const parts = document.querySelectorAll("#bomEdTable .bom-part");

@@ -284,13 +284,15 @@ function renderIssuanceTable() {
   const tbody = document.querySelector("#issuanceTable tbody");
   if (!tbody) return;
   tbody.innerHTML = "";
-  MATERIAL_ISSUANCE.forEach((row) => {
+  const tracked = typeof bxWoIssuanceRows === "function" ? bxWoIssuanceRows() : [];
+  const trackedWos = new Set(tracked.map((r) => r.wo));
+  tracked.concat(MATERIAL_ISSUANCE.filter((r) => !trackedWos.has(r.wo))).forEach((row) => {
     const pillClass = ISSUANCE_STATUS_META[row.status] || "pill-good";
     const remaining = row.required - row.issued;
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${row.wo}</td>
-      <td>${row.part}</td>
+      <td>${escapeHtml(row.wo)}</td>
+      <td>${escapeHtml(row.part)}</td>
       <td>${row.required}</td>
       <td>${row.issued}</td>
       <td>${remaining}</td>

@@ -32,12 +32,13 @@ const PERM_LEVELS = [
 const PERM_RANK = { none: 0, view: 1, create: 2, manage: 3 };
 
 // Anyone may raise these, whatever their department (repair, defect, safety, material, change request)
-const CROSS_CREATE_TYPES = ["mtr", "ncr", "saf", "mreq", "ecr"];
+const CROSS_CREATE_TYPES = ["mtr", "ncr", "saf", "mreq", "ecr", "svc"];
 
 const ALL_VIEWS = [
   ["overview", "ภาพรวม"], ["pilot", "ผลทดสอบนำร่อง"], ["dept", "งานตามแผนก / เอกสาร"], ["plans", "แผนงานของฉัน"],
   ["mytasks", "งานของฉัน"], ["priority", "Priority Matrix"], ["capacity", "Capacity Planning"], ["schedule", "Master Schedule"],
   ["makeorbuy", "Make-or-Buy"], ["resource", "ทรัพยากรการผลิต"], ["p2p", "ติดตามจัดซื้อ (PR→PO→รับของ)"], ["procurement", "จัดซื้อ"], ["workorder", "ใบสั่งผลิต & BOM"],
+  ["bomx", "BOM & เบิกวัสดุ"], ["service", "บริการหลังการขาย"], ["reports", "รายงาน"],
   ["admin", "ผู้ดูแลระบบ (Admin)"],
 ];
 
