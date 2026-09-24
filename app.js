@@ -198,6 +198,11 @@ function appStart() {
       return;
     }
     renderUserChip();
+    if (typeof applyOrgSettings === "function") {
+      if (!orgEnsureCompany()) return; // reloading into a company this user may open
+      applyOrgSettings();
+      initOrg();
+    }
     const picker = document.querySelector(".role-picker");
     if (picker) picker.hidden = true;
   }

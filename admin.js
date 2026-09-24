@@ -27,6 +27,7 @@ function renderAdmin() {
   if (adminTab === "teams") renderAdminTeams();
   if (adminTab === "audit") renderAdminAudit();
   if (adminTab === "storage") renderAdminStorage();
+  if (adminTab === "org" && typeof renderAdminOrg === "function") renderAdminOrg();
 }
 
 /* ---- storage location ------------------------------------------------------ */
@@ -73,7 +74,7 @@ function renderAdminUsers() {
       <td><strong>${escapeHtml(u.name)}</strong><div class="pilot-kpi-method">${escapeHtml(u.position || "")}</div></td>
       <td class="mono-cell">${escapeHtml(u.username)}</td>
       <td>${escapeHtml(authRoleLabel(u.role))}</td>
-      <td>${escapeHtml(authDeptName(u.dept))}</td>
+      <td>${escapeHtml(authDeptName(u.dept))}<div class="pilot-kpi-method">${u.company ? escapeHtml((typeof orgCompany === "function" && orgCompany(u.company) || {}).short || u.company) : "ทุกบริษัท (กลุ่ม)"}</div></td>
       <td>${(u.teams || []).map((t) => (authTeamById(t) || {}).name).filter(Boolean).map((n) => `<span class="pill pill-eliminate">${escapeHtml(n)}</span>`).join(" ") || "—"}</td>
       <td>${custom ? '<span class="pill pill-schedule">กำหนดเอง</span>' : '<span class="muted-inline">ตามบทบาท</span>'}</td>
       <td>${u.active ? '<span class="pill pill-good">ใช้งาน</span>' : '<span class="pill pill-critical">ปิดใช้งาน</span>'}</td>
@@ -109,6 +110,8 @@ function openUserEditor(id) {
   document.getElementById("ue_username").value = u.username;
   document.getElementById("ue_position").value = u.position || "";
   document.getElementById("ue_role").innerHTML = AUTH_ROLES.map((r) => `<option value="${r.id}"${r.id === u.role ? " selected" : ""}>${escapeHtml(r.label)}</option>`).join("");
+  document.getElementById("ue_company").innerHTML = `<option value="">ทุกบริษัท (ระดับกลุ่ม)</option>`
+    + (typeof orgCompanies === "function" ? orgCompanies() : []).map((c) => `<option value="${escapeHtml(c.id)}"${c.id === (isNew ? orgCurrentId() : u.company) ? " selected" : ""}>${escapeHtml(c.short)} — ${escapeHtml(c.name)}</option>`).join("");
   document.getElementById("ue_dept").innerHTML = `<option value="">ส่วนกลาง (ไม่สังกัดแผนก)</option>` + DEPT_WORKSPACES.map((w) => `<option value="${w.id}"${w.id === u.dept ? " selected" : ""}>${escapeHtml(w.name)}</option>`).join("");
   document.getElementById("ue_pin").value = "";
   document.getElementById("ue_pin").placeholder = isNew ? `ไม่กรอก = ${DEMO_PIN}` : "ไม่กรอก = ใช้ PIN เดิม";
@@ -161,6 +164,7 @@ function readUserEditor() {
     position: document.getElementById("ue_position").value.trim(),
     role: document.getElementById("ue_role").value,
     dept: document.getElementById("ue_dept").value,
+    company: document.getElementById("ue_company").value,
     active: document.getElementById("ue_active").checked,
     teams: [...document.querySelectorAll("#ue_teams input:checked")].map((i) => i.value),
     modules, docPerms,
@@ -181,7 +185,7 @@ function saveUserEditor() {
     const u = authUserById(adminEditingUser);
     const fields = [
       { key: "name", label: "ชื่อ" }, { key: "username", label: "ชื่อผู้ใช้" }, { key: "position", label: "ตำแหน่ง" },
-      { key: "role", label: "บทบาท" }, { key: "dept", label: "แผนก" }, { key: "active", label: "สถานะ" },
+      { key: "role", label: "บทบาท" }, { key: "dept", label: "แผนก" }, { key: "company", label: "บริษัท" }, { key: "active", label: "สถานะ" },
     ];
     const before = Object.assign({}, u, { teams: (u.teams || []).join(","), modules: JSON.stringify(u.modules), docPerms: JSON.stringify(u.docPerms || {}) });
     Object.assign(u, data);

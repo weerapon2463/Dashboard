@@ -205,6 +205,50 @@ function file_(id) {
 
 /* ------------------------------------------------------------------ readable report tabs */
 
+// One tab per BOM (model) plus an index tab; tabs of models that no longer exist are removed
+function mirrorBom_(d, co, tab) {
+  const models = d.models || [];
+  const meta = d.meta || {};
+  const bom = d.bom || {};
+  // drawing registered for each part code (latest non-cancelled), from the same company's documents
+  const drawings = {};
+  try {
+    const docsKey = "y2j-dept-docs-v1" + (co ? "--c-" + co : "");
+    const docs = JSON.parse(readAll_(true, [docsKey])[docsKey].value);
+    (docs.dwg || []).filter((x) => x.partCode && x.status !== "ยกเลิก").forEach((x) => {
+      const cur = drawings[x.partCode];
+      if (!cur || String(x.rev) > String(cur.rev)) drawings[x.partCode] = x;
+    });
+  } catch (err) { /* no drawings yet */ }
+  const tabName = (m) => tab("BOM-" + String(m).replace(/[\[\]\*\?\/\:]/g, "-"));
+  writeTab_(tab("BOM (สารบัญ)"), ["รุ่น / เลขที่ BOM", "Revision", "สถานะ", "จำนวนรายการ", "ผลิตเอง", "ซื้อ", "แก้ไขล่าสุด", "แท็บ"],
+    models.map((m) => {
+      const lines = bom[m] || [];
+      const mt = meta[m] || {};
+      const hist = mt.history || [];
+      const last = hist[hist.length - 1] || {};
+      const make = lines.filter((l) => l.source === "ผลิตเอง").length;
+      return ["BOM-" + m, mt.rev || "", mt.status || "", lines.length, make, lines.length - make, last.date || "", tabName(m)];
+    }));
+  models.forEach((m) => {
+    const mt = meta[m] || {};
+    writeTab_(tabName(m), ["ลำดับ", "รหัสชิ้นส่วน", "ชื่อชิ้นส่วน", "จำนวน/คัน", "หน่วย", "ผลิตเอง/ซื้อ", "แบบ (Drawing)", "หมายเหตุ", "BOM Rev.", "สถานะ BOM"],
+      (bom[m] || []).map((l, i) => {
+        const dw = drawings[l.code];
+        return [i + 1, l.code || "", l.part || "", l.qty, l.unit || "", l.source || "", dw ? dw.no + " Rev." + (dw.rev || "-") : "", l.note || "", mt.rev || "", mt.status || ""];
+      }));
+  });
+  // remove tabs of models that were deleted/renamed (only this company's BOM tabs)
+  const keep = {};
+  models.forEach((m) => { keep[tabName(m)] = true; });
+  const ss = sheet_();
+  ss.getSheets().forEach((sh) => {
+    const n = sh.getName();
+    const mine = co ? n.indexOf("BOM-") === 0 && n.slice(-(" (" + co + ")").length) === " (" + co + ")" : n.indexOf("BOM-") === 0 && !/ \([a-z0-9]{2,12}\)$/.test(n);
+    if (mine && !keep[n] && ss.getSheets().length > 1) ss.deleteSheet(sh);
+  });
+}
+
 function writeTab_(name, header, rows) {
   const ss = sheet_();
   const sh = ss.getSheetByName(name) || ss.insertSheet(name);
@@ -234,6 +278,11 @@ const STAGE_ = { pr: "เปิด PR", approve: "อนุมัติ PR", rfq
 function mirror_(key, value) {
   let d;
   try { d = JSON.parse(value); } catch (err) { return; }
+  // other companies' datasets are stored as "<key>--c-<company>" → their report tabs get a "(company)" suffix
+  const co = key.indexOf("--c-") >= 0 ? key.split("--c-")[1] : "";
+  const base = key.split("--c-")[0];
+  const tab = (name) => (co ? name + " (" + co + ")" : name);
+  key = base;
   const names = key === "y2j-auth-v1" ? {} : userNames_();
   const who = (id) => names[id] || id || "";
   if (key === "y2j-dept-docs-v1") {
@@ -242,10 +291,10 @@ function mirror_(key, value) {
       t.toUpperCase(), doc.no || "", doc.title || "", doc.status || "", doc.model || "", doc.owner || "", doc.date || doc.due || "",
       VIS_[(doc.visibility && doc.visibility.mode) || "all"] || "", who(doc.createdBy), doc.createdAt || "", who(doc.updatedBy), doc.updatedAt || "", (doc.files || []).length,
     ])));
-    writeTab_("เอกสาร", ["ชนิด", "เลขที่", "เรื่อง", "สถานะ", "รุ่น", "ผู้รับผิดชอบ", "วันที่", "การมองเห็น", "สร้างโดย", "สร้างเมื่อ", "แก้ล่าสุดโดย", "แก้เมื่อ", "ไฟล์แนบ"], rows);
+    writeTab_(tab("เอกสาร"), ["ชนิด", "เลขที่", "เรื่อง", "สถานะ", "รุ่น", "ผู้รับผิดชอบ", "วันที่", "การมองเห็น", "สร้างโดย", "สร้างเมื่อ", "แก้ล่าสุดโดย", "แก้เมื่อ", "ไฟล์แนบ"], rows);
   }
   if (key === "y2j-p2p-v1") {
-    writeTab_("จัดซื้อ", ["PR", "รายการ", "จำนวน", "หน่วย", "ผู้ขอ", "ผู้ขาย", "PO", "มูลค่า", "วันที่ต้องใช้", "นัดส่ง", "ขั้นล่าสุด", "เมื่อ", "โดย", "สถานะ", "ประเด็นค้าง"],
+    writeTab_(tab("จัดซื้อ"), ["PR", "รายการ", "จำนวน", "หน่วย", "ผู้ขอ", "ผู้ขาย", "PO", "มูลค่า", "วันที่ต้องใช้", "นัดส่ง", "ขั้นล่าสุด", "เมื่อ", "โดย", "สถานะ", "ประเด็นค้าง"],
       (d || []).map((c) => {
         const ev = (c.events || []).filter((e) => !e.superseded);
         const last = ev[ev.length - 1] || {};
@@ -255,17 +304,17 @@ function mirror_(key, value) {
       }));
   }
   if (key === "y2j-audit-v1") {
-    writeTab_("ประวัติ", ["วันเวลา", "ผู้ใช้", "การกระทำ", "เป้าหมาย", "รายละเอียด"],
+    writeTab_(tab("ประวัติ"), ["วันเวลา", "ผู้ใช้", "การกระทำ", "เป้าหมาย", "รายละเอียด"],
       (d || []).slice().reverse().map((e) => [e.ts, e.userName, e.action, e.target, e.detail]));
   }
   if (key === "y2j-auth-v1") {
     const teams = {};
     (d.teams || []).forEach((t) => { teams[t.id] = t.name; });
-    writeTab_("ผู้ใช้", ["ชื่อ", "ชื่อผู้ใช้", "ตำแหน่ง", "บทบาท", "แผนก", "ทีม", "ใช้งาน", "เข้าระบบล่าสุด"],
+    writeTab_(tab("ผู้ใช้"), ["ชื่อ", "ชื่อผู้ใช้", "ตำแหน่ง", "บทบาท", "แผนก", "ทีม", "ใช้งาน", "เข้าระบบล่าสุด"],
       (d.users || []).map((u) => [u.name, u.username, u.position || "", u.role, u.dept || "ส่วนกลาง", (u.teams || []).map((t) => teams[t] || t).join(", "), u.active ? "ใช่" : "ไม่", u.lastLogin || ""]));
   }
   if (key === "y2j-plans-v1") {
-    writeTab_("แผนงาน", ["แผน", "เจ้าของ", "สถานะ", "เริ่ม", "กำหนดเสร็จ", "ความคืบหน้า", "การมองเห็น"],
+    writeTab_(tab("แผนงาน"), ["แผน", "เจ้าของ", "สถานะ", "เริ่ม", "กำหนดเสร็จ", "ความคืบหน้า", "การมองเห็น"],
       (d || []).map((p) => {
         const items = p.items || [];
         const pct = p.status === "เสร็จแล้ว" ? 100 : items.length ? Math.round(items.filter((i) => i.done).length / items.length * 100) : 0;
@@ -273,11 +322,12 @@ function mirror_(key, value) {
       }));
   }
   if (key === "y2j-pilot-v1") {
-    writeTab_("Pilot", ["ตัวชี้วัด", "หน่วย", "ทิศทางที่ดี", "ก่อนใช้", "หลังใช้", "ครั้ง/เดือน", "จำนวนคน"],
+    writeTab_(tab("Pilot"), ["ตัวชี้วัด", "หน่วย", "ทิศทางที่ดี", "ก่อนใช้", "หลังใช้", "ครั้ง/เดือน", "จำนวนคน"],
       (d.kpis || []).map((k) => [k.name, k.unit, k.direction === "higher" ? "มากขึ้น" : "น้อยลง", k.before == null ? "" : k.before, k.after == null ? "" : k.after, k.timesPerMonth == null ? "" : k.timesPerMonth, k.people == null ? "" : k.people]));
   }
+  if (key === "y2j-bom-v1") mirrorBom_(d, co, tab);
   if (key === "y2j-workorders-v1") {
-    writeTab_("ใบสั่งผลิต", ["เลขที่", "PO", "รุ่น", "ไลน์", "จำนวน", "สถานะ", "เบิกวัสดุ %", "กำหนดส่ง", "ผู้รับผิดชอบ"],
+    writeTab_(tab("ใบสั่งผลิต"), ["เลขที่", "PO", "รุ่น", "ไลน์", "จำนวน", "สถานะ", "เบิกวัสดุ %", "กำหนดส่ง", "ผู้รับผิดชอบ"],
       (d || []).map((w) => [w.wo, w.po, w.model, w.department, w.qty, w.status, w.issuedPct, w.dueDate, w.assignee || w.claimedBy || ""]));
   }
 }

@@ -64,7 +64,7 @@ function markPMInitialStatus(hasStored) {
 
 function initPriorityData() {
   const stored = loadStoredPriorityJobs();
-  if (stored && stored.length) {
+  if (Array.isArray(stored)) {
     PRIORITY_JOBS.length = 0;
     stored.forEach((j) => PRIORITY_JOBS.push(j));
     return true;

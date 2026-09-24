@@ -118,6 +118,19 @@ function renderBomEditor() {
   const card = document.getElementById("bomEditor");
   if (!card || card.hidden) return;
   if (!MACHINE_MODELS.includes(bomModel)) bomModel = MACHINE_MODELS[0];
+  if (!bomModel) {
+    // no models yet (new company): only "create BOM" makes sense
+    document.getElementById("bomEdModel").innerHTML = "";
+    document.getElementById("bomEdBadge").innerHTML = "";
+    document.getElementById("bomEdStats").textContent = "ยังไม่มี BOM — กด \"+ สร้าง BOM รุ่นใหม่\" เพื่อเริ่ม";
+    ["bomReleaseBtn", "bomRevBtn", "bomAddLineBtn", "bomLockNote", "bomSheetBtn"].forEach((id) => { document.getElementById(id).hidden = true; });
+    document.getElementById("bomNewBtn").hidden = !bomCanEdit(currentRole());
+    document.querySelector("#bomEdTable tbody").innerHTML = "";
+    document.getElementById("bomEmptyNote").hidden = false;
+    document.getElementById("bomHistory").innerHTML = "";
+    return;
+  }
+  document.getElementById("bomSheetBtn").hidden = false;
 
   const sel = document.getElementById("bomEdModel");
   sel.innerHTML = MACHINE_MODELS.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)} — Rev.${escapeHtml(BOM_META[m].rev)}</option>`).join("");

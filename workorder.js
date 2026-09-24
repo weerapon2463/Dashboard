@@ -70,7 +70,7 @@ function markWOSaveFailed() {
 
 function initWorkOrderData() {
   const stored = loadStoredWorkOrders();
-  if (stored && stored.length) {
+  if (Array.isArray(stored)) {
     WORK_ORDERS.length = 0;
     stored.forEach((w) => WORK_ORDERS.push(w));
     return true;

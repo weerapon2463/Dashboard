@@ -56,8 +56,10 @@ function pinHash(pin, salt) {
 /* ---- store --------------------------------------------------------------- */
 
 function authSeed() {
+  // company "" = group level (may open every company)
   const u = (id, username, name, role, dept, position, teams) => ({
     id, username, name, role, dept, position, teams, active: true,
+    company: role === "admin" || role === "group" ? "" : "y2j",
     pin: pinHash(DEMO_PIN, id), modules: null, docPerms: {}, createdAt: "2026-09-24T08:00:00", lastLogin: "",
   });
   return {
@@ -82,7 +84,16 @@ function authSeed() {
 function authLoad() {
   try {
     const parsed = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || "null");
-    if (parsed && Array.isArray(parsed.users) && parsed.users.length) { AUTH = parsed; return; }
+    if (parsed && Array.isArray(parsed.users) && parsed.users.length) {
+      AUTH = parsed;
+      // users created before companies existed belong to the original company (admins/executives: group level)
+      let migrated = false;
+      AUTH.users.forEach((u) => {
+        if (u.company === undefined) { u.company = u.role === "admin" || u.role === "group" ? "" : "y2j"; migrated = true; }
+      });
+      if (migrated) authSave();
+      return;
+    }
   } catch (e) { /* fall through */ }
   AUTH = authSeed();
   authSave();
@@ -270,6 +281,7 @@ function auditLog(action, target, detail) {
     ts: new Date().toISOString(),
     user: AUTH_USER ? AUTH_USER.id : "",
     userName: AUTH_USER ? AUTH_USER.name : "(ไม่ระบุ)",
+    company: typeof Y2JStore !== "undefined" ? Y2JStore.company() : "",
     action, target: target || "", detail: detail || "",
   });
   while (log.length > AUDIT_MAX) log.shift();

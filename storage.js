@@ -15,8 +15,12 @@ const Y2JStore = (() => {
   const SHARED = [
     "y2j-auth-v1", "y2j-audit-v1", "y2j-dept-docs-v1", "y2j-bom-v1", "y2j-p2p-v1", "y2j-plans-v1", "y2j-pilot-v1",
     "y2j-workorders-v1", "y2j-procurement-v1", "y2j-master-schedule-v1", "y2j-priority-jobs-v1", "y2j-resource-v1",
-    "y2j-form-settings-v1",
+    "y2j-form-settings-v1", "y2j-org-v1",
   ];
+  // Datasets that belong to one company. Users/teams/companies and the audit log are group-wide.
+  const COMPANY_SCOPED = SHARED.filter((k) => k !== "y2j-auth-v1" && k !== "y2j-audit-v1");
+  const COMPANY_KEY = "y2j-company-v1"; // per device: which company this browser is working in
+  const DEFAULT_COMPANY = "y2j";
   const POLL_MS = 30000;
 
   const origSet = Storage.prototype.setItem;
@@ -27,6 +31,12 @@ const Y2JStore = (() => {
   const readJson = (k, dflt) => { try { return JSON.parse(rawGet(k) || "null") || dflt; } catch (e) { return dflt; } };
 
   let cfg = readJson(CONFIG_KEY, { mode: "local", url: "", token: "" });
+  let company = rawGet(COMPANY_KEY) || DEFAULT_COMPANY;
+  if (!/^[a-z0-9]{2,12}$/.test(company)) company = DEFAULT_COMPANY;
+  // The original company keeps the plain keys, so data saved before companies existed stays put
+  const phys = (k) => (company !== DEFAULT_COMPANY && COMPANY_SCOPED.includes(k) ? `${k}--c-${company}` : k);
+  const baseOf = (pk) => String(pk).split("--c-")[0];
+  const isShared = (pk) => SHARED.includes(baseOf(pk));
   let meta = readJson(META_KEY, { keys: {}, pending: [] });
   const dirty = new Set(meta.pending || []);
   let pushTimer = null;
@@ -55,14 +65,28 @@ const Y2JStore = (() => {
     } catch (e) { return ""; }
   };
 
-  // Intercept saves of shared datasets
+  // Every module keeps using the plain key names; here they are mapped to the current company's copy,
+  // and saves of shared datasets are queued for Google Sheets.
+  const origRemove = Storage.prototype.removeItem;
+  Storage.prototype.getItem = function (k) {
+    return origGet.call(this, this === ls ? phys(k) : k);
+  };
+  Storage.prototype.removeItem = function (k) {
+    return origRemove.call(this, this === ls ? phys(k) : k);
+  };
   Storage.prototype.setItem = function (k, v) {
-    origSet.call(this, k, v);
-    if (this === ls && isRemote() && SHARED.includes(k)) {
-      dirty.add(k);
+    const pk = this === ls ? phys(k) : k;
+    origSet.call(this, pk, v);
+    if (this === ls && isRemote() && isShared(pk)) {
+      dirty.add(pk);
       saveMeta();
       schedulePush();
     }
+  };
+  const localSharedKeys = () => {
+    const out = [];
+    for (let i = 0; i < ls.length; i++) { const k = ls.key(i); if (isShared(k)) out.push(k); }
+    return out;
   };
 
   /* ---- transport ---------------------------------------------------------- */
@@ -158,7 +182,8 @@ const Y2JStore = (() => {
   async function pullAll() {
     const res = await api("pull", {});
     const data = res.data || {};
-    SHARED.forEach((key) => {
+    const keys = new Set([...Object.keys(data).filter(isShared), ...localSharedKeys()]);
+    keys.forEach((key) => {
       const entry = data[key];
       const local = rawGet(key);
       if (!entry) {
@@ -224,7 +249,7 @@ const Y2JStore = (() => {
     if (!isRemote() || document.hidden || pushing) return;
     try {
       const res = await api("versions", {});
-      const changed = SHARED.filter((k) => res.versions[k] && res.versions[k].version > ((meta.keys[k] || {}).version || 0) && !dirty.has(k));
+      const changed = Object.keys(res.versions).filter((k) => isShared(k) && res.versions[k].version > ((meta.keys[k] || {}).version || 0) && !dirty.has(k));
       if (changed.length) {
         const pulled = await api("pull", { keys: changed.join(",") });
         changed.forEach((k) => { if (pulled.data[k]) applyRemote(k, pulled.data[k]); });
@@ -345,7 +370,7 @@ const Y2JStore = (() => {
   // Overwrite the sheet with this device's data (first-time migration or recovery)
   async function forceUpload() {
     let n = 0;
-    for (const key of SHARED) {
+    for (const key of localSharedKeys()) {
       const value = rawGet(key);
       if (value === null) continue;
       const res = await api("push", { key, value, force: true, by: who() }, true);
@@ -364,8 +389,15 @@ const Y2JStore = (() => {
     return `${base}?sheet=${encodeURIComponent(cfg.url)}&key=${encodeURIComponent(cfg.token)}`;
   }
 
+  function setCompany(id) {
+    rawSet(COMPANY_KEY, id);
+    try { sessionStorage.removeItem("y2j-return-view"); } catch (e) { /* ignore */ }
+    location.reload();
+  }
+
   return {
     ready, test, connect, disconnect, forceUpload, setupLink, uploadFile, fetchFile, flush,
+    company: () => company, setCompany,
     isRemote, config: () => Object.assign({}, cfg), status: () => Object.assign({ pending: [...dirty] }, status),
     sharedKeys: SHARED, merge3,
   };

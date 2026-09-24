@@ -62,7 +62,7 @@ function markMSInitialStatus(hasStored) {
 
 function initScheduleData() {
   const stored = loadStoredSchedule();
-  if (stored && stored.length) {
+  if (Array.isArray(stored)) {
     MASTER_SCHEDULE.length = 0;
     stored.forEach((row) => MASTER_SCHEDULE.push(row));
     return true;

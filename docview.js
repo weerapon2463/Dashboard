@@ -28,11 +28,13 @@ let dwgRegRows = [];       // pending rows in the drawing-registration modal
 let docViewFileName = "document"; // base name for the generated PDF
 
 function formSettings() {
-  try {
-    return Object.assign({}, FORM_DEFAULTS, JSON.parse(localStorage.getItem(FORM_SETTINGS_KEY) || "{}"));
-  } catch (e) {
-    return Object.assign({}, FORM_DEFAULTS);
-  }
+  const c = typeof orgCurrent === "function" && typeof AUTH !== "undefined" && AUTH ? orgCurrent() : null;
+  const companyDefaults = c ? { companyEn: c.name, logo: c.logo || "" } : {};
+  let stored = {};
+  try { stored = JSON.parse(localStorage.getItem(FORM_SETTINGS_KEY) || "{}") || {}; } catch (e) { /* defaults */ }
+  const fs = Object.assign({}, FORM_DEFAULTS, companyDefaults, stored);
+  if (!stored.logo && c && c.logo) fs.logo = c.logo; // an uploaded company logo always shows unless the form has its own
+  return fs;
 }
 
 /* ---- file storage (IndexedDB) ------------------------------------------ */

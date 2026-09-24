@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Dashboard | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260925a">
+<link rel="stylesheet" href="style.css?v=20260925b">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -102,6 +102,9 @@
           <span class="data-badge">ข้อมูลตัวอย่าง (Sample Data)</span>
           <label class="role-picker" for="roleSelect">มุมมอง:
             <select id="roleSelect" autocomplete="off"></select>
+          </label>
+          <label class="role-picker company-picker" id="companyPicker" for="companySelect" hidden>บริษัท:
+            <select id="companySelect"></select>
           </label>
           <span class="sync-chip" id="syncChip" hidden></span>
           <div class="user-chip" id="userChip" hidden></div>
@@ -481,15 +484,16 @@
               <button type="button" class="dept-tab admin-tab" data-tab="users">ผู้ใช้งาน &amp; สิทธิ์</button>
               <button type="button" class="dept-tab admin-tab" data-tab="teams">ทีม</button>
               <button type="button" class="dept-tab admin-tab" data-tab="audit">ประวัติการใช้งาน (Audit Log)</button>
+              <button type="button" class="dept-tab admin-tab" data-tab="org">🏢 องค์กร (บริษัท / ฝ่าย / โลโก้)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="storage">☁ ที่เก็บข้อมูล</button>
             </div>
-            <p class="admin-note">ระบบต้นแบบ: ผู้ใช้ สิทธิ์ และประวัติ เก็บในเบราว์เซอร์ของเครื่องนี้ ยังไม่ใช่ระบบความปลอดภัยจริงและยังไม่ซิงก์ข้ามเครื่อง — ขั้นต่อไปคือย้ายไปฐานข้อมูลกลาง</p>
+            <p class="admin-note">ข้อมูลใช้ร่วมกันทุกเครื่องเมื่อเชื่อม Google Sheets (แท็บ "ที่เก็บข้อมูล") · การเข้าสู่ระบบด้วย PIN เป็นระดับแอป — ถ้าต้องการความปลอดภัยระดับองค์กร ขั้นต่อไปคือเข้าสู่ระบบด้วยบัญชี Google ของบริษัท</p>
 
             <div class="admin-panel" data-panel="users">
               <div class="filter-row"><button id="adminAddUserBtn" class="btn-primary" type="button">+ เพิ่มผู้ใช้</button></div>
               <div class="table-scroll">
                 <table class="data-table" id="adminUserTable">
-                  <thead><tr><th>ชื่อ / ตำแหน่ง</th><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>แผนก</th><th>ทีม</th><th>สิทธิ์</th><th>สถานะ</th><th>เข้าระบบล่าสุด</th><th>การดำเนินการ</th></tr></thead>
+                  <thead><tr><th>ชื่อ / ตำแหน่ง</th><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>แผนก / บริษัท</th><th>ทีม</th><th>สิทธิ์</th><th>สถานะ</th><th>เข้าระบบล่าสุด</th><th>การดำเนินการ</th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>
@@ -500,6 +504,31 @@
               <div class="team-grid" id="adminTeamList"></div>
             </div>
 
+            <div class="admin-panel" data-panel="org" hidden>
+              <div class="card-header card-header-actions org-head">
+                <div><h3>บริษัทในกลุ่ม</h3><p class="card-sub">แต่ละบริษัทมีโลโก้และข้อมูลแยกกันทั้งหมด (เอกสาร จัดซื้อ BOM แผนงาน ฯลฯ) — ผู้ใช้ที่ไม่ได้ระบุบริษัทคือระดับกลุ่ม สลับดูได้ทุกบริษัท</p></div>
+                <button id="orgAddCompanyBtn" class="btn-primary" type="button">+ เพิ่มบริษัท</button>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table" id="orgCompanyTable">
+                  <thead><tr><th>โลโก้</th><th>บริษัท</th><th class="num">ผู้ใช้</th><th>การดำเนินการ</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <div class="card-header card-header-actions org-head">
+                <div><h3 id="orgDeptTitle">ฝ่าย / แผนก</h3><p class="card-sub">เพิ่ม แก้ชื่อ หรือลบฝ่ายของบริษัทนี้ และเลือกว่าแต่ละฝ่ายใช้เอกสารชนิดไหน — มีผลกับเมนู "งานตามแผนก" และสิทธิ์ของผู้ใช้ทันที</p></div>
+                <div class="pilot-toolbar">
+                  <button id="orgResetDeptBtn" class="btn-secondary" type="button">คืนค่ามาตรฐาน</button>
+                  <button id="orgAddDeptBtn" class="btn-primary" type="button">+ เพิ่มฝ่าย / แผนก</button>
+                </div>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table" id="orgDeptTable">
+                  <thead><tr><th>ฝ่าย / แผนก</th><th>เอกสารที่ใช้</th><th class="num">ผู้ใช้</th><th></th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
             <div class="admin-panel" data-panel="storage" hidden>
               <div class="storage-status" id="storageStatus"></div>
               <div class="modal-grid storage-form">
@@ -1363,6 +1392,7 @@
         <div class="form-field"><label for="ue_pin">PIN (ตัวเลข 4–6 หลัก)</label><input id="ue_pin" inputmode="numeric" autocomplete="new-password"></div>
         <div class="form-field"><label for="ue_role">บทบาท</label><select id="ue_role"></select></div>
         <div class="form-field"><label for="ue_dept">แผนก</label><select id="ue_dept"></select></div>
+        <div class="form-field"><label for="ue_company">บริษัท</label><select id="ue_company"></select></div>
       </div>
       <label class="fs-check"><input type="checkbox" id="ue_active"> เปิดใช้งานบัญชีนี้</label>
       <div class="ue-section-title">ทีมที่สังกัด</div>
@@ -1458,6 +1488,53 @@
       <div class="modal-actions">
         <button id="p2pNewCancel" class="btn-secondary" type="button">ยกเลิก</button>
         <button id="p2pNewSave" class="btn-primary" type="button">เปิดคำขอซื้อ</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="companyBackdrop">
+    <div class="modal modal-wide">
+      <h3 id="coTitle">บริษัท</h3>
+      <div class="fs-logo-row">
+        <div class="fs-logo-preview org-logo-big" id="coLogoPreview"></div>
+        <div class="pilot-toolbar">
+          <label class="btn-secondary" for="coLogoFile">อัปโหลดโลโก้</label>
+          <button id="coLogoRemove" class="btn-secondary" type="button">ใช้ตัวย่อแทนโลโก้</button>
+        </div>
+        <input type="file" id="coLogoFile" accept="image/*" hidden>
+      </div>
+      <div class="modal-grid">
+        <div class="form-field modal-grid-wide"><label for="co_name">ชื่อบริษัท *</label><input id="co_name" placeholder="เช่น บริษัท น้ำตาลพิษณุโลก จำกัด"></div>
+        <div class="form-field"><label for="co_short">ตัวย่อ (แสดงบนเมนู, ไม่เกิน 8 ตัว) *</label><input id="co_short" maxlength="8" placeholder="เช่น PSL"></div>
+        <div class="form-field"><label for="co_id">รหัสบริษัท (a-z, 0-9) *</label><input id="co_id" maxlength="12" placeholder="เช่น psl" autocomplete="off"></div>
+      </div>
+      <div id="coStartBox">
+        <div class="ue-section-title">เริ่มต้นข้อมูลของบริษัทนี้</div>
+        <label class="vis-opt"><input type="radio" name="coStart" value="empty" checked> ข้อมูลว่าง — เริ่มใช้งานจริงจากศูนย์</label>
+        <label class="vis-opt"><input type="radio" name="coStart" value="sample"> ข้อมูลตัวอย่าง — สำหรับทดลอง/สาธิต</label>
+      </div>
+      <div class="modal-actions">
+        <button id="coCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="coSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="deptEdBackdrop">
+    <div class="modal modal-xwide">
+      <h3 id="dpTitle">ฝ่าย / แผนก</h3>
+      <div class="modal-grid">
+        <div class="form-field"><label for="dp_name">ชื่อฝ่าย / แผนก *</label><input id="dp_name" placeholder="เช่น ฝ่ายความปลอดภัย (จป.)"></div>
+        <div class="form-field"><label for="dp_desc">หน้าที่ / คำอธิบาย</label><input id="dp_desc"></div>
+      </div>
+      <div class="ue-section-title">เอกสารที่ฝ่ายนี้ใช้ (เลือกได้หลายชนิด ใช้ร่วมกับฝ่ายอื่นได้)</div>
+      <div class="dp-types" id="dp_types"></div>
+      <div class="ue-section-title">เครื่องมือในระบบที่เกี่ยวข้อง (ปุ่มลัด)</div>
+      <div class="vis-group" id="dp_tools"></div>
+      <div class="modal-actions">
+        <button id="dpDeleteBtn" class="btn-secondary" type="button" hidden>ลบฝ่ายนี้</button>
+        <button id="dpCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="dpSaveBtn" class="btn-primary" type="button">บันทึก</button>
       </div>
     </div>
   </div>
@@ -1558,28 +1635,29 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260925a"></script>
-  <script src="data.js?v=20260925a"></script>
-  <script src="priority-matrix.js?v=20260925a"></script>
-  <script src="capacity-planning.js?v=20260925a"></script>
-  <script src="master-schedule.js?v=20260925a"></script>
-  <script src="make-or-buy.js?v=20260925a"></script>
-  <script src="resource.js?v=20260925a"></script>
-  <script src="procurement.js?v=20260925a"></script>
-  <script src="workorder.js?v=20260925a"></script>
-  <script src="alerts.js?v=20260925a"></script>
-  <script src="overview-charts.js?v=20260925a"></script>
-  <script src="pilot.js?v=20260925a"></script>
-  <script src="dept-data.js?v=20260925a"></script>
-  <script src="dept-samples.js?v=20260925a"></script>
-  <script src="dept.js?v=20260925a"></script>
-  <script src="bom.js?v=20260925a"></script>
-  <script src="docview.js?v=20260925a"></script>
-  <script src="p2p-data.js?v=20260925a"></script>
-  <script src="p2p.js?v=20260925a"></script>
-  <script src="auth.js?v=20260925a"></script>
-  <script src="admin.js?v=20260925a"></script>
-  <script src="plans.js?v=20260925a"></script>
-  <script src="app.js?v=20260925a"></script>
+  <script src="storage.js?v=20260925b"></script>
+  <script src="data.js?v=20260925b"></script>
+  <script src="priority-matrix.js?v=20260925b"></script>
+  <script src="capacity-planning.js?v=20260925b"></script>
+  <script src="master-schedule.js?v=20260925b"></script>
+  <script src="make-or-buy.js?v=20260925b"></script>
+  <script src="resource.js?v=20260925b"></script>
+  <script src="procurement.js?v=20260925b"></script>
+  <script src="workorder.js?v=20260925b"></script>
+  <script src="alerts.js?v=20260925b"></script>
+  <script src="overview-charts.js?v=20260925b"></script>
+  <script src="pilot.js?v=20260925b"></script>
+  <script src="dept-data.js?v=20260925b"></script>
+  <script src="dept-samples.js?v=20260925b"></script>
+  <script src="org.js?v=20260925b"></script>
+  <script src="dept.js?v=20260925b"></script>
+  <script src="bom.js?v=20260925b"></script>
+  <script src="docview.js?v=20260925b"></script>
+  <script src="p2p-data.js?v=20260925b"></script>
+  <script src="p2p.js?v=20260925b"></script>
+  <script src="auth.js?v=20260925b"></script>
+  <script src="admin.js?v=20260925b"></script>
+  <script src="plans.js?v=20260925b"></script>
+  <script src="app.js?v=20260925b"></script>
 </body>
 </html>
