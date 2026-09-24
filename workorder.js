@@ -286,7 +286,9 @@ function renderIssuanceTable() {
   tbody.innerHTML = "";
   const tracked = typeof bxWoIssuanceRows === "function" ? bxWoIssuanceRows() : [];
   const trackedWos = new Set(tracked.map((r) => r.wo));
-  tracked.concat(MATERIAL_ISSUANCE.filter((r) => !trackedWos.has(r.wo))).forEach((row) => {
+  // built-in sample rows only for work orders that still exist and have no requisitions in the system
+  const woIds = new Set(WORK_ORDERS.map((w) => w.wo));
+  tracked.concat(MATERIAL_ISSUANCE.filter((r) => woIds.has(r.wo) && !trackedWos.has(r.wo))).forEach((row) => {
     const pillClass = ISSUANCE_STATUS_META[row.status] || "pill-good";
     const remaining = row.required - row.issued;
     const tr = document.createElement("tr");
@@ -305,7 +307,7 @@ function renderIssuanceTable() {
 function updateWorkOrderStats() {
   // สถิติในหน้าภาพรวมนับจากใบสั่งผลิตทั้งหมดของทุกไลน์ ไม่ผูกกับตัวกรองแผนกในตาราง
   const lateCount = WORK_ORDERS.filter((w) => w.status === "ล่าช้า").length;
-  const avgIssuedPct = Math.round(WORK_ORDERS.reduce((s, w) => s + w.issuedPct, 0) / WORK_ORDERS.length);
+  const avgIssuedPct = WORK_ORDERS.length ? Math.round(WORK_ORDERS.reduce((s, w) => s + (Number(w.issuedPct) || 0), 0) / WORK_ORDERS.length) : 0;
 
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   set("woStatLate", lateCount);
