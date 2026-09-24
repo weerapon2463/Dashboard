@@ -1,0 +1,374 @@
+/* ==========================================================================
+   Users, login, permissions, document visibility and audit trail.
+
+   PROTOTYPE NOTE: everything here lives in this browser's localStorage, so it
+   organises who-sees-what for day-to-day use and demonstrates the design,
+   but it is NOT real security (anyone with the device can read storage) and
+   it does not sync between devices. Moving AUTH_STORE / audit / documents to
+   a shared backend (e.g. Google Sheets + Apps Script, Firebase) is the next
+   step for true multi-user use.
+   ========================================================================== */
+
+const AUTH_STORAGE_KEY = "y2j-auth-v1";
+const SESSION_STORAGE_KEY = "y2j-session-v1";
+const AUDIT_STORAGE_KEY = "y2j-audit-v1";
+const AUDIT_MAX = 3000;
+const DEMO_PIN = "1234";
+
+const AUTH_ROLES = [
+  { id: "admin", label: "ผู้ดูแลระบบ (Admin)" },
+  { id: "plant", label: "ผู้จัดการโรงงาน/บริษัท" },
+  { id: "depthead", label: "หัวหน้าแผนก" },
+  { id: "operator", label: "พนักงาน (Operator)" },
+  { id: "group", label: "ผู้บริหารระดับกลุ่ม" },
+];
+
+const PERM_LEVELS = [
+  { id: "none", label: "ไม่เห็น" },
+  { id: "view", label: "ดูได้" },
+  { id: "create", label: "สร้าง/เสนอได้" },
+  { id: "manage", label: "จัดการ/อนุมัติ" },
+];
+const PERM_RANK = { none: 0, view: 1, create: 2, manage: 3 };
+
+// Anyone may raise these, whatever their department (repair, defect, safety, material, change request)
+const CROSS_CREATE_TYPES = ["mtr", "ncr", "saf", "mreq", "ecr"];
+
+const ALL_VIEWS = [
+  ["overview", "ภาพรวม"], ["pilot", "ผลทดสอบนำร่อง"], ["dept", "งานตามแผนก / เอกสาร"], ["plans", "แผนงานของฉัน"],
+  ["mytasks", "งานของฉัน"], ["priority", "Priority Matrix"], ["capacity", "Capacity Planning"], ["schedule", "Master Schedule"],
+  ["makeorbuy", "Make-or-Buy"], ["resource", "ทรัพยากรการผลิต"], ["procurement", "จัดซื้อ"], ["workorder", "ใบสั่งผลิต & BOM"],
+  ["admin", "ผู้ดูแลระบบ (Admin)"],
+];
+
+let AUTH = null;        // { users, teams }
+let AUTH_USER = null;   // the signed-in user object (from AUTH.users)
+
+/* ---- hashing (obfuscation only — see prototype note) --------------------- */
+
+function pinHash(pin, salt) {
+  let h = 2166136261;
+  const s = `${salt}:${pin}:y2j`;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16);
+}
+
+/* ---- store --------------------------------------------------------------- */
+
+function authSeed() {
+  const u = (id, username, name, role, dept, position, teams) => ({
+    id, username, name, role, dept, position, teams, active: true,
+    pin: pinHash(DEMO_PIN, id), modules: null, docPerms: {}, createdAt: "2026-09-24T08:00:00", lastLogin: "",
+  });
+  return {
+    users: [
+      u("u-admin", "admin", "ผู้ดูแลระบบ", "admin", "", "IT / ผู้ดูแลระบบ", []),
+      u("u-plant", "plant", "ผู้จัดการโรงงาน", "plant", "", "ผู้จัดการโรงงาน", ["t-yt6500", "t-award"]),
+      u("u-rnd", "rnd", "หัวหน้าฝ่าย R&D", "depthead", "rnd", "หัวหน้าฝ่ายวิศวกรรม", ["t-yt6500", "t-qcc"]),
+      u("u-qc", "qc", "หัวหน้า QC", "depthead", "qc", "หัวหน้าฝ่ายควบคุมคุณภาพ", ["t-qcc"]),
+      u("u-prod", "prod", "หัวหน้าไลน์ประกอบ 1", "depthead", "prod", "หัวหน้าไลน์ผลิต", ["t-yt6500"]),
+      u("u-op1", "op1", "ช่างประกอบ ไลน์ 1", "operator", "prod", "ช่างประกอบ", []),
+      u("u-pur", "pur", "เจ้าหน้าที่จัดซื้อ", "operator", "pur", "เจ้าหน้าที่จัดซื้อ", []),
+      u("u-exec", "exec", "ผู้บริหารกลุ่ม", "group", "", "ผู้บริหารระดับกลุ่ม", ["t-award"]),
+    ],
+    teams: [
+      { id: "t-yt6500", name: "ทีมโครงการ YT6500" },
+      { id: "t-qcc", name: "ทีมปรับปรุงคุณภาพ (QCC)" },
+      { id: "t-award", name: "คณะทำงาน PS Innovation Award" },
+    ],
+  };
+}
+
+function authLoad() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || "null");
+    if (parsed && Array.isArray(parsed.users) && parsed.users.length) { AUTH = parsed; return; }
+  } catch (e) { /* fall through */ }
+  AUTH = authSeed();
+  authSave();
+}
+
+function authSave() {
+  try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(AUTH)); } catch (e) { showToast("บันทึกข้อมูลผู้ใช้ไม่สำเร็จ", "warn"); }
+}
+
+function authUserById(id) { return AUTH.users.find((u) => u.id === id) || null; }
+function authTeamById(id) { return AUTH.teams.find((t) => t.id === id) || null; }
+function authCurrentUser() { return AUTH_USER; }
+function authIsAdmin() { return !!AUTH_USER && AUTH_USER.role === "admin"; }
+function authRoleLabel(role) { return (AUTH_ROLES.find((r) => r.id === role) || {}).label || role; }
+function authDeptName(id) {
+  if (!id) return "ส่วนกลาง";
+  const ws = typeof DEPT_WORKSPACES !== "undefined" ? DEPT_WORKSPACES.find((w) => w.id === id) : null;
+  return ws ? ws.name : id;
+}
+
+// Role used by the older role-gated modules (admin behaves like plant manager there)
+function authLegacyRole() {
+  if (!AUTH_USER) return null;
+  return AUTH_USER.role === "admin" ? "plant" : AUTH_USER.role;
+}
+
+/* ---- session ------------------------------------------------------------- */
+
+// Returns true when a valid user is signed in
+function authInit() {
+  authLoad();
+  let id = null;
+  try { id = localStorage.getItem(SESSION_STORAGE_KEY); } catch (e) { /* ignore */ }
+  const u = id ? authUserById(id) : null;
+  AUTH_USER = u && u.active ? u : null;
+  return !!AUTH_USER;
+}
+
+function authSignIn(user, via) {
+  try { localStorage.setItem(SESSION_STORAGE_KEY, user.id); } catch (e) { /* ignore */ }
+  user.lastLogin = new Date().toISOString();
+  authSave();
+  AUTH_USER = user;
+  auditLog(via === "impersonate" ? "เข้าใช้แทนผู้ใช้" : "เข้าสู่ระบบ", user.username, via === "impersonate" ? `ผู้ดูแลเข้าใช้เป็น ${user.name}` : "");
+  location.reload();
+}
+
+function authSignOut() {
+  auditLog("ออกจากระบบ", AUTH_USER ? AUTH_USER.username : "", "");
+  try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch (e) { /* ignore */ }
+  location.reload();
+}
+
+/* ---- permissions ----------------------------------------------------------- */
+
+function roleDefaultModules(role) {
+  if (role === "admin") return ALL_VIEWS.map((v) => v[0]);
+  const base = MODULE_ACCESS[role] || MODULE_ACCESS.group;
+  return base.concat(["plans"]);
+}
+
+function authAllowedModules(user) {
+  const u = user || AUTH_USER;
+  if (!u) return null;
+  const list = Array.isArray(u.modules) ? u.modules.slice() : roleDefaultModules(u.role);
+  if (u.role === "admin" && !list.includes("admin")) list.push("admin");
+  if (u.role !== "admin") return list.filter((v) => v !== "admin");
+  return list;
+}
+
+function roleDefaultDocPerm(user, type) {
+  const role = user.role;
+  if (role === "admin" || role === "plant") return "manage";
+  if (role === "group") return "view";
+  const ownDept = DEPT_WORKSPACES.find((w) => w.id === user.dept);
+  const own = !!ownDept && ownDept.docTypes.includes(type);
+  if (role === "depthead") {
+    if (own) return "manage";
+    return CROSS_CREATE_TYPES.includes(type) ? "create" : "view";
+  }
+  // operator
+  if (own) return "create";
+  return CROSS_CREATE_TYPES.includes(type) ? "create" : "none";
+}
+
+function authDocPerm(type, user) {
+  const u = user || AUTH_USER;
+  if (!u) return "manage";
+  const set = u.docPerms && u.docPerms[type];
+  return set || roleDefaultDocPerm(u, type);
+}
+
+function authCan(type, level) {
+  return PERM_RANK[authDocPerm(type)] >= PERM_RANK[level];
+}
+
+/* ---- document visibility --------------------------------------------------- */
+
+const VIS_MODES = [
+  { id: "all", label: "ทุกคนที่มีสิทธิ์ดูเอกสารชนิดนี้", icon: "🌐" },
+  { id: "dept", label: "เฉพาะแผนกของผู้สร้าง", icon: "🏢" },
+  { id: "custom", label: "ลับ — เฉพาะทีม/แผนก/บุคคลที่เลือก", icon: "🔒" },
+  { id: "private", label: "ส่วนตัว — เฉพาะผู้สร้าง", icon: "👤" },
+];
+
+function visLabel(vis) {
+  const m = VIS_MODES.find((x) => x.id === ((vis && vis.mode) || "all")) || VIS_MODES[0];
+  if (m.id === "custom" && vis) {
+    const parts = []
+      .concat((vis.teams || []).map((t) => (authTeamById(t) || {}).name).filter(Boolean))
+      .concat((vis.depts || []).map(authDeptName))
+      .concat((vis.users || []).map((u) => (authUserById(u) || {}).name).filter(Boolean));
+    return `${m.icon} ลับ: ${parts.join(", ") || "ยังไม่ได้เลือก"}`;
+  }
+  if (m.id === "dept" && vis) return `${m.icon} เฉพาะ${authDeptName(vis.ownerDept)}`;
+  return `${m.icon} ${m.id === "all" ? "ทั่วไป" : m.label}`;
+}
+
+// Can `user` see an item carrying `vis` created by `createdBy`?
+function visAllows(vis, createdBy, user) {
+  const u = user || AUTH_USER;
+  if (!u) return true;
+  if (u.role === "admin") return true;
+  if (createdBy && createdBy === u.id) return true;
+  const mode = (vis && vis.mode) || "all";
+  if (mode === "all") return true;
+  if (mode === "private") return false;
+  if (mode === "dept") return !!vis.ownerDept && vis.ownerDept === u.dept;
+  if (mode === "custom") {
+    return (vis.users || []).includes(u.id)
+      || (vis.depts || []).includes(u.dept)
+      || (vis.teams || []).some((t) => (u.teams || []).includes(t));
+  }
+  return true;
+}
+
+function authCanSeeDoc(type, doc) {
+  if (!AUTH_USER) return true;
+  if (!authCan(type, "view") && doc.createdBy !== AUTH_USER.id) return false;
+  return visAllows(doc.visibility, doc.createdBy);
+}
+
+// Visibility editor used by document and plan forms
+function visEditorHtml(prefix, vis) {
+  const v = vis || { mode: "all" };
+  const chk = (group, id, label, on) => `<label class="vis-opt"><input type="checkbox" data-vis-${prefix}="${group}" value="${escapeHtml(id)}"${on ? " checked" : ""}> ${escapeHtml(label)}</label>`;
+  return `
+    <div class="form-field">
+      <label for="${prefix}VisMode">การมองเห็น / ชั้นความลับ</label>
+      <select id="${prefix}VisMode">${VIS_MODES.map((m) => `<option value="${m.id}"${m.id === (v.mode || "all") ? " selected" : ""}>${m.icon} ${escapeHtml(m.label)}</option>`).join("")}</select>
+    </div>
+    <div class="vis-custom" id="${prefix}VisCustom"${v.mode === "custom" ? "" : " hidden"}>
+      <div class="vis-group"><div class="vis-group-title">ทีม</div>${AUTH.teams.map((t) => chk("teams", t.id, t.name, (v.teams || []).includes(t.id))).join("") || '<span class="muted-inline">ยังไม่มีทีม</span>'}</div>
+      <div class="vis-group"><div class="vis-group-title">แผนก</div>${DEPT_WORKSPACES.map((w) => chk("depts", w.id, w.name, (v.depts || []).includes(w.id))).join("")}</div>
+      <div class="vis-group"><div class="vis-group-title">บุคคล</div>${AUTH.users.filter((u) => u.active).map((u) => chk("users", u.id, u.name, (v.users || []).includes(u.id))).join("")}</div>
+    </div>`;
+}
+
+function visEditorWire(prefix) {
+  const sel = document.getElementById(`${prefix}VisMode`);
+  if (!sel) return;
+  sel.addEventListener("change", () => { document.getElementById(`${prefix}VisCustom`).hidden = sel.value !== "custom"; });
+}
+
+function visEditorRead(prefix, ownerDept) {
+  const sel = document.getElementById(`${prefix}VisMode`);
+  if (!sel) return undefined;
+  const pick = (g) => [...document.querySelectorAll(`[data-vis-${prefix}="${g}"]:checked`)].map((i) => i.value);
+  const mode = sel.value;
+  const vis = { mode };
+  if (mode === "dept") vis.ownerDept = ownerDept || (AUTH_USER && AUTH_USER.dept) || "";
+  if (mode === "custom") { vis.teams = pick("teams"); vis.depts = pick("depts"); vis.users = pick("users"); }
+  return vis;
+}
+
+/* ---- audit trail ----------------------------------------------------------- */
+
+function auditLoad() {
+  try { return JSON.parse(localStorage.getItem(AUDIT_STORAGE_KEY) || "[]"); } catch (e) { return []; }
+}
+
+function auditLog(action, target, detail) {
+  const log = auditLoad();
+  log.push({
+    ts: new Date().toISOString(),
+    user: AUTH_USER ? AUTH_USER.id : "",
+    userName: AUTH_USER ? AUTH_USER.name : "(ไม่ระบุ)",
+    action, target: target || "", detail: detail || "",
+  });
+  while (log.length > AUDIT_MAX) log.shift();
+  try { localStorage.setItem(AUDIT_STORAGE_KEY, JSON.stringify(log)); } catch (e) { /* storage full — drop silently */ }
+}
+
+// Human-readable list of field changes between two versions of a record
+function auditDiff(before, after, fields) {
+  const changes = [];
+  fields.forEach((f) => {
+    const a = before[f.key] ?? "";
+    const b = after[f.key] ?? "";
+    if (String(a) !== String(b)) changes.push(`${f.label}: "${a || "—"}" → "${b || "—"}"`);
+  });
+  return changes.join(" · ");
+}
+
+function auditFor(target) {
+  return auditLoad().filter((e) => e.target === target).reverse();
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return `${formatThaiDate(iso.slice(0, 10))} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+// Stamp who/when on a record being created or edited
+function stampRecord(rec, isNew) {
+  const now = new Date().toISOString();
+  const who = AUTH_USER ? AUTH_USER.id : "";
+  if (isNew) { rec.createdBy = who; rec.createdAt = now; }
+  rec.updatedBy = who;
+  rec.updatedAt = now;
+}
+
+function authUserName(id) {
+  const u = id ? authUserById(id) : null;
+  return u ? u.name : (id ? id : "ข้อมูลตัวอย่าง");
+}
+
+/* ---- login screen + user chip ---------------------------------------------- */
+
+function renderLoginScreen() {
+  const scr = document.getElementById("loginScreen");
+  scr.hidden = false;
+  document.querySelector(".app-shell").hidden = true;
+  const list = document.getElementById("loginUsers");
+  list.innerHTML = AUTH.users.filter((u) => u.active).map((u) => `
+    <button type="button" class="login-user" data-uid="${escapeHtml(u.id)}">
+      <span class="login-avatar">${escapeHtml(u.name.slice(0, 1))}</span>
+      <span class="login-user-text"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(authRoleLabel(u.role))} · ${escapeHtml(authDeptName(u.dept))}</span></span>
+    </button>`).join("");
+  let picked = null;
+  const pinBox = document.getElementById("loginPinBox");
+  const pinInput = document.getElementById("loginPin");
+  list.querySelectorAll("[data-uid]").forEach((b) => b.addEventListener("click", () => {
+    list.querySelectorAll(".login-user").forEach((x) => x.classList.toggle("active", x === b));
+    picked = authUserById(b.dataset.uid);
+    document.getElementById("loginPickedName").textContent = picked.name;
+    pinBox.hidden = false;
+    pinInput.value = "";
+    document.getElementById("loginError").hidden = true;
+    pinInput.focus();
+  }));
+  const submit = () => {
+    if (!picked) return;
+    if (pinHash(pinInput.value.trim(), picked.id) !== picked.pin) {
+      document.getElementById("loginError").hidden = false;
+      pinInput.select();
+      return;
+    }
+    authSignIn(picked, "login");
+  };
+  document.getElementById("loginSubmit").onclick = submit;
+  pinInput.onkeydown = (e) => { if (e.key === "Enter") submit(); };
+}
+
+function renderUserChip() {
+  const chip = document.getElementById("userChip");
+  if (!chip || !AUTH_USER) return;
+  chip.hidden = false;
+  chip.innerHTML = `
+    <span class="login-avatar small">${escapeHtml(AUTH_USER.name.slice(0, 1))}</span>
+    <span class="user-chip-text"><strong>${escapeHtml(AUTH_USER.name)}</strong><span>${escapeHtml(authRoleLabel(AUTH_USER.role))}</span></span>
+    <button type="button" class="btn-chip" id="changePinBtn">เปลี่ยน PIN</button>
+    <button type="button" class="btn-chip" id="logoutBtn">ออกจากระบบ</button>`;
+  document.getElementById("logoutBtn").addEventListener("click", authSignOut);
+  document.getElementById("changePinBtn").addEventListener("click", () => {
+    const oldPin = prompt("PIN ปัจจุบัน");
+    if (oldPin === null) return;
+    if (pinHash(oldPin.trim(), AUTH_USER.id) !== AUTH_USER.pin) { showToast("PIN ปัจจุบันไม่ถูกต้อง", "warn"); return; }
+    const next = prompt("PIN ใหม่ (ตัวเลข 4–6 หลัก)");
+    if (next === null) return;
+    if (!/^\d{4,6}$/.test(next.trim())) { showToast("PIN ต้องเป็นตัวเลข 4–6 หลัก", "warn"); return; }
+    AUTH_USER.pin = pinHash(next.trim(), AUTH_USER.id);
+    authSave();
+    auditLog("เปลี่ยน PIN", AUTH_USER.username, "");
+    showToast("เปลี่ยน PIN แล้ว", "good");
+  });
+}

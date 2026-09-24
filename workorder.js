@@ -89,6 +89,7 @@ function afterWOMutation() {
 /* ---- "งานของฉัน" — personal workspace filtered to claimed work orders ---- */
 
 function getMyName() {
+  if (typeof authCurrentUser === "function" && authCurrentUser()) return authCurrentUser().name;
   try { return localStorage.getItem(MY_NAME_STORAGE_KEY) || ""; } catch (e) { return ""; }
 }
 

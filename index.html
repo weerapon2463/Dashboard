@@ -5,9 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Dashboard | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260924g">
+<link rel="stylesheet" href="style.css?v=20260924h">
 </head>
 <body>
+  <div class="login-screen" id="loginScreen" hidden>
+    <div class="login-card">
+      <div class="login-brand">
+        <div class="brand-mark">Y2J</div>
+        <div>
+          <div class="login-title">Production Dashboard</div>
+          <div class="login-sub">เข้าสู่ระบบตามสิทธิ์การใช้งาน</div>
+        </div>
+      </div>
+      <div class="login-step">1. เลือกผู้ใช้</div>
+      <div class="login-users" id="loginUsers"></div>
+      <div class="login-pin" id="loginPinBox" hidden>
+        <div class="login-step">2. ใส่ PIN ของ <strong id="loginPickedName"></strong></div>
+        <div class="login-pin-row">
+          <input type="password" id="loginPin" inputmode="numeric" autocomplete="current-password" maxlength="6" aria-label="PIN">
+          <button type="button" class="btn-primary" id="loginSubmit">เข้าสู่ระบบ</button>
+        </div>
+        <p class="login-error" id="loginError" hidden>PIN ไม่ถูกต้อง</p>
+      </div>
+      <p class="login-hint">บัญชีทดลองทุกบัญชีใช้ PIN <strong>1234</strong> — ผู้ดูแลระบบ (admin) เพิ่มผู้ใช้ กำหนดสิทธิ์ และเปลี่ยน PIN ได้</p>
+    </div>
+  </div>
+
   <div class="app-shell">
     <!-- Sidebar -->
     <aside class="sidebar">
@@ -28,6 +51,9 @@
         </button>
         <button class="nav-item" data-view="dept">
           <span class="nav-icon">◆</span> งานตามแผนก / เอกสาร
+        </button>
+        <button class="nav-item" data-view="plans">
+          <span class="nav-icon">◆</span> แผนงานของฉัน
         </button>
         <button class="nav-item" data-view="mytasks">
           <span class="nav-icon">◆</span> งานของฉัน
@@ -53,6 +79,9 @@
         <button class="nav-item" data-view="workorder">
           <span class="nav-icon">◆</span> ใบสั่งผลิต &amp; BOM
         </button>
+        <button class="nav-item nav-admin" data-view="admin" hidden>
+          <span class="nav-icon">◆</span> ผู้ดูแลระบบ (Admin)
+        </button>
       </nav>
       <div class="sidebar-footer">
         <div class="footer-label">PS Innovation Award 2026</div>
@@ -69,6 +98,7 @@
           <label class="role-picker" for="roleSelect">มุมมอง:
             <select id="roleSelect" autocomplete="off"></select>
           </label>
+          <div class="user-chip" id="userChip" hidden></div>
           <button class="theme-toggle" id="themeToggle" title="สลับโหมดสี">🌓</button>
         </div>
       </header>
@@ -405,6 +435,80 @@
             <p class="muted-note" id="bomEmptyNote" hidden>ยังไม่มีรายการใน BOM นี้</p>
             <h4 class="bom-history-title">ประวัติ Revision</h4>
             <ul class="bom-history" id="bomHistory"></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Personal plans -->
+      <section class="view" id="view-plans">
+        <div class="card">
+          <div class="card-header card-header-actions">
+            <div>
+              <h3>แผนงานของฉัน</h3>
+              <p class="card-sub">แต่ละคนทำแผนของตัวเองได้ และเลือกได้ว่าให้ใครเห็น — เฉพาะตัวเอง แผนก ทีม บุคคลที่เลือก หรือทุกคน</p>
+            </div>
+            <button id="planAddBtn" class="btn-primary" type="button">+ สร้างแผน</button>
+          </div>
+          <div class="card-body">
+            <div class="dept-tabs">
+              <button type="button" class="dept-tab plan-tab" data-tab="mine">แผนของฉัน <span class="dept-tab-count" id="planCountMine">0</span></button>
+              <button type="button" class="dept-tab plan-tab" data-tab="shared">แชร์กับฉัน <span class="dept-tab-count" id="planCountShared">0</span></button>
+              <button type="button" class="dept-tab plan-tab" data-tab="all" id="planTabAll" hidden>ทั้งหมด (Admin)</button>
+            </div>
+            <div class="plan-grid" id="planList"></div>
+            <p class="muted-note" id="planEmpty" hidden></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Admin -->
+      <section class="view" id="view-admin">
+        <div class="stat-grid pilot-stat-grid">
+          <div class="stat-tile"><div class="stat-label">ผู้ใช้งานที่เปิดใช้</div><div class="stat-value" id="adminStatUsers">-</div><div class="stat-note">บัญชี</div></div>
+          <div class="stat-tile"><div class="stat-label">ทีม</div><div class="stat-value" id="adminStatTeams">-</div><div class="stat-note">ใช้กำหนดการมองเห็น</div></div>
+          <div class="stat-tile"><div class="stat-label">กิจกรรมวันนี้</div><div class="stat-value" id="adminStatToday">-</div><div class="stat-note">บันทึกในประวัติการใช้งาน</div></div>
+          <div class="stat-tile"><div class="stat-label">เอกสารจำกัดการมองเห็น</div><div class="stat-value" id="adminStatConf">-</div><div class="stat-note">ลับ / เฉพาะแผนก / ส่วนตัว</div></div>
+        </div>
+        <div class="card">
+          <div class="card-body">
+            <div class="dept-tabs admin-tabs">
+              <button type="button" class="dept-tab admin-tab" data-tab="users">ผู้ใช้งาน &amp; สิทธิ์</button>
+              <button type="button" class="dept-tab admin-tab" data-tab="teams">ทีม</button>
+              <button type="button" class="dept-tab admin-tab" data-tab="audit">ประวัติการใช้งาน (Audit Log)</button>
+            </div>
+            <p class="admin-note">ระบบต้นแบบ: ผู้ใช้ สิทธิ์ และประวัติ เก็บในเบราว์เซอร์ของเครื่องนี้ ยังไม่ใช่ระบบความปลอดภัยจริงและยังไม่ซิงก์ข้ามเครื่อง — ขั้นต่อไปคือย้ายไปฐานข้อมูลกลาง</p>
+
+            <div class="admin-panel" data-panel="users">
+              <div class="filter-row"><button id="adminAddUserBtn" class="btn-primary" type="button">+ เพิ่มผู้ใช้</button></div>
+              <div class="table-scroll">
+                <table class="data-table" id="adminUserTable">
+                  <thead><tr><th>ชื่อ / ตำแหน่ง</th><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>แผนก</th><th>ทีม</th><th>สิทธิ์</th><th>สถานะ</th><th>เข้าระบบล่าสุด</th><th>การดำเนินการ</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="admin-panel" data-panel="teams" hidden>
+              <div class="filter-row"><button id="adminAddTeamBtn" class="btn-primary" type="button">+ สร้างทีม</button></div>
+              <div class="team-grid" id="adminTeamList"></div>
+            </div>
+
+            <div class="admin-panel" data-panel="audit" hidden>
+              <div class="filter-row">
+                <label for="auditUser">ผู้ใช้:</label><select id="auditUser"></select>
+                <label for="auditAction">การกระทำ:</label><select id="auditAction"></select>
+                <label for="auditSearch">ค้นหา:</label><input type="text" id="auditSearch" class="wo-search" placeholder="เลขที่เอกสาร / รายละเอียด">
+                <button id="auditExportBtn" class="btn-secondary" type="button">ส่งออก CSV</button>
+                <span class="muted-inline" id="auditCount"></span>
+              </div>
+              <div class="table-scroll">
+                <table class="data-table" id="auditTable">
+                  <thead><tr><th>วันเวลา</th><th>ผู้ใช้</th><th>การกระทำ</th><th>เป้าหมาย</th><th>รายละเอียด / สิ่งที่เปลี่ยน</th></tr></thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+              <p class="muted-note" id="auditEmpty" hidden>ยังไม่มีประวัติตามตัวกรองนี้</p>
+            </div>
           </div>
         </div>
       </section>
@@ -1114,10 +1218,77 @@
         <label for="deptDocStatus">สถานะ</label>
         <select id="deptDocStatus"></select>
       </div>
+      <div id="deptDocVisBox"></div>
+      <p class="doc-meta" id="deptDocMeta"></p>
       <div class="modal-actions">
         <button id="deptDocDeleteBtn" class="btn-secondary" type="button" hidden>ลบเอกสารนี้</button>
         <button id="deptDocCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
         <button id="deptDocSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="userEdBackdrop">
+    <div class="modal modal-xwide">
+      <h3 id="userEdTitle">ผู้ใช้งาน</h3>
+      <div class="modal-grid">
+        <div class="form-field"><label for="ue_name">ชื่อที่แสดง *</label><input id="ue_name" placeholder="เช่น หัวหน้าไลน์ประกอบ 2"></div>
+        <div class="form-field"><label for="ue_username">ชื่อผู้ใช้ (ภาษาอังกฤษ) *</label><input id="ue_username" autocomplete="off" placeholder="เช่น line2"></div>
+        <div class="form-field"><label for="ue_position">ตำแหน่ง</label><input id="ue_position"></div>
+        <div class="form-field"><label for="ue_pin">PIN (ตัวเลข 4–6 หลัก)</label><input id="ue_pin" inputmode="numeric" autocomplete="new-password"></div>
+        <div class="form-field"><label for="ue_role">บทบาท</label><select id="ue_role"></select></div>
+        <div class="form-field"><label for="ue_dept">แผนก</label><select id="ue_dept"></select></div>
+      </div>
+      <label class="fs-check"><input type="checkbox" id="ue_active"> เปิดใช้งานบัญชีนี้</label>
+      <div class="ue-section-title">ทีมที่สังกัด</div>
+      <div class="vis-group" id="ue_teams"></div>
+      <div class="ue-section-title">หน้าที่เข้าถึงได้ <label class="fs-check inline"><input type="checkbox" id="ue_modCustom"> กำหนดเอง (ไม่ติ๊ก = ตามบทบาท)</label></div>
+      <div class="vis-group" id="ue_modules"></div>
+      <div class="ue-section-title">สิทธิ์ต่อเอกสารแต่ละชนิด
+        <span class="ue-perm-tools">
+          <select id="ue_permAll" aria-label="ตั้งทุกช่องเป็น"><option value="">ตั้งทุกช่องเป็น…</option><option value="none">ไม่เห็น</option><option value="view">ดูได้</option><option value="create">สร้าง/เสนอได้</option><option value="manage">จัดการ/อนุมัติ</option></select>
+          <button type="button" class="btn-chip" id="ue_permReset">ใช้ค่าตามบทบาททั้งหมด</button>
+        </span>
+      </div>
+      <p class="muted-note">ไม่เห็น = เมนูเอกสารนั้นถูกซ่อน · ดูได้ = อ่าน/พิมพ์ · สร้าง/เสนอได้ = เปิดเอกสารใหม่และแนบไฟล์ · จัดการ/อนุมัติ = แก้ไข เลื่อนสถานะ ลบ</p>
+      <div class="perm-grid" id="ue_perms"></div>
+      <div class="modal-actions">
+        <button id="userEdCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="userEdSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="teamEdBackdrop">
+    <div class="modal">
+      <h3 id="teamEdTitle">ทีม</h3>
+      <div class="form-field"><label for="te_name">ชื่อทีม *</label><input id="te_name" placeholder="เช่น ทีมโครงการ YT7500"></div>
+      <div class="ue-section-title">สมาชิก</div>
+      <div class="vis-group" id="te_members"></div>
+      <div class="modal-actions">
+        <button id="teamDeleteBtn" class="btn-secondary" type="button" hidden>ลบทีม</button>
+        <button id="teamEdCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="teamEdSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="planEdBackdrop">
+    <div class="modal modal-wide">
+      <h3 id="planEdTitle">แผน</h3>
+      <div class="form-field"><label for="pl_title">ชื่อแผน / เป้าหมาย *</label><input id="pl_title" placeholder="เช่น ลดเวลาประกอบโครงฐานลง 20%"></div>
+      <div class="form-field"><label for="pl_detail">รายละเอียด</label><textarea id="pl_detail" rows="2"></textarea></div>
+      <div class="modal-grid">
+        <div class="form-field"><label for="pl_start">เริ่ม</label><input type="date" id="pl_start"></div>
+        <div class="form-field"><label for="pl_due">กำหนดเสร็จ</label><input type="date" id="pl_due"></div>
+        <div class="form-field"><label for="pl_status">สถานะ</label><select id="pl_status"></select></div>
+      </div>
+      <div class="form-field"><label for="pl_items">ขั้นตอน / รายการที่ต้องทำ (บรรทัดละ 1 ข้อ — ขึ้นต้น [x] = เสร็จแล้ว)</label><textarea id="pl_items" rows="4" placeholder="ศึกษาปัญหา&#10;ทดลองวิธีใหม่&#10;สรุปผล"></textarea></div>
+      <div id="planVisBox"></div>
+      <div class="modal-actions">
+        <button id="planDeleteBtn" class="btn-secondary" type="button" hidden>ลบแผน</button>
+        <button id="planCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="planSaveBtn" class="btn-primary" type="button">บันทึก</button>
       </div>
     </div>
   </div>
@@ -1218,22 +1389,25 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="data.js?v=20260924g"></script>
-  <script src="priority-matrix.js?v=20260924g"></script>
-  <script src="capacity-planning.js?v=20260924g"></script>
-  <script src="master-schedule.js?v=20260924g"></script>
-  <script src="make-or-buy.js?v=20260924g"></script>
-  <script src="resource.js?v=20260924g"></script>
-  <script src="procurement.js?v=20260924g"></script>
-  <script src="workorder.js?v=20260924g"></script>
-  <script src="alerts.js?v=20260924g"></script>
-  <script src="overview-charts.js?v=20260924g"></script>
-  <script src="pilot.js?v=20260924g"></script>
-  <script src="dept-data.js?v=20260924g"></script>
-  <script src="dept-samples.js?v=20260924g"></script>
-  <script src="dept.js?v=20260924g"></script>
-  <script src="bom.js?v=20260924g"></script>
-  <script src="docview.js?v=20260924g"></script>
-  <script src="app.js?v=20260924g"></script>
+  <script src="data.js?v=20260924h"></script>
+  <script src="priority-matrix.js?v=20260924h"></script>
+  <script src="capacity-planning.js?v=20260924h"></script>
+  <script src="master-schedule.js?v=20260924h"></script>
+  <script src="make-or-buy.js?v=20260924h"></script>
+  <script src="resource.js?v=20260924h"></script>
+  <script src="procurement.js?v=20260924h"></script>
+  <script src="workorder.js?v=20260924h"></script>
+  <script src="alerts.js?v=20260924h"></script>
+  <script src="overview-charts.js?v=20260924h"></script>
+  <script src="pilot.js?v=20260924h"></script>
+  <script src="dept-data.js?v=20260924h"></script>
+  <script src="dept-samples.js?v=20260924h"></script>
+  <script src="dept.js?v=20260924h"></script>
+  <script src="bom.js?v=20260924h"></script>
+  <script src="docview.js?v=20260924h"></script>
+  <script src="auth.js?v=20260924h"></script>
+  <script src="admin.js?v=20260924h"></script>
+  <script src="plans.js?v=20260924h"></script>
+  <script src="app.js?v=20260924h"></script>
 </body>
 </html>

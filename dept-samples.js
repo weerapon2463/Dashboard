@@ -82,9 +82,9 @@ const DOC_SAMPLES = {
     { no: "RFQ-2026-003", status: "ขอราคา", title: "ชั้นวางพาเลทคลังสินค้าเพิ่มเติม", pr: "PR-2026-0150", suppliers: "3 ราย", selected: "", amount: "", owner: "ฝ่ายจัดซื้อ", date: "2026-09-23" },
   ],
   sev: [
-    { no: "SE-2026-001", status: "ประเมินแล้ว", title: "บจก. เหล็กไทยรุ่งเรือง", period: "ไตรมาส 3/2569", quality: 5, delivery: 4, price: 4, owner: "ฝ่ายจัดซื้อ", date: "2026-09-20" },
-    { no: "SE-2026-002", status: "ประเมินแล้ว", title: "บจก. ไฮดรอลิกซัพพลาย", period: "ไตรมาส 3/2569", quality: 4, delivery: 2, price: 4, owner: "ฝ่ายจัดซื้อ", date: "2026-09-20" },
-    { no: "SE-2026-003", status: "ร่าง", title: "หจก. เกียร์ทรานสมิชชั่น", period: "ไตรมาส 3/2569", quality: 2, delivery: 4, price: 4, owner: "ฝ่ายจัดซื้อ", date: "2026-09-23" },
+    { no: "SE-2026-001", status: "ประเมินแล้ว", title: "บจก. เหล็กไทยรุ่งเรือง", period: "ไตรมาส 3/2569", quality: 5, delivery: 4, price: 4, owner: "ฝ่ายจัดซื้อ", date: "2026-09-20", visibility: { mode: "custom", teams: [], depts: ["pur"], users: ["u-plant"] } },
+    { no: "SE-2026-002", status: "ประเมินแล้ว", title: "บจก. ไฮดรอลิกซัพพลาย", period: "ไตรมาส 3/2569", quality: 4, delivery: 2, price: 4, owner: "ฝ่ายจัดซื้อ", date: "2026-09-20", visibility: { mode: "custom", teams: [], depts: ["pur"], users: ["u-plant"] } },
+    { no: "SE-2026-003", status: "ร่าง", title: "หจก. เกียร์ทรานสมิชชั่น", period: "ไตรมาส 3/2569", quality: 2, delivery: 4, price: 4, owner: "ฝ่ายจัดซื้อ", date: "2026-09-23", visibility: { mode: "custom", teams: [], depts: ["pur"], users: ["u-plant"] } },
   ],
   grn: [
     { no: "GRN-2026-001", status: "ส่งคืนผู้ขาย", title: "ชุดเฟืองขับ (Drive Gear Set)", po: "PO-2026-0313", supplier: "หจก. เกียร์ทรานสมิชชั่น", qty: 20, owner: "คลังสินค้า", date: "2026-09-22" },

@@ -14,6 +14,8 @@ const VIEW_TITLES = {
   resource: "การบริหารทรัพยากรการผลิต (คน / เครื่องจักร / เครื่องมือ)",
   procurement: "จัดซื้อ (PR / PO / ซัพพลายเออร์)",
   workorder: "ใบสั่งผลิต & BOM",
+  plans: "แผนงานของฉัน",
+  admin: "ผู้ดูแลระบบ — ผู้ใช้ สิทธิ์ และประวัติการใช้งาน",
 };
 
 const ROLES = [
@@ -64,6 +66,8 @@ function switchView(view) {
   if (view === "overview") renderOverviewCharts();
   if (view === "pilot" && typeof renderPilot === "function") renderPilot();
   if (view === "dept" && typeof renderDept === "function") renderDept();
+  if (view === "plans" && typeof renderPlans === "function") renderPlans();
+  if (view === "admin" && typeof renderAdmin === "function") renderAdmin();
   if (view === "mytasks") renderMyTasks();
   if (view === "priority") renderPriorityMatrix();
   if (view === "capacity") renderCapacityChart(document.getElementById("capacityLineFilter").value);
@@ -81,6 +85,8 @@ function initNav() {
 }
 
 function getStoredRole() {
+  // A signed-in user's role always wins over the old "มุมมอง" selector
+  if (typeof authLegacyRole === "function" && authLegacyRole()) return authLegacyRole();
   // Default to "plant" (full module access) so a first-time visitor — e.g. a
   // competition judge — sees everything; role filtering only kicks in once
   // someone deliberately switches the "มุมมอง" selector.
@@ -93,7 +99,7 @@ function getStoredRole() {
 }
 
 function applyModuleAccess(role) {
-  const allowed = MODULE_ACCESS[role] || MODULE_ACCESS.group;
+  const allowed = (typeof authAllowedModules === "function" && authAllowedModules()) || MODULE_ACCESS[role] || MODULE_ACCESS.group;
   document.querySelectorAll(".nav-item").forEach((btn) => {
     btn.hidden = !allowed.includes(btn.dataset.view);
   });
@@ -175,6 +181,17 @@ function refreshAllCharts() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  // Login gate: nothing else starts until a user signs in (the page reloads after sign-in)
+  if (typeof authInit === "function") {
+    if (!authInit()) {
+      initThemeToggle();
+      renderLoginScreen();
+      return;
+    }
+    renderUserChip();
+    const picker = document.querySelector(".role-picker");
+    if (picker) picker.hidden = true;
+  }
   initNav();
   initRoleSelect();
   initThemeToggle();
@@ -195,6 +212,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const hadStoredDept = hasDept ? initDeptData() : false;
   if (hasDept) { initDeptInteractions(); initBomInteractions(); }
   if (hasDept && typeof initDocView === "function") initDocView();
+  if (typeof initPlans === "function") initPlans();
+  if (typeof initAdmin === "function") initAdmin();
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();

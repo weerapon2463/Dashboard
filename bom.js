@@ -14,7 +14,13 @@ const BOM_DRAFT = "ร่าง (Draft)";
 let BOM_META = {}; // model -> { rev, status, history: [{ rev, date, note, ref }] }
 let bomModel = null;
 
-function bomCanEdit(role) { return role === "depthead" || role === "plant"; }
+function bomCanEdit(role) {
+  if (typeof authCurrentUser === "function" && authCurrentUser()) return authCan("bom", "manage");
+  return role === "depthead" || role === "plant";
+}
+function bomAudit(action, detail) {
+  if (typeof auditLog === "function") auditLog(action, `BOM ${bomModel}`, detail);
+}
 
 /* ---- persistence ------------------------------------------------------ */
 
@@ -172,7 +178,9 @@ function renderBomEditor() {
 
   tbody.querySelectorAll(".bom-inline").forEach((el) => el.addEventListener("change", () => {
     const line = MASTER_BOM[bomModel][Number(el.dataset.i)];
+    const prev = line[el.dataset.k];
     line[el.dataset.k] = el.dataset.k === "qty" ? Number(el.value) || 0 : el.value.trim();
+    bomAudit("แก้ไขรายการ BOM", `Rev.${BOM_META[bomModel].rev} แถว ${Number(el.dataset.i) + 1} ${el.getAttribute("aria-label")}: "${prev ?? ""}" → "${line[el.dataset.k]}"`);
     saveBom();
     bomSyncOtherViews();
     const s = MASTER_BOM[bomModel];
@@ -184,6 +192,7 @@ function renderBomEditor() {
     const name = MASTER_BOM[bomModel][i].part || `รายการที่ ${i + 1}`;
     if (!confirm(`ลบ "${name}" ออกจาก BOM ${bomModel}?`)) return;
     MASTER_BOM[bomModel].splice(i, 1);
+    bomAudit("ลบรายการ BOM", `Rev.${BOM_META[bomModel].rev}: ${name}`);
     afterBomMutation();
   }));
 
@@ -217,6 +226,7 @@ function saveBomNew() {
     history: [{ rev: "A", date: new Date().toISOString().slice(0, 10), note: from ? `สร้างใหม่ โดยคัดลอกจาก ${from}` : "สร้าง BOM ใหม่", ref: "" }],
   };
   bomModel = name;
+  bomAudit("สร้าง BOM", from ? `คัดลอกจาก ${from}` : "BOM ว่าง");
   document.getElementById("bomNewBackdrop").classList.remove("open");
   afterBomMutation();
   showToast(`สร้าง BOM ${name} (ร่าง) แล้ว — แก้ไขรายการแล้วกด "อนุมัติใช้งาน"`, "good");
@@ -241,6 +251,7 @@ function saveBomRev() {
   meta.status = BOM_DRAFT;
   meta.history.push({ rev: meta.rev, date: new Date().toISOString().slice(0, 10), note, ref: document.getElementById("bomRevRef").value });
   document.getElementById("bomRevBackdrop").classList.remove("open");
+  bomAudit("ออก Revision ใหม่", `Rev.${meta.rev}: ${note}${meta.history[meta.history.length - 1].ref ? ` (${meta.history[meta.history.length - 1].ref})` : ""}`);
   afterBomMutation();
   showToast(`เปิด Rev.${meta.rev} ของ ${bomModel} เพื่อแก้ไขแล้ว`, "good");
 }
@@ -252,6 +263,7 @@ function releaseBom() {
   if (lines.some((l) => !l.part || !(Number(l.qty) > 0))) { showToast("มีรายการที่ยังไม่มีชื่อชิ้นส่วนหรือจำนวน", "warn"); return; }
   if (!confirm(`อนุมัติใช้งาน BOM ${bomModel} Rev.${meta.rev}? หลังอนุมัติจะแก้ไขได้โดยออก Revision ใหม่เท่านั้น`)) return;
   meta.status = BOM_RELEASED;
+  bomAudit("อนุมัติใช้งาน BOM", `Rev.${meta.rev}`);
   const last = meta.history[meta.history.length - 1];
   if (last && last.rev === meta.rev) last.date = new Date().toISOString().slice(0, 10);
   afterBomMutation();
@@ -287,6 +299,7 @@ function initBomInteractions() {
   document.getElementById("bomSheetBtn").addEventListener("click", () => openBomSheet(bomModel));
   document.getElementById("bomAddLineBtn").addEventListener("click", () => {
     MASTER_BOM[bomModel].push({ code: "", part: "", qty: 1, unit: "ชิ้น", source: "ซื้อ", note: "" });
+    bomAudit("เพิ่มรายการ BOM", `Rev.${BOM_META[bomModel].rev} แถว ${MASTER_BOM[bomModel].length}`);
     afterBomMutation();
     const parts = document.querySelectorAll("#bomEdTable .bom-part");
     if (parts.length) parts[parts.length - 1].focus();

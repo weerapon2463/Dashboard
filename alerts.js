@@ -32,14 +32,15 @@ function computeAlerts() {
 
   // Department documents that need attention (open NCRs, unfinished repairs)
   if (typeof DEPT_DOCS !== "undefined") {
-    (DEPT_DOCS.ncr || []).filter((d) => d.status !== "ปิดแล้ว").forEach((d) => {
+    const seen = (t) => (DEPT_DOCS[t] || []).filter((d) => typeof authCanSeeDoc !== "function" || authCanSeeDoc(t, d));
+    seen("ncr").filter((d) => d.status !== "ปิดแล้ว").forEach((d) => {
       alerts.push({
         type: "คุณภาพ (NCR)",
         detail: `${d.no} — ${d.title}${d.model ? ` (${d.model})` : ""} สถานะ: ${d.status}`,
         severity: d.status === "เปิด" ? "critical" : "warning",
       });
     });
-    (DEPT_DOCS.mtr || []).filter((d) => d.status !== "ซ่อมเสร็จ").forEach((d) => {
+    seen("mtr").filter((d) => d.status !== "ซ่อมเสร็จ").forEach((d) => {
       alerts.push({
         type: "แจ้งซ่อม",
         detail: `${d.no} — ${d.machine || ""} ${d.title} (${d.status})`,

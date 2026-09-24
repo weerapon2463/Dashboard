@@ -99,10 +99,15 @@ async function storeFiles(fileList) {
 
 /* ---- lookups ------------------------------------------------------------ */
 
+// Only documents the signed-in user may see are found (keeps confidential docs out of links)
 function findDocByNo(no) {
   for (const t of Object.keys(DEPT_DOCS)) {
     const i = (DEPT_DOCS[t] || []).findIndex((d) => d.no === no);
-    if (i >= 0) return { type: t, index: i, doc: DEPT_DOCS[t][i] };
+    if (i >= 0) {
+      const doc = DEPT_DOCS[t][i];
+      if (typeof authCanSeeDoc === "function" && !authCanSeeDoc(t, doc)) return null;
+      return { type: t, index: i, doc };
+    }
   }
   return null;
 }
@@ -121,6 +126,7 @@ function relatedDocs(doc) {
   });
   Object.keys(DEPT_DOCS).forEach((t) => (DEPT_DOCS[t] || []).forEach((d, i) => {
     if (d === doc || out.has(d.no)) return;
+    if (typeof authCanSeeDoc === "function" && !authCanSeeDoc(t, d)) return;
     if (Object.values(d).some((v) => String(v ?? "").includes(doc.no))) out.set(d.no, { type: t, index: i, doc: d, dir: "ถูกอ้างถึงโดย" });
   }));
   return [...out.values()];
@@ -148,7 +154,7 @@ function bomDrawingCell(line) {
     const ok = d.status === "อนุมัติ (Released)";
     return `<button class="btn-chip dwg-chip${ok ? "" : " dwg-chip-pending"}" type="button" data-docno="${escapeHtml(d.no)}" title="${escapeHtml(d.status)}">${escapeHtml(d.no)} Rev.${escapeHtml(d.rev || "-")}</button>`;
   }
-  if (line.code && deptCanCreate(currentRole())) {
+  if (line.code && deptCanCreate(currentRole(), "dwg")) {
     return `<button class="btn-chip" type="button" data-regpart="${escapeHtml(line.code)}">+ ลงทะเบียนแบบ</button>`;
   }
   return `<span class="muted-inline">—</span>`;
@@ -217,7 +223,7 @@ function paperOutputActions() {
   ];
   if (navigator.canShare && navigator.share) acts.push({ label: "📤 ส่งต่อ PDF", onClick: () => exportPaperPdf("share") });
   acts.push({ label: "🖨 พิมพ์", onClick: printDocView });
-  if (deptCanManage(currentRole())) acts.push({ label: "🎨 ออกแบบฟอร์ม", onClick: openFormDesigner });
+  if (typeof authIsAdmin === "function" ? (authIsAdmin() || authLegacyRole() === "plant") : deptCanManage(currentRole())) acts.push({ label: "🎨 ออกแบบฟอร์ม", onClick: openFormDesigner });
   return acts;
 }
 
@@ -302,7 +308,19 @@ function openDocView(type, index) {
     ? `<div class="paper-flow">${flow.map((s, i) => `<span class="flow-step${i < pos ? " done" : ""}${i === pos ? " current" : ""}">${escapeHtml(s)}</span>`).join('<span class="flow-arrow">→</span>')}${pos < 0 ? `<span class="flow-step current off">${escapeHtml(doc.status)}</span>` : ""}</div>`
     : "";
 
+  const hasAuth = typeof authCurrentUser === "function" && authCurrentUser();
+  const confidential = doc.visibility && doc.visibility.mode && doc.visibility.mode !== "all";
+  const history = hasAuth ? auditFor(doc.no) : [];
+  const historyHtml = hasAuth ? `
+    <div class="paper-section-title no-print-pdf">ข้อมูลเอกสารและประวัติการแก้ไข</div>
+    <div class="paper-textbox paper-history">
+      <div>สร้างโดย <strong>${escapeHtml(authUserName(doc.createdBy))}</strong>${doc.createdAt ? ` เมื่อ ${fmtDateTime(doc.createdAt)}` : ""}${doc.updatedAt && doc.updatedAt !== doc.createdAt ? ` · แก้ไขล่าสุดโดย <strong>${escapeHtml(authUserName(doc.updatedBy))}</strong> เมื่อ ${fmtDateTime(doc.updatedAt)}` : ""}</div>
+      <div>การมองเห็น: ${escapeHtml(visLabel(doc.visibility))}</div>
+      ${history.length ? `<table class="paper-table paper-table-compact"><thead><tr><th>วันเวลา</th><th>ผู้ใช้</th><th>การกระทำ</th><th>สิ่งที่เปลี่ยน</th></tr></thead><tbody>${history.slice(0, 30).map((h) => `<tr><td>${fmtDateTime(h.ts)}</td><td>${escapeHtml(h.userName)}</td><td>${escapeHtml(h.action)}</td><td>${escapeHtml(h.detail)}</td></tr>`).join("")}</tbody></table>` : `<div class="paper-empty">ยังไม่มีการแก้ไขในระบบ (ข้อมูลตั้งต้น)</div>`}
+    </div>` : "";
+
   const html = `
+    ${confidential ? `<div class="paper-conf">${escapeHtml(visLabel(doc.visibility))}</div>` : ""}
     ${paperHeader(formTitle, formEn, ws ? ws.name : "", doc.no, doc.date || doc.due || "", doc.status, tone)}
     ${flowHtml}
     <div class="paper-grid">
@@ -316,12 +334,13 @@ function openDocView(type, index) {
     <div id="docAttachments" class="paper-attach"><span class="paper-empty">${(doc.files || []).length ? "กำลังโหลด…" : "ไม่มีไฟล์แนบ"}</span></div>
     ${paperSignatures([doc.owner || doc.requester || "", "", ""])}
     ${paperFooter(`FM-${def.prefix}-01 Rev.0`)}
+    ${historyHtml}
   `;
 
   const role = currentRole();
   const actions = paperOutputActions();
-  if (deptCanCreate(role)) actions.push({ label: "📎 แนบไฟล์ / ถ่ายรูป", onClick: () => document.getElementById("docAttachInput").click() });
-  if (deptCanManage(role)) actions.push({ label: "แก้ไขข้อมูล", onClick: () => { closeDocView(); openDeptModal(type, index); } });
+  if (deptCanCreate(role, type)) actions.push({ label: "📎 แนบไฟล์ / ถ่ายรูป", onClick: () => document.getElementById("docAttachInput").click() });
+  if (deptCanManage(role, type)) actions.push({ label: "แก้ไขข้อมูล", onClick: () => { closeDocView(); openDeptModal(type, index); } });
   actions.push({ label: "ปิด", onClick: () => closeDocView() });
   docViewFileName = doc.no;
   showPaper(html, actions);
@@ -337,7 +356,7 @@ async function renderDocAttachments(type, doc) {
   const preview = document.getElementById("dwgPreview");
   const files = doc.files || [];
   if (!box || !files.length) return;
-  const canDelete = deptCanManage(currentRole());
+  const canDelete = deptCanManage(currentRole(), type);
   const items = [];
   let previewDone = false;
   for (const f of files) {
@@ -368,8 +387,10 @@ async function renderDocAttachments(type, doc) {
   box.innerHTML = items.join("");
   box.querySelectorAll("[data-fid]").forEach((b) => b.addEventListener("click", async () => {
     if (!confirm("ลบไฟล์แนบนี้?")) return;
+    const removed = (doc.files || []).find((f) => f.id === b.dataset.fid);
     doc.files = (doc.files || []).filter((f) => f.id !== b.dataset.fid);
     try { await Y2JFiles.del(b.dataset.fid); } catch (e) { /* ignore */ }
+    if (typeof auditLog === "function") auditLog("ลบไฟล์แนบ", doc.no, removed ? removed.name : "");
     saveDeptDocs();
     reopenCurrentDoc();
   }));
@@ -492,6 +513,7 @@ function saveFormDesigner() {
   ["sig1", "sig2", "sig3"].forEach((k) => { if (!next[k]) next[k] = FORM_DEFAULTS[k]; });
   try {
     localStorage.setItem(FORM_SETTINGS_KEY, JSON.stringify(next));
+    if (typeof auditLog === "function") auditLog("ออกแบบฟอร์มเอกสาร", "หัวกระดาษ", [next.companyTh, next.companyEn].filter(Boolean).join(" / "));
   } catch (e) {
     showToast("บันทึกไม่สำเร็จ — โลโก้อาจใหญ่เกินไป", "warn");
     return;
@@ -528,6 +550,7 @@ async function attachToCurrentDoc(fileList) {
   const saved = await storeFiles(fileList);
   if (!saved.length) return;
   doc.files = (doc.files || []).concat(saved);
+  if (typeof stampRecord === "function") { stampRecord(doc, false); auditLog("แนบไฟล์", doc.no, saved.map((f) => f.name).join(", ")); }
   saveDeptDocs();
   reopenCurrentDoc();
   renderDept();
@@ -615,7 +638,7 @@ function newDwgRow(file, partCode) {
 }
 
 function openDwgRegModal(partCode) {
-  if (!deptCanCreate(currentRole())) return;
+  if (!deptCanCreate(currentRole(), "dwg")) return;
   dwgRegRows = [newDwgRow(null, partCode)];
   renderDwgRegRows();
   document.getElementById("dwgRegBackdrop").classList.add("open");
@@ -672,7 +695,7 @@ async function saveDwgReg() {
   if (missing >= 0) { document.getElementById(`dwgTitle${missing}`).focus(); return; }
   const btn = document.getElementById("dwgRegSaveBtn");
   btn.disabled = true;
-  const owner = typeof getMyName === "function" ? getMyName() : "";
+  const owner = typeof authCurrentUser === "function" && authCurrentUser() ? authCurrentUser().name : (typeof getMyName === "function" ? getMyName() : "");
   const created = [];
   for (const r of dwgRegRows) {
     const files = r.file ? await storeFiles([r.file]) : [];
@@ -688,6 +711,7 @@ async function saveDwgReg() {
       link: "",
       files,
     };
+    if (typeof stampRecord === "function") { stampRecord(doc, true); auditLog("ลงทะเบียนแบบ", doc.no, `${doc.title}${doc.partCode ? ` (${doc.partCode})` : ""}${files.length ? ` · ไฟล์ ${files[0].name}` : ""}`); }
     DEPT_DOCS.dwg = DEPT_DOCS.dwg || [];
     DEPT_DOCS.dwg.push(doc);
     created.push(doc.no);

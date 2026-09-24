@@ -12,11 +12,25 @@ let deptCurrent = "rnd";
 let deptDocType = "ecr";
 let deptEditing = null; // { type, index } or { type, index: null } when adding
 
-// Anyone except the group-executive view can open a new document (e.g. an
-// operator filing a repair request or NCR); approving, advancing status,
-// editing and deleting stay with department heads and the plant manager.
-function deptCanCreate(role) { return role !== "group"; }
-function deptCanManage(role) { return role === "depthead" || role === "plant"; }
+// With a signed-in user, permissions come from the user's per-document-type
+// rights (auth.js / Admin page). Without one (older cached page), fall back to
+// the role rules: anyone but executives can file; heads and plant manage.
+function deptCanCreate(role, type) {
+  if (typeof authCurrentUser === "function" && authCurrentUser()) return authCan(type || deptDocType, "create");
+  return role !== "group";
+}
+function deptCanManage(role, type) {
+  if (typeof authCurrentUser === "function" && authCurrentUser()) return authCan(type || deptDocType, "manage");
+  return role === "depthead" || role === "plant";
+}
+function deptVisibleDocs(type) {
+  const list = DEPT_DOCS[type] || [];
+  return typeof authCanSeeDoc === "function" ? list.filter((d) => authCanSeeDoc(type, d)) : list;
+}
+function deptTypeVisible(type) {
+  if (typeof authCurrentUser !== "function" || !authCurrentUser()) return true;
+  return authCan(type, "view") || (DEPT_DOCS[type] || []).some((d) => d.createdBy === authCurrentUser().id);
+}
 
 /* ---- persistence ------------------------------------------------------ */
 
@@ -115,12 +129,18 @@ function deptCellText(field, value) {
 }
 
 function deptOpenCount(type) {
-  return (DEPT_DOCS[type] || []).filter((d) => deptIsOpen(type, d)).length;
+  return deptVisibleDocs(type).filter((d) => deptIsOpen(type, d)).length;
 }
 
 /* ---- rendering --------------------------------------------------------- */
 
 function renderDept() {
+  // Make sure the remembered department / document type is one this user may see
+  const visibleWs = DEPT_WORKSPACES.filter((w) => w.docTypes.some(deptTypeVisible));
+  if (visibleWs.length && !visibleWs.some((w) => w.id === deptCurrent)) deptCurrent = visibleWs[0].id;
+  const curWs = DEPT_WORKSPACES.find((w) => w.id === deptCurrent);
+  if (curWs && !deptTypeVisible(deptDocType)) deptDocType = curWs.docTypes.find(deptTypeVisible) || curWs.docTypes[0];
+  if (curWs && !curWs.docTypes.includes(deptDocType)) deptDocType = curWs.docTypes.find(deptTypeVisible) || curWs.docTypes[0];
   renderDeptSummary();
   renderDeptTabs();
   renderDeptHeader();
@@ -133,8 +153,8 @@ function renderDeptSummary() {
   let open = 0;
   Object.keys(DEPT_DOCS).forEach((t) => { open += deptOpenCount(t); });
   set("deptStatOpen", open);
-  set("deptStatChange", (DEPT_DOCS.ecr || []).filter((d) => d.status === "รอพิจารณา").length
-    + (DEPT_DOCS.eo || []).filter((d) => d.status === "รออนุมัติ").length);
+  set("deptStatChange", deptVisibleDocs("ecr").filter((d) => d.status === "รอพิจารณา").length
+    + deptVisibleDocs("eo").filter((d) => d.status === "รออนุมัติ").length);
   set("deptStatNcr", deptOpenCount("ncr"));
   set("deptStatRepair", deptOpenCount("mtr"));
 }
@@ -144,6 +164,7 @@ function renderDeptTabs() {
   if (!wrap) return;
   wrap.innerHTML = "";
   DEPT_WORKSPACES.forEach((ws) => {
+    if (!ws.docTypes.some(deptTypeVisible)) return;
     const open = ws.docTypes.reduce((s, t) => s + (DOC_TYPES[t].special ? 0 : deptOpenCount(t)), 0);
     const btn = document.createElement("button");
     btn.type = "button";
@@ -152,7 +173,7 @@ function renderDeptTabs() {
     btn.innerHTML = `${escapeHtml(ws.name)}${open ? ` <span class="dept-tab-count">${open}</span>` : ""}`;
     btn.addEventListener("click", () => {
       deptCurrent = ws.id;
-      deptDocType = ws.docTypes[0];
+      deptDocType = ws.docTypes.find(deptTypeVisible) || ws.docTypes[0];
       saveDeptView();
       renderDept();
     });
@@ -164,7 +185,7 @@ function renderDeptHeader() {
   const ws = DEPT_WORKSPACES.find((w) => w.id === deptCurrent);
   const el = document.getElementById("deptHeader");
   if (!ws || !el) return;
-  const allowed = MODULE_ACCESS[currentRole()] || [];
+  const allowed = (typeof authAllowedModules === "function" && authAllowedModules()) || MODULE_ACCESS[currentRole()] || [];
   const tools = ws.tools.filter((t) => allowed.includes(t.view));
   el.innerHTML = `
     <h3>${escapeHtml(ws.name)}</h3>
@@ -179,13 +200,13 @@ function renderDeptDocGrid() {
   const grid = document.getElementById("deptDocGrid");
   if (!ws || !grid) return;
   grid.innerHTML = "";
-  ws.docTypes.forEach((t) => {
+  ws.docTypes.filter(deptTypeVisible).forEach((t) => {
     const def = DOC_TYPES[t];
     let meta;
     if (def.special) {
       meta = typeof bomSummaryText === "function" ? bomSummaryText() : "";
     } else {
-      const all = (DEPT_DOCS[t] || []).length;
+      const all = deptVisibleDocs(t).length;
       const open = deptOpenCount(t);
       meta = all ? `เปิดอยู่ ${open} · ทั้งหมด ${all}` : "ยังไม่มีเอกสาร";
     }
@@ -252,10 +273,11 @@ function renderDeptRegister() {
 
   const tbody = document.querySelector("#deptTable tbody");
   tbody.innerHTML = "";
-  const docs = DEPT_DOCS[deptDocType] || [];
+  const docs = deptVisibleDocs(deptDocType);
   const canManage = deptCanManage(role);
-  const rows = docs
+  const rows = (DEPT_DOCS[deptDocType] || [])
     .map((d, i) => ({ d, i }))
+    .filter(({ d }) => docs.includes(d))
     .filter(({ d }) => {
       if (statusSel.value === "__open__" && !deptIsOpen(deptDocType, d)) return false;
       if (statusSel.value !== "__open__" && statusSel.value !== "__all__" && d.status !== statusSel.value) return false;
@@ -269,7 +291,7 @@ function renderDeptRegister() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="mono-cell">${escapeHtml(d.no)}</td>
-      <td class="dept-title-cell"><button type="button" class="link-btn" data-action="view" data-index="${i}">${escapeHtml(d[titleField.key] || "")}</button>${(d.files || []).length ? ` <span class="attach-count" title="ไฟล์แนบ">📎${d.files.length}</span>` : ""}</td>
+      <td class="dept-title-cell"><button type="button" class="link-btn" data-action="view" data-index="${i}">${escapeHtml(d[titleField.key] || "")}</button>${(d.files || []).length ? ` <span class="attach-count" title="ไฟล์แนบ">📎${d.files.length}</span>` : ""}${d.visibility && d.visibility.mode && d.visibility.mode !== "all" ? ` <span class="conf-badge" title="${escapeHtml(typeof visLabel === "function" ? visLabel(d.visibility) : "")}">${d.visibility.mode === "private" ? "👤 ส่วนตัว" : d.visibility.mode === "dept" ? "🏢 เฉพาะแผนก" : "🔒 ลับ"}</span>` : ""}</td>
       ${def.cols.map((k) => `<td>${deptCellText(fieldsByKey[k], d[k])}</td>`).join("")}
       <td><span class="pill ${DOC_TONE_PILL[deptStatusTone(deptDocType, d.status)]}">${escapeHtml(d.status)}</span></td>
       <td class="wo-actions-cell">
@@ -291,7 +313,9 @@ function renderDeptRegister() {
     const doc = DEPT_DOCS[deptDocType][Number(b.dataset.index)];
     const next = deptNextStatus(deptDocType, doc.status);
     if (!next) return;
+    const prev = doc.status;
     doc.status = next;
+    if (typeof stampRecord === "function") { stampRecord(doc, false); auditLog("เปลี่ยนสถานะ", doc.no, `${prev} → ${next}`); }
     saveDeptDocs();
     renderDept();
     showToast(`${doc.no} → ${next}`, "good");
@@ -360,21 +384,33 @@ function openDeptModal(type, index) {
   const def = DOC_TYPES[type];
   const isEdit = index !== null && index !== undefined;
   const role = currentRole();
-  const readOnly = isEdit && !deptCanManage(role);
+  const readOnly = isEdit && !deptCanManage(role, type);
   const doc = isEdit ? DEPT_DOCS[type][index] : { no: deptNextNumber(type), status: def.statuses[0][0], date: new Date().toISOString().slice(0, 10) };
   deptEditing = { type, index: isEdit ? index : null };
 
   document.getElementById("deptDocTitle").textContent = isEdit ? `${doc.no}` : `สร้าง ${def.abbr} ใหม่`;
   document.getElementById("deptDocSub").textContent = isEdit ? def.name : `เลขที่เอกสาร: ${doc.no} (ออกให้อัตโนมัติ)`;
   document.getElementById("deptDocFields").innerHTML = def.fields.map((f) => deptFieldInput(f, doc[f.key], readOnly, deptFieldExample(type, f.key))).join("");
+  const visBox = document.getElementById("deptDocVisBox");
+  const meta = document.getElementById("deptDocMeta");
+  if (visBox && typeof visEditorHtml === "function" && authCurrentUser()) {
+    // Only the creator, a manager of this type, or admin may change who can see the document
+    const me = authCurrentUser();
+    const mayChangeVis = !readOnly && (!isEdit || doc.createdBy === me.id || deptCanManage(role, type));
+    visBox.innerHTML = mayChangeVis ? visEditorHtml("doc", doc.visibility) : `<div class="muted-inline">การมองเห็น: ${escapeHtml(visLabel(doc.visibility))}</div>`;
+    if (mayChangeVis) visEditorWire("doc");
+    meta.innerHTML = isEdit
+      ? `สร้างโดย <strong>${escapeHtml(authUserName(doc.createdBy))}</strong>${doc.createdAt ? ` เมื่อ ${fmtDateTime(doc.createdAt)}` : ""}${doc.updatedAt ? ` · แก้ไขล่าสุดโดย <strong>${escapeHtml(authUserName(doc.updatedBy))}</strong> เมื่อ ${fmtDateTime(doc.updatedAt)}` : ""}`
+      : `ผู้สร้าง: <strong>${escapeHtml(me.name)}</strong>`;
+  } else if (visBox) { visBox.innerHTML = ""; meta.innerHTML = ""; }
 
   const statusSel = document.getElementById("deptDocStatus");
   statusSel.innerHTML = def.statuses.map((s) => `<option value="${escapeHtml(s[0])}"${s[0] === doc.status ? " selected" : ""}>${escapeHtml(s[0])}</option>`).join("");
   // New documents always start at the first status; changing status is a manager action
-  statusSel.disabled = readOnly || !isEdit || !deptCanManage(role);
+  statusSel.disabled = readOnly || !isEdit || !deptCanManage(role, type);
 
   document.getElementById("deptDocSaveBtn").hidden = readOnly;
-  document.getElementById("deptDocDeleteBtn").hidden = !isEdit || !deptCanManage(role);
+  document.getElementById("deptDocDeleteBtn").hidden = !isEdit || !deptCanManage(role, type);
   document.getElementById("deptDocCancelBtn").textContent = readOnly ? "ปิด" : "ยกเลิก";
   document.getElementById("deptDocBackdrop").classList.add("open");
   const first = document.getElementById(`deptField_${def.fields[0].key}`);
@@ -398,15 +434,27 @@ function saveDeptModal() {
     if (f.type === "number") val = val === "" ? "" : Number(val);
     entry[f.key] = val;
   }
+  const hasAuth = typeof authCurrentUser === "function" && authCurrentUser();
+  const vis = hasAuth ? visEditorRead("doc", authCurrentUser().dept) : undefined;
   if (index === null) {
     entry.no = deptNextNumber(type);
     entry.status = def.statuses[0][0];
+    if (vis) entry.visibility = vis;
+    if (hasAuth) { stampRecord(entry, true); auditLog("สร้างเอกสาร", entry.no, `${def.abbr}: ${entry[def.fields[0].key]}${vis && vis.mode !== "all" ? ` · ${visLabel(vis)}` : ""}`); }
     DEPT_DOCS[type] = DEPT_DOCS[type] || [];
     DEPT_DOCS[type].push(entry);
   } else {
     const doc = DEPT_DOCS[type][index];
+    const before = Object.assign({}, doc);
     Object.assign(doc, entry);
     doc.status = document.getElementById("deptDocStatus").value;
+    if (vis) doc.visibility = vis;
+    if (hasAuth) {
+      const changes = [auditDiff(before, doc, def.fields.concat([{ key: "status", label: "สถานะ" }]))];
+      if (vis && JSON.stringify(before.visibility || { mode: "all" }) !== JSON.stringify(vis)) changes.push(`การมองเห็น → ${visLabel(vis)}`);
+      stampRecord(doc, false);
+      auditLog("แก้ไขเอกสาร", doc.no, changes.filter(Boolean).join(" · ") || "บันทึกโดยไม่มีการเปลี่ยนแปลง");
+    }
   }
   saveDeptDocs();
   closeDeptModal();
@@ -420,6 +468,7 @@ function deleteDeptDoc() {
   const doc = DEPT_DOCS[type][index];
   if (!confirm(`ลบ ${doc.no} ?`)) return;
   DEPT_DOCS[type].splice(index, 1);
+  if (typeof auditLog === "function") auditLog("ลบเอกสาร", doc.no, `${DOC_TYPES[type].abbr}: ${doc[DOC_TYPES[type].fields[0].key] || ""}`);
   saveDeptDocs();
   closeDeptModal();
   renderDept();
@@ -433,6 +482,7 @@ function fillDeptSamples() {
   const missing = samples.filter((sd) => !list.some((d) => d.no === sd.no));
   if (!missing.length) { showToast(`ตัวอย่าง ${def.abbr} มีครบแล้ว`, "good"); return; }
   missing.forEach((sd) => list.push(Object.assign({}, sd)));
+  if (typeof auditLog === "function") auditLog("เติมข้อมูลตัวอย่าง", def.abbr, missing.map((m) => m.no).join(", "));
   list.sort((a, b) => String(a.no).localeCompare(String(b.no)));
   document.getElementById("deptStatusFilter").value = "__all__";
   saveDeptDocs();
@@ -446,7 +496,7 @@ function exportDeptCsv() {
   const def = DOC_TYPES[deptDocType];
   if (!def || def.special) return;
   const header = ["เลขที่", ...def.fields.map((f) => f.label), "สถานะ"];
-  const rows = (DEPT_DOCS[deptDocType] || []).map((d) => [d.no, ...def.fields.map((f) => d[f.key] ?? ""), d.status]);
+  const rows = deptVisibleDocs(deptDocType).map((d) => [d.no, ...def.fields.map((f) => d[f.key] ?? ""), d.status]);
   const lines = [header, ...rows].map((r) => r.map((v) => {
     const s = String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
