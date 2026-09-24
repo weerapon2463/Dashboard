@@ -10,6 +10,7 @@ const RP_STORAGE_KEY = "y2j-reports-v1";
 
 const RP_PRESETS = [
   { id: "p-exec", name: "ผู้บริหาร — ภาพรวมรายสัปดาห์", sections: ["exec", "wo", "p2p", "supplier", "service", "claims", "quality"] },
+  { id: "p-audit", name: "ตรวจสอบระบบ — ความสอดคล้องและกิจกรรม", sections: ["integrity", "req", "stock", "activity"] },
   { id: "p-prod", name: "หัวหน้าฝ่ายผลิต — งาน วัสดุ คุณภาพ", sections: ["wo", "req", "mrp", "quality", "docs"] },
   { id: "p-plan", name: "ฝ่ายวางแผน — ใบสั่งผลิตและความต้องการวัสดุ", sections: ["wo", "mrp", "p2p"] },
   { id: "p-store", name: "คลังสินค้า — ใบเบิก ค้างจ่าย คงคลัง", sections: ["req", "stock", "mrp"] },
@@ -33,6 +34,7 @@ const RP_SECTIONS = [
   ["claims", "งานเคลม — ติดตามกับผู้ขาย"],
   ["bom", "สถานะ BOM ทุกรุ่น"],
   ["activity", "กิจกรรมล่าสุดในระบบ (ผู้จัดการ/ผู้ดูแล)"],
+  ["integrity", "ความสอดคล้องของข้อมูลข้ามโมดูล"],
 ];
 
 let RP_VIEWS = [];
@@ -187,9 +189,15 @@ const RP_BLOCKS = {
         return `<tr>${rpTd(escapeHtml(m))}${rpTd(escapeHtml(meta.rev || ""))}${rpTd(escapeHtml(meta.status || ""))}${rpTd((MASTER_BOM[m] || []).length, 1)}${rpTd(t.filter((r) => r.line && !r.hasKids).length, 1)}${rpTd(`${last.date ? formatThaiDate(last.date) : "—"} ${escapeHtml(last.note || "")}`)}${rpTd(escapeHtml(last.ref || ""))}</tr>`;
       }));
   },
+  integrity() {
+    if (typeof icRun !== "function") return "";
+    const all = icRun();
+    const n = icSummary(all);
+    return `<p class="rp-sub">ผิดพลาด ${n.error} · ควรตรวจ ${n.warn} · ข้อสังเกต ${n.info}</p>` + icTableHtml(all.filter((f) => f.sev !== "info"), false);
+  },
   activity() {
     const me = rpMe();
-    if (me && !(me.role === "admin" || me.role === "plant")) return `<p class="muted-inline">เฉพาะผู้จัดการโรงงานและผู้ดูแลระบบ</p>`;
+    if (me && !(me.role === "admin" || me.role === "plant" || (typeof authHasAbility === "function" && authHasAbility("reports")))) return `<p class="muted-inline">เฉพาะผู้จัดการโรงงานและผู้ดูแลระบบ</p>`;
     const log = (typeof auditLoad === "function" ? auditLoad() : []).filter((e) => rpInPeriod(e.ts)).slice(-40).reverse();
     return rpTable(["วันเวลา", "ผู้ใช้", "การกระทำ", "เรื่อง", "รายละเอียด"],
       log.map((e) => `<tr>${rpTd(fmtDateTime(e.ts))}${rpTd(escapeHtml(e.userName))}${rpTd(escapeHtml(e.action))}${rpTd(escapeHtml(e.target))}${rpTd(escapeHtml(String(e.detail || "").slice(0, 120)))}</tr>`), "ไม่มีกิจกรรมในช่วงนี้");

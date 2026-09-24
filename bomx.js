@@ -54,19 +54,21 @@ function bxCan(type, level) {
   return r !== "group";
 }
 function bxIsAdminish() { const u = bxUser(); return !u || u.role === "admin" || u.role === "plant"; }
+function bxAbility(a) { return typeof authHasAbility === "function" && authHasAbility(a); }
 function bxCanRequest() {
   const u = bxUser();
+  if (bxAbility("request")) return true;
   if (u && BX_SETTINGS.requesters.length && !bxIsAdminish() && !bxCan("mreq", "manage") && !BX_SETTINGS.requesters.includes(u.id)) return false;
   return bxCan("mreq", "create");
 }
-function bxCanApprove() { return bxCan("mreq", "manage"); }
+function bxCanApprove() { return bxCan("mreq", "manage") || bxAbility("approve"); }
 function bxCanIssue() {
   const u = bxUser();
-  if (u && BX_SETTINGS.issuers.includes(u.id)) return true;
+  if ((u && BX_SETTINGS.issuers.includes(u.id)) || bxAbility("issue")) return true;
   return bxCan("mreq", "manage") || bxCan("stk", "create") || bxCan("grn", "create");
 }
-function bxCanStock() { return bxCan("stk", "create") || bxIsAdminish(); }
-function bxCanSettings() { return bxCan("stk", "manage") || bxIsAdminish(); }
+function bxCanStock() { return bxCan("stk", "create") || bxIsAdminish() || bxAbility("stock"); }
+function bxCanSettings() { return bxCan("stk", "manage") || bxIsAdminish() || bxAbility("stock"); }
 function bxViewAllowed(view) {
   const b = document.querySelector(`.nav-item[data-view="${view}"]`);
   return !!b && !b.hidden;
@@ -1227,7 +1229,7 @@ function renderBxStockTab(pane) {
     <div class="card">
       <div class="card-header">
         <h3>สิทธิ์การเบิก — ใครสั่งเบิกได้ ใครจ่ายของได้</h3>
-        <p class="card-sub">ไม่ติ๊กใครเลย = ทุกคนที่มีสิทธิ์สร้างใบเบิกตามแผนก (ค่าเริ่มต้น) · ติ๊กแล้ว = เฉพาะช่างที่เลือก (หัวหน้าแผนก/ผู้จัดการยังสั่งเบิกและมอบหมายช่างรับของได้เสมอ) · ผู้จ่ายของ = คลังสินค้าและหัวหน้าแผนก รวมถึงคนที่ติ๊กเพิ่ม</p>
+        <p class="card-sub">ไม่ติ๊กใครเลย = ทุกคนที่มีสิทธิ์สร้างใบเบิกตามแผนก (ค่าเริ่มต้น) · ติ๊กแล้ว = เฉพาะช่างที่เลือก (หัวหน้าแผนก/ผู้จัดการยังสั่งเบิกและมอบหมายช่างรับของได้เสมอ) · ผู้จ่ายของ = คลังสินค้าและหัวหน้าแผนก รวมถึงคนที่ติ๊กเพิ่ม · สมาชิกกลุ่มผู้ใช้ที่มีสิทธิ์ "สั่งเบิก" / "จ่ายของ" (Admin › กลุ่มผู้ใช้) ได้สิทธิ์นั้นเสมอ${typeof AUTH !== "undefined" && AUTH && AUTH.groups ? ` — ${AUTH.groups.filter((g) => (g.abilities || []).some((a) => a === "request" || a === "issue")).map((g) => bxEsc(g.name)).join(", ")}` : ""}</p>
       </div>
       <div class="card-body bx-detail-grid">
         <div><div class="vis-group-title">ช่าง / ผู้มีสิทธิ์สั่งเบิก</div><div class="bx-userlist">${users.map((u) => chk("requesters", u)).join("")}</div></div>
@@ -1287,6 +1289,39 @@ function renderBxStockTab(pane) {
     if (!b.dataset.model) return;
     bxModel = b.dataset.model; bxDetailKey = b.dataset.stockdetail; bxTab = "tree"; renderBomx();
   }));
+}
+
+/* ---- goods receipt from purchasing (P2P) moves stock ------------------------------ */
+
+// Which stocked / BOM part a purchase request is for: part code in the item text first, then the part name
+function bxKeyForItem(text) {
+  const t = String(text || "");
+  const parts = bxAllParts();
+  const byCode = parts.filter((p) => p.line.code && bxCodeRegex(p.line.code).test(t)).sort((a, b) => b.line.code.length - a.line.code.length)[0];
+  if (byCode) return byCode.key;
+  const byName = parts.find((p) => { const n = bxShortName(p.line.part); return n && t.includes(n); });
+  return byName ? byName.key : "";
+}
+
+function bxReceiveFromP2P(c, ev) {
+  const key = bxKeyForItem(c.item);
+  const n = bxNum(ev.qtyReceived);
+  if (!key || !(n > 0)) return "";
+  const st = BX_STOCK[key] = BX_STOCK[key] || { qty: 0, loc: "" };
+  st.qty = bxNum(st.qty) + n;
+  ev.stockKey = key;
+  ev.stockQty = n;
+  bxSaveStock();
+  if (typeof renderBomx === "function") renderBomx();
+  return ` · เข้าคลัง ${key} +${bxFmt(n)} (คงคลัง ${bxFmt(st.qty)})`;
+}
+
+function bxReverseFromP2P(c, ev) {
+  if (!ev.stockKey || !(bxNum(ev.stockQty) > 0)) return "";
+  const st = BX_STOCK[ev.stockKey] = BX_STOCK[ev.stockKey] || { qty: 0, loc: "" };
+  st.qty = bxNum(st.qty) - bxNum(ev.stockQty);
+  bxSaveStock();
+  return ` · ตัดคืนจากคลัง ${ev.stockKey} −${bxFmt(ev.stockQty)} (ของไม่ผ่านตรวจ)`;
 }
 
 /* ---- deep link ?bom=<model>&item=<key> ---------------------------------------- */

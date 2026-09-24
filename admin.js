@@ -25,6 +25,8 @@ function renderAdmin() {
   set("adminStatConf", Object.keys(DEPT_DOCS).reduce((s, t) => s + (DEPT_DOCS[t] || []).filter((d) => d.visibility && d.visibility.mode !== "all").length, 0));
   if (adminTab === "users") renderAdminUsers();
   if (adminTab === "teams") renderAdminTeams();
+  if (adminTab === "groups") renderAdminGroups();
+  if (adminTab === "integrity") renderAdminIntegrity();
   if (adminTab === "audit") renderAdminAudit();
   if (adminTab === "storage") renderAdminStorage();
   if (adminTab === "org" && typeof renderAdminOrg === "function") renderAdminOrg();
@@ -75,7 +77,7 @@ function renderAdminUsers() {
       <td class="mono-cell">${escapeHtml(u.username)}</td>
       <td>${escapeHtml(authRoleLabel(u.role))}</td>
       <td>${escapeHtml(authDeptName(u.dept))}<div class="pilot-kpi-method">${u.company ? escapeHtml((typeof orgCompany === "function" && orgCompany(u.company) || {}).short || u.company) : "ทุกบริษัท (กลุ่ม)"}</div></td>
-      <td>${(u.teams || []).map((t) => (authTeamById(t) || {}).name).filter(Boolean).map((n) => `<span class="pill pill-eliminate">${escapeHtml(n)}</span>`).join(" ") || "—"}</td>
+      <td>${authUserGroups(u).map((g) => `<span class="pill pill-schedule">${escapeHtml(g.name)}</span>`).join(" ")} ${(u.teams || []).map((t) => (authTeamById(t) || {}).name).filter(Boolean).map((n) => `<span class="pill pill-eliminate">${escapeHtml(n)}</span>`).join(" ") || (authUserGroups(u).length ? "" : "—")}</td>
       <td>${custom ? '<span class="pill pill-schedule">กำหนดเอง</span>' : '<span class="muted-inline">ตามบทบาท</span>'}</td>
       <td>${u.active ? '<span class="pill pill-good">ใช้งาน</span>' : '<span class="pill pill-critical">ปิดใช้งาน</span>'}</td>
       <td>${u.lastLogin ? fmtDateTime(u.lastLogin) : "—"}</td>
@@ -94,7 +96,7 @@ function renderAdminUsers() {
 
 function permSelect(type, value, roleDefault) {
   return `<select class="perm-select perm-${value}" data-perm="${escapeHtml(type)}" aria-label="สิทธิ์ ${escapeHtml(type)}">
-    <option value="">ตามบทบาท (${escapeHtml(PERM_LEVELS.find((p) => p.id === roleDefault).label)})</option>
+    <option value="">ตามบทบาท/กลุ่ม (${escapeHtml(PERM_LEVELS.find((p) => p.id === roleDefault).label)})</option>
     ${PERM_LEVELS.map((p) => `<option value="${p.id}"${p.id === value ? " selected" : ""}>${escapeHtml(p.label)}</option>`).join("")}
   </select>`;
 }
@@ -117,6 +119,7 @@ function openUserEditor(id) {
   document.getElementById("ue_pin").placeholder = isNew ? `ไม่กรอก = ${DEMO_PIN}` : "ไม่กรอก = ใช้ PIN เดิม";
   document.getElementById("ue_active").checked = u.active !== false;
   document.getElementById("ue_active").disabled = !isNew && u.id === AUTH_USER.id;
+  document.getElementById("ue_groups").innerHTML = (AUTH.groups || []).map((g) => `<label class="vis-opt" title="${escapeHtml(g.desc || "")}"><input type="checkbox" value="${g.id}"${(u.groups || []).includes(g.id) ? " checked" : ""}> ${escapeHtml(g.name)}</label>`).join("") || '<span class="muted-inline">ยังไม่มีกลุ่ม — สร้างได้ที่แท็บ "กลุ่มผู้ใช้"</span>';
   document.getElementById("ue_teams").innerHTML = AUTH.teams.map((t) => `<label class="vis-opt"><input type="checkbox" value="${t.id}"${(u.teams || []).includes(t.id) ? " checked" : ""}> ${escapeHtml(t.name)}</label>`).join("") || '<span class="muted-inline">ยังไม่มีทีม — สร้างได้ที่แท็บ "ทีม"</span>';
   renderUserEditorPerms(u);
   document.getElementById("userEdBackdrop").classList.add("open");
@@ -124,11 +127,13 @@ function openUserEditor(id) {
 
 // Page + document permissions depend on role/department, so re-render when those change
 function renderUserEditorPerms(u) {
+  const groupBoxes = document.querySelectorAll("#ue_groups input");
   const draft = Object.assign({}, u, {
     role: document.getElementById("ue_role").value || u.role,
     dept: document.getElementById("ue_dept").value,
+    groups: groupBoxes.length ? [...groupBoxes].filter((i) => i.checked).map((i) => i.value) : (u.groups || []),
   });
-  const mods = Array.isArray(u.modules) ? u.modules : roleDefaultModules(draft.role);
+  const mods = Array.isArray(u.modules) ? u.modules : authAllowedModules(Object.assign({}, draft, { modules: null }));
   const customMods = Array.isArray(u.modules);
   document.getElementById("ue_modCustom").checked = customMods;
   document.getElementById("ue_modules").innerHTML = ALL_VIEWS
@@ -140,7 +145,7 @@ function renderUserEditorPerms(u) {
       <div class="perm-dept-title">${escapeHtml(ws.name)}</div>
       ${ws.docTypes.map((t) => {
         const cur = (u.docPerms || {})[t] || "";
-        return `<div class="perm-row"><span>${escapeHtml(DOC_TYPES[t].abbr)} — ${escapeHtml(DOC_TYPES[t].name.split(" — ").pop())}</span>${permSelect(t, cur, roleDefaultDocPerm(draft, t))}</div>`;
+        return `<div class="perm-row"><span>${escapeHtml(DOC_TYPES[t].abbr)} — ${escapeHtml(DOC_TYPES[t].name.split(" — ").pop())}</span>${permSelect(t, cur, authDefaultDocPerm(draft, t))}</div>`;
       }).join("")}
     </div>`).join("");
 }
@@ -167,6 +172,7 @@ function readUserEditor() {
     company: document.getElementById("ue_company").value,
     active: document.getElementById("ue_active").checked,
     teams: [...document.querySelectorAll("#ue_teams input:checked")].map((i) => i.value),
+    groups: [...document.querySelectorAll("#ue_groups input:checked")].map((i) => i.value),
     modules, docPerms,
   };
 }
@@ -187,12 +193,13 @@ function saveUserEditor() {
       { key: "name", label: "ชื่อ" }, { key: "username", label: "ชื่อผู้ใช้" }, { key: "position", label: "ตำแหน่ง" },
       { key: "role", label: "บทบาท" }, { key: "dept", label: "แผนก" }, { key: "company", label: "บริษัท" }, { key: "active", label: "สถานะ" },
     ];
-    const before = Object.assign({}, u, { teams: (u.teams || []).join(","), modules: JSON.stringify(u.modules), docPerms: JSON.stringify(u.docPerms || {}) });
+    const before = Object.assign({}, u, { teams: (u.teams || []).join(","), groups: (u.groups || []).join(","), modules: JSON.stringify(u.modules), docPerms: JSON.stringify(u.docPerms || {}) });
     Object.assign(u, data);
     if (pinPlain) u.pin = pinHash(pinPlain, u.id);
-    const after = Object.assign({}, u, { teams: (u.teams || []).join(","), modules: JSON.stringify(u.modules), docPerms: JSON.stringify(u.docPerms || {}) });
+    const after = Object.assign({}, u, { teams: (u.teams || []).join(","), groups: (u.groups || []).join(","), modules: JSON.stringify(u.modules), docPerms: JSON.stringify(u.docPerms || {}) });
     const changes = [auditDiff(before, after, fields)];
     if (before.teams !== after.teams) changes.push("ทีม: เปลี่ยน");
+    if (before.groups !== after.groups) changes.push(`กลุ่ม: ${authUserGroups(u).map((g) => g.name).join(", ") || "ไม่มี"}`);
     if (before.modules !== after.modules) changes.push("สิทธิ์เข้าหน้า: เปลี่ยน");
     if (before.docPerms !== after.docPerms) changes.push("สิทธิ์เอกสาร: เปลี่ยน");
     if (pinPlain) changes.push("รีเซ็ต PIN");
@@ -202,6 +209,109 @@ function saveUserEditor() {
   document.getElementById("userEdBackdrop").classList.remove("open");
   renderAdmin();
   showToast("บันทึกผู้ใช้แล้ว — มีผลเมื่อผู้ใช้เข้าสู่ระบบครั้งถัดไป", "good");
+}
+
+/* ---- user groups (reusable permission sets) --------------------------------------- */
+
+let adminEditingGroup = null;
+
+function renderAdminGroups() {
+  const wrap = document.getElementById("adminGroupList");
+  const pageName = (id) => (ALL_VIEWS.find((v) => v[0] === id) || [id, id])[1];
+  wrap.innerHTML = (AUTH.groups || []).map((g) => {
+    const members = AUTH.users.filter((u) => (u.groups || []).includes(g.id));
+    const perms = Object.keys(g.docPerms || {});
+    return `<div class="team-card">
+      <div class="team-card-head"><strong>${escapeHtml(g.name)}</strong><button class="btn-chip" type="button" data-group="${escapeHtml(g.id)}">แก้ไข</button></div>
+      ${g.desc ? `<div class="pilot-kpi-method">${escapeHtml(g.desc)}</div>` : ""}
+      <div class="grp-line"><span class="grp-label">สมาชิก ${members.length} คน:</span> ${members.map((m) => `<span class="pill pill-eliminate">${escapeHtml(m.name)}</span>`).join(" ") || '<span class="muted-inline">ยังไม่มี</span>'}</div>
+      <div class="grp-line"><span class="grp-label">หน้า:</span> ${(g.modules || []).map((m) => escapeHtml(pageName(m))).join(" · ") || "—"}</div>
+      <div class="grp-line"><span class="grp-label">สิทธิ์พิเศษ:</span> ${(g.abilities || []).map((a) => `<span class="pill pill-schedule">${escapeHtml((GROUP_ABILITIES.find((x) => x[0] === a) || [a, a])[1])}</span>`).join(" ") || "—"}</div>
+      <div class="grp-line"><span class="grp-label">สิทธิ์เอกสาร:</span> ${perms.map((t) => `${escapeHtml((DOC_TYPES[t] || { abbr: t }).abbr)}=${escapeHtml((PERM_LEVELS.find((p) => p.id === g.docPerms[t]) || {}).label || g.docPerms[t])}`).join(", ") || "ตามบทบาท"}</div>
+    </div>`;
+  }).join("") || '<p class="muted-note">ยังไม่มีกลุ่ม</p>';
+  wrap.querySelectorAll("[data-group]").forEach((b) => b.addEventListener("click", () => openGroupEditor(b.dataset.group)));
+}
+
+function openGroupEditor(id) {
+  adminEditingGroup = id || "";
+  const g = id ? authGroupById(id) : { name: "", desc: "", modules: [], docPerms: {}, abilities: [] };
+  if (!g) return;
+  const chk = (cls, val, label, on) => `<label class="vis-opt"><input type="checkbox" class="${cls}" value="${escapeHtml(val)}"${on ? " checked" : ""}> ${escapeHtml(label)}</label>`;
+  document.getElementById("groupEdBody").innerHTML = `
+    <h3>${id ? `แก้ไขกลุ่ม: ${escapeHtml(g.name)}` : "สร้างกลุ่มผู้ใช้ใหม่"}</h3>
+    <div class="modal-grid">
+      <div class="form-field"><label for="ge_name">ชื่อกลุ่ม *</label><input id="ge_name" value="${escapeHtml(g.name)}" placeholder="เช่น ช่างเชื่อม ไลน์ 2"></div>
+      <div class="form-field"><label for="ge_desc">คำอธิบาย</label><input id="ge_desc" value="${escapeHtml(g.desc || "")}" placeholder="กลุ่มนี้ทำอะไร"></div>
+    </div>
+    <div class="ue-section-title">สมาชิก</div>
+    <div class="vis-group">${AUTH.users.filter((u) => u.active).map((u) => chk("ge-mem", u.id, `${u.name} (${authDeptName(u.dept)})`, id && (u.groups || []).includes(id))).join("")}</div>
+    <div class="ue-section-title">สิทธิ์พิเศษ</div>
+    <div class="vis-group">${GROUP_ABILITIES.map(([a, label]) => chk("ge-abl", a, label, (g.abilities || []).includes(a))).join("")}</div>
+    <div class="ue-section-title">หน้าที่เพิ่มให้สมาชิก <span class="muted-inline">(รวมกับหน้าตามบทบาท)</span></div>
+    <div class="vis-group">${ALL_VIEWS.filter((v) => v[0] !== "admin").map((v) => chk("ge-mod", v[0], v[1], (g.modules || []).includes(v[0]))).join("")}</div>
+    <div class="ue-section-title">สิทธิ์ต่อเอกสาร <span class="muted-inline">(ว่าง = ไม่เพิ่ม ใช้ตามบทบาท · ถ้าตั้งไว้และสูงกว่าบทบาทจะใช้ของกลุ่ม)</span></div>
+    <div class="perm-grid">${DEPT_WORKSPACES.map((ws) => `<div class="perm-dept"><div class="perm-dept-title">${escapeHtml(ws.name)}</div>${ws.docTypes.map((t) => `<div class="perm-row"><span>${escapeHtml(DOC_TYPES[t].abbr)} — ${escapeHtml(DOC_TYPES[t].name.split(" — ").pop())}</span>
+      <select class="perm-select ge-perm" data-perm="${escapeHtml(t)}" aria-label="สิทธิ์ ${escapeHtml(t)}"><option value="">—</option>${PERM_LEVELS.map((p) => `<option value="${p.id}"${(g.docPerms || {})[t] === p.id ? " selected" : ""}>${escapeHtml(p.label)}</option>`).join("")}</select></div>`).join("")}</div>`).join("")}</div>
+    <div class="modal-actions">
+      ${id ? `<button type="button" class="btn-secondary" id="ge_delete">ลบกลุ่ม</button>` : ""}
+      <button type="button" class="btn-secondary" id="ge_cancel">ยกเลิก</button>
+      <button type="button" class="btn-primary" id="ge_save">บันทึก</button>
+    </div>`;
+  const bd = document.getElementById("groupEdBackdrop");
+  document.getElementById("ge_cancel").addEventListener("click", () => bd.classList.remove("open"));
+  document.getElementById("ge_save").addEventListener("click", saveGroupEditor);
+  if (id) document.getElementById("ge_delete").addEventListener("click", deleteGroup);
+  bd.classList.add("open");
+}
+
+function saveGroupEditor() {
+  const name = document.getElementById("ge_name").value.trim();
+  if (!name) { document.getElementById("ge_name").focus(); return; }
+  AUTH.groups = AUTH.groups || [];
+  let id = adminEditingGroup;
+  let g = id ? authGroupById(id) : null;
+  if (!g) { id = "g-" + Date.now().toString(36); g = { id }; AUTH.groups.push(g); }
+  const vals = (cls) => [...document.querySelectorAll(`#groupEdBody .${cls}:checked`)].map((i) => i.value);
+  const docPerms = {};
+  document.querySelectorAll("#groupEdBody .ge-perm").forEach((s) => { if (s.value) docPerms[s.dataset.perm] = s.value; });
+  Object.assign(g, { name, desc: document.getElementById("ge_desc").value.trim(), modules: vals("ge-mod"), abilities: vals("ge-abl"), docPerms });
+  const members = vals("ge-mem");
+  AUTH.users.forEach((u) => {
+    const has = (u.groups || []).includes(id);
+    if (members.includes(u.id) && !has) u.groups = (u.groups || []).concat(id);
+    if (!members.includes(u.id) && has) u.groups = u.groups.filter((x) => x !== id);
+  });
+  authSave();
+  auditLog(adminEditingGroup ? "แก้ไขกลุ่มผู้ใช้" : "สร้างกลุ่มผู้ใช้", name, `สมาชิก ${members.length} คน · หน้า ${g.modules.length} · สิทธิ์พิเศษ ${g.abilities.map((a) => (GROUP_ABILITIES.find((x) => x[0] === a) || [a, a])[1]).join(", ") || "-"} · เอกสาร ${Object.keys(docPerms).length} ชนิด`);
+  document.getElementById("groupEdBackdrop").classList.remove("open");
+  renderAdmin();
+  showToast(`บันทึกกลุ่ม "${name}" แล้ว — มีผลเมื่อสมาชิกโหลดหน้าใหม่`, "good");
+}
+
+function deleteGroup() {
+  const g = authGroupById(adminEditingGroup);
+  if (!g || !confirm(`ลบกลุ่ม "${g.name}"? สมาชิกจะเหลือสิทธิ์ตามบทบาทและที่ตั้งรายคน`)) return;
+  AUTH.groups = AUTH.groups.filter((x) => x.id !== g.id);
+  AUTH.users.forEach((u) => { u.groups = (u.groups || []).filter((x) => x !== g.id); });
+  authSave();
+  auditLog("ลบกลุ่มผู้ใช้", g.name, "");
+  document.getElementById("groupEdBackdrop").classList.remove("open");
+  renderAdmin();
+}
+
+/* ---- consistency check ------------------------------------------------------------ */
+
+function renderAdminIntegrity() {
+  if (typeof icRun !== "function") return;
+  const all = icRun();
+  const sev = document.getElementById("icSev").value;
+  const list = all.filter((f) => sev === "all" || f.sev === "error" || (sev === "warn" && f.sev === "warn"));
+  const n = icSummary(all);
+  document.getElementById("icSummary").textContent = `ผิดพลาด ${n.error} · ควรตรวจ ${n.warn} · ข้อสังเกต ${n.info} (ตรวจเมื่อ ${fmtDateTime(new Date().toISOString())})`;
+  const box = document.getElementById("icResult");
+  box.innerHTML = icTableHtml(list, true);
+  box.querySelectorAll("[data-icref]").forEach((b) => b.addEventListener("click", () => icOpen(b.dataset.icref)));
 }
 
 /* ---- teams ------------------------------------------------------------------ */
@@ -363,6 +473,12 @@ function initAdmin() {
     rerender();
   });
   document.getElementById("ue_dept").addEventListener("change", rerender);
+  document.getElementById("ue_groups").addEventListener("change", rerender);
+  document.getElementById("adminAddGroupBtn").addEventListener("click", () => openGroupEditor(""));
+  const ge = document.getElementById("groupEdBackdrop");
+  ge.addEventListener("click", (e) => { if (e.target === e.currentTarget) ge.classList.remove("open"); });
+  document.getElementById("icRunBtn").addEventListener("click", renderAdminIntegrity);
+  document.getElementById("icSev").addEventListener("change", renderAdminIntegrity);
   document.getElementById("ue_modCustom").addEventListener("change", () => {
     const on = document.getElementById("ue_modCustom").checked;
     document.querySelectorAll("#ue_modules input").forEach((i) => { i.disabled = !on; });

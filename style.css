@@ -908,3 +908,7 @@ html, body {
 }
 #bxReqBody { max-width: 1180px; }
 #bxReqBody td:nth-child(3) { min-width: 180px; }
+
+.grp-line { font-size: 12.5px; margin-top: 6px; line-height: 1.7; }
+.grp-label { color: var(--text-secondary); font-weight: 600; }
+.ic-ok { color: var(--status-good); font-weight: 600; }

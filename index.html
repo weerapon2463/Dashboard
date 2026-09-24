@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Dashboard | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260926b">
+<link rel="stylesheet" href="style.css?v=20260926c">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -492,7 +492,9 @@
           <div class="card-body">
             <div class="dept-tabs admin-tabs">
               <button type="button" class="dept-tab admin-tab" data-tab="users">ผู้ใช้งาน &amp; สิทธิ์</button>
+              <button type="button" class="dept-tab admin-tab" data-tab="groups">กลุ่มผู้ใช้ &amp; สิทธิ์</button>
               <button type="button" class="dept-tab admin-tab" data-tab="teams">ทีม</button>
+              <button type="button" class="dept-tab admin-tab" data-tab="integrity">✔ ตรวจสอบความสอดคล้อง</button>
               <button type="button" class="dept-tab admin-tab" data-tab="audit">ประวัติการใช้งาน (Audit Log)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="org">🏢 องค์กร (บริษัท / ฝ่าย / โลโก้)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="storage">☁ ที่เก็บข้อมูล</button>
@@ -503,10 +505,27 @@
               <div class="filter-row"><button id="adminAddUserBtn" class="btn-primary" type="button">+ เพิ่มผู้ใช้</button></div>
               <div class="table-scroll">
                 <table class="data-table" id="adminUserTable">
-                  <thead><tr><th>ชื่อ / ตำแหน่ง</th><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>แผนก / บริษัท</th><th>ทีม</th><th>สิทธิ์</th><th>สถานะ</th><th>เข้าระบบล่าสุด</th><th>การดำเนินการ</th></tr></thead>
+                  <thead><tr><th>ชื่อ / ตำแหน่ง</th><th>ชื่อผู้ใช้</th><th>บทบาท</th><th>แผนก / บริษัท</th><th>กลุ่ม / ทีม</th><th>สิทธิ์</th><th>สถานะ</th><th>เข้าระบบล่าสุด</th><th>การดำเนินการ</th></tr></thead>
                   <tbody></tbody>
                 </table>
               </div>
+            </div>
+
+            <div class="admin-panel" data-panel="groups" hidden>
+              <p class="muted-note">กลุ่มผู้ใช้ = ชุดสิทธิ์ที่ใช้ซ้ำได้ (หน้าที่เห็น + สิทธิ์เอกสาร + สิทธิ์พิเศษ เช่น สั่งเบิก / อนุมัติเบิก / จ่ายของ) · ผู้ใช้อยู่ได้หลายกลุ่ม สิทธิ์รวมกันโดยเอาระดับที่สูงกว่า · สิทธิ์ที่ตั้งรายคนในหน้าผู้ใช้ยังมีผลเหนือกลุ่ม · "ทีม" ใช้กำหนดว่าใครเห็นเอกสารลับ</p>
+              <div class="filter-row"><button id="adminAddGroupBtn" class="btn-primary" type="button">+ สร้างกลุ่ม</button></div>
+              <div class="team-grid" id="adminGroupList"></div>
+            </div>
+
+            <div class="admin-panel" data-panel="integrity" hidden>
+              <div class="filter-row">
+                <button id="icRunBtn" class="btn-primary" type="button">ตรวจสอบอีกครั้ง</button>
+                <label for="icSev">แสดง:</label>
+                <select id="icSev"><option value="all">ทั้งหมด</option><option value="error">เฉพาะผิดพลาด</option><option value="warn">ผิดพลาด + ควรตรวจ</option></select>
+                <span class="muted-inline" id="icSummary"></span>
+              </div>
+              <p class="muted-note">ตรวจข้ามโมดูลแบบอ่านอย่างเดียว: ใบสั่งผลิต ↔ BOM · ใบเบิก ↔ งาน/BOM/คงคลัง · ของไม่พอจ่ายแต่ไม่มี PR · งานบริการ ↔ ทะเบียนเครื่อง ↔ ประกัน · เคลม ↔ NCR/ECR · รับของจัดซื้อ ↔ คงคลัง · เลขเอกสารที่อ้างถึงแต่ไม่มีอยู่ · ผู้ใช้ ↔ กลุ่ม/ทีม/แผนก</p>
+              <div class="table-scroll" id="icResult"></div>
             </div>
 
             <div class="admin-panel" data-panel="teams" hidden>
@@ -1445,6 +1464,8 @@
         <div class="form-field"><label for="ue_company">บริษัท</label><select id="ue_company"></select></div>
       </div>
       <label class="fs-check"><input type="checkbox" id="ue_active"> เปิดใช้งานบัญชีนี้</label>
+      <div class="ue-section-title">กลุ่มผู้ใช้ (สิทธิ์ตามกลุ่ม)</div>
+      <div class="vis-group" id="ue_groups"></div>
       <div class="ue-section-title">ทีมที่สังกัด</div>
       <div class="vis-group" id="ue_teams"></div>
       <div class="ue-section-title">หน้าที่เข้าถึงได้ <label class="fs-check inline"><input type="checkbox" id="ue_modCustom"> กำหนดเอง (ไม่ติ๊ก = ตามบทบาท)</label></div>
@@ -1462,6 +1483,10 @@
         <button id="userEdSaveBtn" class="btn-primary" type="button">บันทึก</button>
       </div>
     </div>
+  </div>
+
+  <div class="modal-backdrop" id="groupEdBackdrop">
+    <div class="modal modal-xwide" id="groupEdBody"></div>
   </div>
 
   <div class="modal-backdrop" id="teamEdBackdrop">
@@ -1685,32 +1710,33 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260926b"></script>
-  <script src="data.js?v=20260926b"></script>
-  <script src="priority-matrix.js?v=20260926b"></script>
-  <script src="capacity-planning.js?v=20260926b"></script>
-  <script src="master-schedule.js?v=20260926b"></script>
-  <script src="make-or-buy.js?v=20260926b"></script>
-  <script src="resource.js?v=20260926b"></script>
-  <script src="procurement.js?v=20260926b"></script>
-  <script src="workorder.js?v=20260926b"></script>
-  <script src="alerts.js?v=20260926b"></script>
-  <script src="overview-charts.js?v=20260926b"></script>
-  <script src="pilot.js?v=20260926b"></script>
-  <script src="dept-data.js?v=20260926b"></script>
-  <script src="dept-samples.js?v=20260926b"></script>
-  <script src="org.js?v=20260926b"></script>
-  <script src="dept.js?v=20260926b"></script>
-  <script src="bom.js?v=20260926b"></script>
-  <script src="bomx.js?v=20260926b"></script>
-  <script src="service.js?v=20260926b"></script>
-  <script src="reports.js?v=20260926b"></script>
-  <script src="docview.js?v=20260926b"></script>
-  <script src="p2p-data.js?v=20260926b"></script>
-  <script src="p2p.js?v=20260926b"></script>
-  <script src="auth.js?v=20260926b"></script>
-  <script src="admin.js?v=20260926b"></script>
-  <script src="plans.js?v=20260926b"></script>
-  <script src="app.js?v=20260926b"></script>
+  <script src="storage.js?v=20260926c"></script>
+  <script src="data.js?v=20260926c"></script>
+  <script src="priority-matrix.js?v=20260926c"></script>
+  <script src="capacity-planning.js?v=20260926c"></script>
+  <script src="master-schedule.js?v=20260926c"></script>
+  <script src="make-or-buy.js?v=20260926c"></script>
+  <script src="resource.js?v=20260926c"></script>
+  <script src="procurement.js?v=20260926c"></script>
+  <script src="workorder.js?v=20260926c"></script>
+  <script src="alerts.js?v=20260926c"></script>
+  <script src="overview-charts.js?v=20260926c"></script>
+  <script src="pilot.js?v=20260926c"></script>
+  <script src="dept-data.js?v=20260926c"></script>
+  <script src="dept-samples.js?v=20260926c"></script>
+  <script src="org.js?v=20260926c"></script>
+  <script src="dept.js?v=20260926c"></script>
+  <script src="bom.js?v=20260926c"></script>
+  <script src="bomx.js?v=20260926c"></script>
+  <script src="service.js?v=20260926c"></script>
+  <script src="reports.js?v=20260926c"></script>
+  <script src="integrity.js?v=20260926c"></script>
+  <script src="docview.js?v=20260926c"></script>
+  <script src="p2p-data.js?v=20260926c"></script>
+  <script src="p2p.js?v=20260926c"></script>
+  <script src="auth.js?v=20260926c"></script>
+  <script src="admin.js?v=20260926c"></script>
+  <script src="plans.js?v=20260926c"></script>
+  <script src="app.js?v=20260926c"></script>
 </body>
 </html>

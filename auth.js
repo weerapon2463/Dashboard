@@ -42,7 +42,37 @@ const ALL_VIEWS = [
   ["admin", "ผู้ดูแลระบบ (Admin)"],
 ];
 
-let AUTH = null;        // { users, teams }
+// Special rights a user group can grant on top of page/document permissions
+const GROUP_ABILITIES = [
+  ["request", "สั่งเบิกวัสดุ"],
+  ["approve", "อนุมัติใบเบิก"],
+  ["issue", "จ่ายของตามใบเบิก (คลัง)"],
+  ["stock", "ปรับยอดคงคลัง / ตั้งสิทธิ์การเบิก"],
+  ["reports", "ดูรายงานกิจกรรมทั้งระบบ"],
+];
+
+// Starting groups — admin can rename, change or delete them (Admin › กลุ่มผู้ใช้)
+function authDefaultGroups() {
+  return [
+    { id: "g-tech", name: "ช่างประกอบ / ช่างเทคนิค", desc: "เบิกวัสดุตาม BOM ดูใบสั่งผลิตและงานของตัวเอง", modules: ["bomx", "workorder", "mytasks", "service"], docPerms: { mreq: "create", dpr: "create", ncr: "create" }, abilities: ["request"], members: ["op1"] },
+    { id: "g-lead", name: "หัวหน้างาน / ผู้อนุมัติเบิก", desc: "อนุมัติใบเบิก สั่งเบิกแทนและมอบหมายช่างรับของ", modules: ["bomx", "workorder", "reports"], docPerms: { mreq: "manage", dpr: "manage" }, abilities: ["request", "approve"], members: ["prod"] },
+    { id: "g-store", name: "คลังสินค้า", desc: "จ่ายของตามใบเบิก รับของเข้าคลัง ปรับยอดคงคลัง", modules: ["bomx", "workorder", "p2p"], docPerms: { grn: "manage", stk: "manage", mreq: "create" }, abilities: ["issue", "stock"], members: ["store"] },
+    { id: "g-svc", name: "ช่างบริการหลังการขาย", desc: "เปิด/อัปเดตงานบริการ เบิกอะไหล่ตาม BOM ของเครื่องลูกค้า", modules: ["service", "bomx"], docPerms: { svc: "manage", mc: "create", cc: "create", mreq: "create" }, abilities: ["request"], members: ["svc1"] },
+    { id: "g-pur", name: "จัดซื้อ", desc: "PR → PO → ผู้ขาย และของที่ต้องสั่งเพิ่ม", modules: ["p2p", "procurement", "bomx", "reports"], docPerms: { rfq: "manage", sev: "manage", mrq: "view" }, abilities: [], members: ["pur"] },
+    { id: "g-exec", name: "ผู้บริหาร / ผู้ดูรายงาน", desc: "ดูภาพรวม รายงาน และกิจกรรมทั้งระบบ", modules: ["overview", "pilot", "reports", "bomx", "service", "p2p"], docPerms: {}, abilities: ["reports"], members: ["exec", "plant"] },
+  ];
+}
+
+// Put users into the starting groups by username (used once, when groups are first introduced)
+function authApplyDefaultMembers(auth) {
+  const defs = authDefaultGroups();
+  auth.groups = defs.map(({ members, ...g }) => g);
+  auth.users.forEach((u) => {
+    u.groups = defs.filter((g) => g.members.includes(u.username)).map((g) => g.id);
+  });
+}
+
+let AUTH = null;        // { users, teams, groups }
 let AUTH_USER = null;   // the signed-in user object (from AUTH.users)
 
 /* ---- hashing (obfuscation only — see prototype note) --------------------- */
@@ -63,7 +93,7 @@ function authSeed() {
     company: role === "admin" || role === "group" ? "" : "y2j",
     pin: pinHash(DEMO_PIN, id), modules: null, docPerms: {}, createdAt: "2026-09-24T08:00:00", lastLogin: "",
   });
-  return {
+  const seed = {
     users: [
       u("u-admin", "admin", "ผู้ดูแลระบบ", "admin", "", "IT / ผู้ดูแลระบบ", []),
       u("u-plant", "plant", "ผู้จัดการโรงงาน", "plant", "", "ผู้จัดการโรงงาน", ["t-yt6500", "t-award"]),
@@ -80,6 +110,8 @@ function authSeed() {
       { id: "t-award", name: "คณะทำงาน PS Innovation Award" },
     ],
   };
+  authApplyDefaultMembers(seed);
+  return seed;
 }
 
 function authLoad() {
@@ -92,6 +124,7 @@ function authLoad() {
       AUTH.users.forEach((u) => {
         if (u.company === undefined) { u.company = u.role === "admin" || u.role === "group" ? "" : "y2j"; migrated = true; }
       });
+      if (!Array.isArray(AUTH.groups)) { authApplyDefaultMembers(AUTH); migrated = true; }
       if (migrated) authSave();
       return;
     }
@@ -102,6 +135,18 @@ function authLoad() {
 
 function authSave() {
   try { localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(AUTH)); } catch (e) { showToast("บันทึกข้อมูลผู้ใช้ไม่สำเร็จ", "warn"); }
+}
+
+function authGroupById(id) { return (AUTH.groups || []).find((g) => g.id === id) || null; }
+function authUserGroups(user) {
+  const u = user || AUTH_USER;
+  return u ? (u.groups || []).map(authGroupById).filter(Boolean) : [];
+}
+function authHasAbility(ability, user) {
+  const u = user || AUTH_USER;
+  if (!u) return false;
+  if (u.role === "admin") return true;
+  return authUserGroups(u).some((g) => (g.abilities || []).includes(ability));
 }
 
 function authUserById(id) { return AUTH.users.find((u) => u.id === id) || null; }
@@ -160,6 +205,8 @@ function authAllowedModules(user) {
   const u = user || AUTH_USER;
   if (!u) return null;
   const list = Array.isArray(u.modules) ? u.modules.slice() : roleDefaultModules(u.role);
+  // pages granted by the user's groups are added to the role defaults (not to a hand-picked list)
+  if (!Array.isArray(u.modules)) authUserGroups(u).forEach((g) => (g.modules || []).forEach((m) => { if (!list.includes(m)) list.push(m); }));
   if (u.role === "admin" && !list.includes("admin")) list.push("admin");
   if (u.role !== "admin") return list.filter((v) => v !== "admin");
   return list;
@@ -180,11 +227,21 @@ function roleDefaultDocPerm(user, type) {
   return CROSS_CREATE_TYPES.includes(type) ? "create" : "none";
 }
 
+// Role default raised by any group the user belongs to (a per-user setting still overrides both)
+function authDefaultDocPerm(user, type) {
+  let best = roleDefaultDocPerm(user, type);
+  authUserGroups(user).forEach((g) => {
+    const p = (g.docPerms || {})[type];
+    if (p && PERM_RANK[p] > PERM_RANK[best]) best = p;
+  });
+  return best;
+}
+
 function authDocPerm(type, user) {
   const u = user || AUTH_USER;
   if (!u) return "manage";
   const set = u.docPerms && u.docPerms[type];
-  return set || roleDefaultDocPerm(u, type);
+  return set || authDefaultDocPerm(u, type);
 }
 
 function authCan(type, level) {

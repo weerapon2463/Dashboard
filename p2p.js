@@ -566,6 +566,7 @@ function saveP2PStep() {
     const po = PO_LIST.find((p) => p.id === c.po);
     if (po) po.status = "ส่งมอบแล้ว";
     auditDetail = `รับของ ${ev.qtyReceived}/${c.qty} ${c.unit}`;
+    if (typeof bxReceiveFromP2P === "function") auditDetail += bxReceiveFromP2P(c, ev);
   }
   if (stage === "iqc") {
     ev.result = val("p2pStepResult");
@@ -577,7 +578,10 @@ function saveP2PStep() {
   c.events.push(ev);
   if (stage === "iqc" && ev.result === "fail") {
     // the delivery is rejected: keep its history but reopen shipping for the replacement
-    c.events.forEach((e) => { if (["ship", "grn", "iqc"].includes(e.stage)) e.superseded = true; });
+    c.events.forEach((e) => {
+      if (e.stage === "grn" && !e.superseded && typeof bxReverseFromP2P === "function") auditDetail += bxReverseFromP2P(c, e);
+      if (["ship", "grn", "iqc"].includes(e.stage)) e.superseded = true;
+    });
     c.issues = c.issues || [];
     c.issues.push({ type: "คุณภาพไม่ผ่าน", note: `ตรวจรับไม่ผ่าน${ev.ref ? ` (${ev.ref})` : ""} — ${ev.note || "รอของทดแทน"}`, at: ev.at, by: ev.by, resolved: false });
   }
