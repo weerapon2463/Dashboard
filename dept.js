@@ -51,6 +51,8 @@ function initDeptData() {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
+        // real data exists: a document type added in a later version starts empty, never with sample rows
+        Object.keys(DEPT_DOCS).forEach((t) => { DEPT_DOCS[t] = []; });
         Object.keys(parsed).forEach((t) => { if (Array.isArray(parsed[t]) && DOC_TYPES[t]) DEPT_DOCS[t] = parsed[t]; });
         hadStored = true;
       }
