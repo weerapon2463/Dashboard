@@ -4,6 +4,7 @@
 
 const VIEW_TITLES = {
   overview: "ภาพรวมการผลิต",
+  pilot: "ผลการทดสอบนำร่อง (Pilot Test)",
   mytasks: "งานของฉัน",
   priority: "Priority Matrix",
   capacity: "Capacity Planning",
@@ -23,9 +24,9 @@ const ROLES = [
 
 const MODULE_ACCESS = {
   operator: ["overview", "mytasks", "workorder"],
-  depthead: ["overview", "mytasks", "priority", "workorder", "resource"],
-  plant: ["overview", "mytasks", "priority", "capacity", "schedule", "makeorbuy", "resource", "procurement", "workorder"],
-  group: ["overview", "capacity", "schedule", "makeorbuy"],
+  depthead: ["overview", "pilot", "mytasks", "priority", "workorder", "resource"],
+  plant: ["overview", "pilot", "mytasks", "priority", "capacity", "schedule", "makeorbuy", "resource", "procurement", "workorder"],
+  group: ["overview", "pilot", "capacity", "schedule", "makeorbuy"],
 };
 
 const ROLE_STORAGE_KEY = "y2j-role-v1";
@@ -53,10 +54,14 @@ function switchView(view) {
     section.classList.toggle("active", section.id === `view-${view}`);
   });
   document.getElementById("viewTitle").textContent = VIEW_TITLES[view] || "";
+  // Pilot results are real measurements, so the "sample data" badge would mislead there
+  const badge = document.querySelector(".data-badge");
+  if (badge) badge.hidden = view === "pilot";
 
   // Re-render the relevant chart in case it needs a resize/redraw
   // (canvas charts drawn while display:none report zero size)
   if (view === "overview") renderOverviewCharts();
+  if (view === "pilot") renderPilot();
   if (view === "mytasks") renderMyTasks();
   if (view === "priority") renderPriorityMatrix();
   if (view === "capacity") renderCapacityChart(document.getElementById("capacityLineFilter").value);
@@ -122,6 +127,7 @@ function initRoleSelect() {
     if (typeof renderMasterSchedule === "function") renderMasterSchedule();
     if (typeof renderPriorityMatrix === "function") renderPriorityMatrix();
     if (typeof renderResource === "function") renderResource();
+    if (typeof renderPilot === "function") renderPilot();
   });
 }
 
@@ -156,6 +162,7 @@ function refreshAllCharts() {
   renderMyTasks();
   renderOverviewCharts();
   renderAlerts();
+  renderPilot();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -170,6 +177,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const hadStoredPriority = initPriorityData();
   initPriorityInteractions();
   const hadStoredResource = initResourceData();
+  const hadStoredPilot = initPilotData();
+  initPilotInteractions();
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();
@@ -185,9 +194,11 @@ document.addEventListener("DOMContentLoaded", () => {
   renderMyTasks();
   renderOverviewCharts();
   renderAlerts();
+  renderPilot();
   markWOInitialStatus(hadStoredWorkOrders);
   markProcInitialStatus(hadStoredProcurement);
   markMSInitialStatus(hadStoredSchedule);
   markPMInitialStatus(hadStoredPriority);
   markResInitialStatus(hadStoredResource);
+  markPilotInitialStatus(hadStoredPilot);
 });

@@ -22,6 +22,9 @@
         <button class="nav-item active" data-view="overview">
           <span class="nav-icon">◆</span> ภาพรวม
         </button>
+        <button class="nav-item" data-view="pilot">
+          <span class="nav-icon">◆</span> ผลทดสอบนำร่อง (Pilot)
+        </button>
         <button class="nav-item" data-view="mytasks">
           <span class="nav-icon">◆</span> งานของฉัน
         </button>
@@ -153,6 +156,141 @@
           <div class="card-body">
             <p>Production Dashboard เป็นเครื่องมือสนับสนุนการตัดสินใจสำหรับฝ่ายผลิต Y2J Machinery ให้ผู้บริหารเห็นข้อมูลจากหน้างานจริงแบบครอบคลุมทุกมิติของการบริหารการผลิตทั้งบริษัท — งาน กำลังการผลิต แผนงาน ต้นทุน คน เครื่องจักร เครื่องมือ และการจัดซื้อ ประกอบด้วย 7 โมดูลหลัก: การจัดลำดับความสำคัญงาน (Priority Matrix), การวางแผนกำลังการผลิต (Capacity Planning), ตารางแผนการผลิตรวม (Master Schedule), เครื่องมือช่วยตัดสินใจผลิตเองหรือซื้อ (Make-or-Buy Decision Support), การบริหารทรัพยากรการผลิต — คน เครื่องจักร และเครื่องมือวัด (Resource Management), การจัดซื้อ — PR / PO / ซัพพลายเออร์ (Procurement) และใบสั่งผลิตที่จัดกลุ่มเป็นโปรเจกต์ตาม PO พร้อม Master BOM และการเบิกวัสดุประกอบ (Work Orders &amp; BOM)</p>
             <p class="muted-note">เวอร์ชันนี้ใช้ข้อมูลตัวอย่าง (mock data) สำหรับสาธิตแนวคิด — ขั้นต่อไปคือเชื่อมข้อมูลจริงจากหน้างานและระบบ Stock/BOM</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Pilot Test: real before/after results from the pilot project -->
+      <section class="view" id="view-pilot">
+        <div class="card">
+          <div class="card-header card-header-actions">
+            <div>
+              <h3>ผลการทดสอบนำร่อง (Pilot Test)</h3>
+              <p class="card-sub">บันทึกค่าที่วัดได้จริงก่อนและหลังใช้ Dashboard ในโครงการนำร่อง ระบบคำนวณ % การปรับปรุงและประมาณการต้นทุนที่ประหยัดได้ให้อัตโนมัติ</p>
+            </div>
+            <div class="pilot-toolbar">
+              <button id="pilotCopyBtn" class="btn-secondary" type="button">คัดลอกสรุปผล</button>
+              <button id="pilotExportBtn" class="btn-secondary" type="button">ส่งออก CSV</button>
+              <button id="pilotPrintBtn" class="btn-secondary" type="button">พิมพ์ / PDF</button>
+            </div>
+          </div>
+          <div class="save-status" id="pilotSaveStatus"></div>
+          <div class="card-body">
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="pilotProject">โครงการนำร่อง</label>
+                <input type="text" id="pilotProject" placeholder="เช่น YT6500 ล็อต 1">
+              </div>
+              <div class="form-field">
+                <label for="pilotStart">เริ่มทดสอบ</label>
+                <input type="date" id="pilotStart">
+              </div>
+              <div class="form-field">
+                <label for="pilotEnd">สิ้นสุดการทดสอบ</label>
+                <input type="date" id="pilotEnd">
+              </div>
+              <div class="form-field">
+                <label for="pilotTeam">ผู้ร่วมทดสอบ</label>
+                <input type="text" id="pilotTeam" placeholder="เช่น หัวหน้าไลน์ประกอบ 1, ฝ่ายจัดซื้อ 2 คน">
+              </div>
+              <div class="form-field">
+                <label for="pilotScope">ขอบเขตการทดสอบ</label>
+                <input type="text" id="pilotScope" placeholder="เช่น ใช้ติดตามใบสั่งผลิตและ PR ของโครงการ">
+              </div>
+              <div class="form-field">
+                <label for="pilotLaborRate">ค่าแรง+สวัสดิการเฉลี่ย (บาท/ชม.)</label>
+                <input type="number" id="pilotLaborRate" min="0" step="any">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="stat-grid pilot-stat-grid">
+          <div class="stat-tile">
+            <div class="stat-label">ตัวชี้วัดที่วัดผลแล้ว</div>
+            <div class="stat-value" id="pilotStatMeasured">-</div>
+            <div class="stat-note">มีค่าก่อนและหลังครบ</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">การปรับปรุงเฉลี่ย</div>
+            <div class="stat-value" id="pilotStatAvg">-</div>
+            <div class="stat-note">เฉลี่ยทุกตัวชี้วัดที่วัดแล้ว</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">เวลาที่ประหยัดได้ (ชม.-คน/เดือน)</div>
+            <div class="stat-value" id="pilotStatHours">-</div>
+            <div class="stat-note">จากตัวชี้วัดหน่วยเวลาที่ระบุความถี่</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">ประมาณการประหยัด (บาท/ปี)</div>
+            <div class="stat-value" id="pilotStatSaving">-</div>
+            <div class="stat-note">เวลาที่ลดลง × ความถี่ × ค่าแรง</div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>% การเปลี่ยนแปลงเทียบกับก่อนใช้ Dashboard</h3>
+            <p class="card-sub">ค่าบวก = ดีขึ้น (ตามทิศทางที่ดีของแต่ละตัวชี้วัด) · ค่าลบ = แย่ลง</p>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap chart-wrap-md">
+              <canvas id="pilotChart"></canvas>
+            </div>
+            <p class="muted-note" id="pilotChartEmpty" hidden>ยังไม่มีตัวชี้วัดที่กรอกค่าก่อนและหลังครบ — กรอกในตารางด้านล่างแล้วกราฟจะแสดงทันที</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header card-header-actions">
+            <div>
+              <h3>ตัวชี้วัด (KPI) ก่อน / หลัง</h3>
+              <p class="card-sub">กรอกตัวเลขในช่อง "ก่อนใช้" และ "หลังใช้" ได้ทันที — กด "แก้ไข" เพื่อระบุความถี่ต่อเดือนและจำนวนคน สำหรับคำนวณต้นทุนที่ประหยัดได้</p>
+            </div>
+            <button id="pilotAddBtn" class="btn-primary pilot-edit-only" type="button">+ เพิ่มตัวชี้วัด</button>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="pilotKpiTable">
+              <thead>
+                <tr>
+                  <th>ตัวชี้วัด / วิธีวัด</th>
+                  <th>หน่วย</th>
+                  <th>ก่อนใช้</th>
+                  <th>หลังใช้</th>
+                  <th>ผลลัพธ์</th>
+                  <th>ประหยัด (บาท/เดือน)</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>เสียงจากผู้ใช้งาน</h3>
+            <p class="card-sub">บันทึกความคิดเห็นจริงของผู้ใช้ระหว่างทดสอบ — ใช้เป็นหลักฐานการนำไปใช้งานในเอกสารประกวด</p>
+          </div>
+          <div class="card-body">
+            <div class="pilot-feedback-form pilot-edit-only">
+              <input type="text" id="pilotFeedbackText" placeholder="ความคิดเห็นของผู้ใช้" aria-label="ความคิดเห็นของผู้ใช้">
+              <input type="text" id="pilotFeedbackWho" placeholder="ชื่อ / ตำแหน่ง" aria-label="ชื่อหรือตำแหน่งผู้ให้ความคิดเห็น">
+              <button id="pilotFeedbackAddBtn" class="btn-secondary" type="button">บันทึก</button>
+            </div>
+            <div id="pilotFeedbackList"></div>
+          </div>
+        </div>
+
+        <div class="card pilot-backup-card">
+          <div class="card-header">
+            <h3>สำรองข้อมูล</h3>
+            <p class="card-sub">ข้อมูลเก็บในเบราว์เซอร์เครื่องนี้เท่านั้น — กดสำรองเป็นไฟล์หลังกรอกทุกครั้ง และใช้นำเข้าเมื่อย้ายไปเครื่องอื่น</p>
+          </div>
+          <div class="card-body pilot-toolbar">
+            <button id="pilotBackupBtn" class="btn-secondary" type="button">สำรองข้อมูล (.json)</button>
+            <button id="pilotRestoreBtn" class="btn-secondary pilot-edit-only" type="button">นำเข้าไฟล์สำรอง</button>
+            <input type="file" id="pilotRestoreInput" accept=".json,application/json" hidden>
           </div>
         </div>
       </section>
@@ -806,6 +944,53 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="pilotFormBackdrop">
+    <div class="modal">
+      <h3 id="pilotFormTitle">เพิ่มตัวชี้วัด</h3>
+      <div class="form-field">
+        <label for="pilotFormName">ชื่อตัวชี้วัด</label>
+        <input type="text" id="pilotFormName" placeholder="เช่น เวลาจัดทำรายงานประจำสัปดาห์">
+      </div>
+      <div class="form-field">
+        <label for="pilotFormMethod">วิธีวัด</label>
+        <input type="text" id="pilotFormMethod" placeholder="วัด/นับอย่างไร จากแหล่งข้อมูลไหน">
+      </div>
+      <div class="form-field">
+        <label for="pilotFormUnit">หน่วย</label>
+        <select id="pilotFormUnit"></select>
+      </div>
+      <div class="form-field">
+        <label for="pilotFormDirection">ทิศทางที่ดี</label>
+        <select id="pilotFormDirection">
+          <option value="lower">ยิ่งน้อยยิ่งดี</option>
+          <option value="higher">ยิ่งมากยิ่งดี</option>
+        </select>
+      </div>
+      <div class="form-field">
+        <label for="pilotFormBefore">ค่าก่อนใช้ Dashboard</label>
+        <input type="number" id="pilotFormBefore" step="any">
+      </div>
+      <div class="form-field">
+        <label for="pilotFormAfter">ค่าหลังใช้ Dashboard</label>
+        <input type="number" id="pilotFormAfter" step="any">
+      </div>
+      <div class="form-field">
+        <label for="pilotFormTimes">เกิดขึ้นกี่ครั้งต่อเดือน (สำหรับคำนวณต้นทุน)</label>
+        <input type="number" id="pilotFormTimes" min="0" step="any" placeholder="เช่น ประชุมสัปดาห์ละครั้ง = 4">
+      </div>
+      <div class="form-field">
+        <label for="pilotFormPeople">จำนวนคนที่เกี่ยวข้องแต่ละครั้ง</label>
+        <input type="number" id="pilotFormPeople" min="1" step="1" placeholder="ไม่กรอก = 1 คน">
+      </div>
+      <p class="muted-note">ต้นทุนคำนวณเฉพาะตัวชี้วัดหน่วย ชั่วโมง/นาที/บาท ที่ "ยิ่งน้อยยิ่งดี" และระบุจำนวนครั้งต่อเดือน</p>
+      <div class="modal-actions">
+        <button id="pilotDeleteBtn" class="btn-secondary" type="button" hidden>ลบตัวชี้วัดนี้</button>
+        <button id="pilotFormCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="pilotFormSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
   <script src="data.js"></script>
@@ -818,6 +1003,7 @@
   <script src="workorder.js"></script>
   <script src="alerts.js"></script>
   <script src="overview-charts.js"></script>
+  <script src="pilot.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
