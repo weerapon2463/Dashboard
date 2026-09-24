@@ -398,6 +398,7 @@ async function renderDocAttachments(type, doc) {
 
 function reopenCurrentDoc() {
   if (docViewCurrent && docViewCurrent.kind === "doc") openDocView(docViewCurrent.type, docViewCurrent.index);
+  else if (docViewCurrent && docViewCurrent.kind === "p2p" && typeof openP2PCase === "function") openP2PCase(docViewCurrent.id);
   else if (docViewCurrent && docViewCurrent.kind === "bom") {
     const sel = document.getElementById("bomSheetQty");
     openBomSheet(docViewCurrent.model, sel ? sel.value : undefined);

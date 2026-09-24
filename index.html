@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Dashboard | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260924h">
+<link rel="stylesheet" href="style.css?v=20260924i">
 </head>
 <body>
   <div class="login-screen" id="loginScreen" hidden>
@@ -72,6 +72,9 @@
         </button>
         <button class="nav-item" data-view="resource">
           <span class="nav-icon">◆</span> ทรัพยากรการผลิต
+        </button>
+        <button class="nav-item" data-view="p2p">
+          <span class="nav-icon">◆</span> ติดตามจัดซื้อ (PR→PO→รับของ)
         </button>
         <button class="nav-item" data-view="procurement">
           <span class="nav-icon">◆</span> จัดซื้อ / ซัพพลายเออร์
@@ -513,6 +516,91 @@
         </div>
       </section>
 
+      <!-- Procure-to-Pay tracker -->
+      <section class="view" id="view-p2p">
+        <div class="stat-grid pilot-stat-grid">
+          <div class="stat-tile"><div class="stat-label">คำขอซื้อที่ยังไม่ปิด</div><div class="stat-value" id="p2pStatOpen">-</div><div class="stat-note">PR → รับของ → จ่ายเงิน</div></div>
+          <div class="stat-tile"><div class="stat-label">งานเกินกำหนด</div><div class="stat-value" id="p2pStatLate">-</div><div class="stat-note">ค้างเกินเป้าหมายของขั้นตอน</div></div>
+          <div class="stat-tile"><div class="stat-label">ผู้ขายส่งตรงเวลา</div><div class="stat-value" id="p2pStatOnTime">-</div><div class="stat-note">รับภายในวันที่ยืนยัน (นับรายที่เลยนัดแล้วยังไม่ส่งเป็นช้า)</div></div>
+          <div class="stat-tile"><div class="stat-label">รอบเวลา PR → รับของ</div><div class="stat-value" id="p2pStatCycle">-</div><div class="stat-note">เฉลี่ยงานที่รับของแล้ว</div></div>
+        </div>
+
+        <div class="card">
+          <div class="card-header card-header-actions">
+            <div>
+              <h3>ประเด็นที่ต้องจัดการ <span class="dept-tab-count" id="p2pIssueCount">0</span></h3>
+              <p class="card-sub">ระบบตรวจให้อัตโนมัติ: ค้างเกินเป้าหมาย · ผู้ขายส่งช้า · วันส่งช้ากว่าวันที่ต้องใช้ · รับของไม่ครบ · ตรวจรับไม่ผ่าน · ปัญหาที่มีคนแจ้ง</p>
+            </div>
+            <div class="pilot-toolbar">
+              <button id="p2pSopBtn" class="btn-secondary" type="button">📄 ขั้นตอนมาตรฐาน (SOP)</button>
+              <button id="p2pNewBtn" class="btn-primary" type="button">+ เปิดคำขอซื้อ (PR)</button>
+            </div>
+          </div>
+          <div class="card-body"><div class="p2p-issues" id="p2pIssues"></div></div>
+        </div>
+
+        <div class="p2p-stack">
+          <div class="card">
+            <div class="card-header">
+              <h3>คอขวดอยู่ที่ขั้นตอนไหน</h3>
+              <p class="card-sub">แท่ง = วันเฉลี่ยที่ใช้จริง · เส้นขีด = เป้าหมาย · สีแดง = ช้ากว่าเป้าหมาย</p>
+            </div>
+            <div class="card-body table-scroll">
+              <table class="data-table" id="p2pStageTable">
+                <thead><tr><th>ขั้นตอน</th><th>ใช้เวลาเทียบเป้าหมาย</th><th class="num">เฉลี่ย (วัน)</th><th class="num">เป้าหมาย</th><th class="num">ค้างอยู่</th><th class="num">เกินกำหนด</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-header">
+              <h3>งานค้างอยู่ที่ใคร</h3>
+              <p class="card-sub">นับจากขั้นตอนปัจจุบันของแต่ละคำขอ เรียงตามจำนวนงานเกินกำหนด</p>
+            </div>
+            <div class="card-body table-scroll">
+              <table class="data-table" id="p2pHolderTable">
+                <thead><tr><th>ผู้ถืองาน</th><th class="num">งาน</th><th class="num">เกินกำหนด</th><th class="num">ค้างนานสุด</th><th>เลขที่</th></tr></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>ติดตามทุกคำขอซื้อ — อยู่ขั้นไหน ใครถือ รอมากี่วัน</h3>
+            <p class="card-sub">กดเลขที่ PR เพื่อดูใบติดตาม: ใครทำแต่ละขั้น เมื่อไร ใช้กี่วัน และบันทึกขั้นถัดไป · จุด ● แทน 10 ขั้นตอน (เขียว = เสร็จ)</p>
+          </div>
+          <div class="card-body table-scroll">
+            <div class="filter-row">
+              <label for="p2pStatusFilter">แสดง:</label>
+              <select id="p2pStatusFilter"><option value="open">ยังไม่ปิด</option><option value="late">เฉพาะเกินกำหนด</option><option value="closed">ปิด/ยกเลิกแล้ว</option><option value="all">ทั้งหมด</option></select>
+              <label for="p2pStageFilter">ขั้นตอน:</label><select id="p2pStageFilter"></select>
+              <label for="p2pSupplierFilter">ผู้ขาย:</label><select id="p2pSupplierFilter"></select>
+              <label for="p2pSearch">ค้นหา:</label><input type="text" id="p2pSearch" class="wo-search" placeholder="PR / PO / รายการ / WO">
+            </div>
+            <table class="data-table" id="p2pCaseTable">
+              <thead><tr><th>PR / PO</th><th>รายการ</th><th>ผู้ขอ</th><th>ผู้ขาย</th><th>ขั้นตอน</th><th>อยู่ที่</th><th class="num">รอมา</th><th>กำหนด</th><th>ต้องใช้</th><th>สถานะ</th></tr></thead>
+              <tbody></tbody>
+            </table>
+            <p class="muted-note" id="p2pCaseEmpty" hidden>ไม่มีคำขอตามตัวกรองนี้</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <h3>ผลงานผู้ขาย (Supplier Scorecard)</h3>
+            <p class="card-sub">คำนวณจากการรับของจริงเทียบวันที่ผู้ขายยืนยัน และผลตรวจรับ — ใช้ประกอบการประเมินผู้ขาย (SE) · *นับรายที่เลยวันนัดแล้วยังไม่ส่งเป็น "ช้า"</p>
+          </div>
+          <div class="card-body table-scroll">
+            <table class="data-table" id="p2pSupplierTable">
+              <thead><tr><th>ผู้ขาย</th><th class="num">PO</th><th class="num">ส่งแล้ว (ครั้ง)</th><th class="num">ตรงเวลา*</th><th class="num">ช้าเฉลี่ย (วัน)</th><th class="num">IQC ไม่ผ่าน</th><th class="num">กำลังช้าอยู่</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
       <!-- My Tasks (per-person workspace, filtered to what this person claimed) -->
       <section class="view" id="view-mytasks">
         <div class="card">
@@ -859,7 +947,7 @@
         <div class="card">
           <div class="card-header">
             <h3>ใบขอซื้อ (Purchase Requisition — PR)</h3>
-            <p class="card-sub">หัวหน้าแผนก/ผู้จัดการโรงงานอนุมัติหรือปฏิเสธคำขอซื้อได้โดยตรงจากตารางนี้</p>
+            <p class="card-sub">หัวหน้าแผนก/ผู้จัดการโรงงานอนุมัติหรือปฏิเสธคำขอซื้อได้โดยตรงจากตารางนี้ — ดูทุกขั้นตั้งแต่ PR ถึงรับของ ใครถืองาน และผู้ขายรายไหนช้า ได้ที่ <button type="button" class="link-btn" onclick="switchView('p2p')">ติดตามจัดซื้อ →</button></p>
           </div>
           <div class="save-status" id="prSaveStatus"></div>
           <div class="card-body table-scroll">
@@ -1293,6 +1381,50 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="p2pStepBackdrop">
+    <div class="modal">
+      <h3 id="p2pStepTitle">บันทึกขั้นตอน</h3>
+      <p class="card-sub" id="p2pStepControl"></p>
+      <div id="p2pStepFields"></div>
+      <div class="modal-actions">
+        <button id="p2pStepCancel" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="p2pStepSave" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="p2pIssueBackdrop">
+    <div class="modal">
+      <h3>แจ้งปัญหา</h3>
+      <div class="form-field"><label for="p2pIssueType">ประเภท</label><select id="p2pIssueType"></select></div>
+      <div class="form-field"><label for="p2pIssueNote">รายละเอียด *</label><input id="p2pIssueNote" placeholder="เช่น ผู้ขายแจ้งวัตถุดิบขาด เลื่อนส่ง 5 วัน"></div>
+      <div class="modal-actions">
+        <button id="p2pIssueCancel" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="p2pIssueSave" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="p2pNewBackdrop">
+    <div class="modal modal-wide">
+      <h3>เปิดคำขอซื้อ (PR)</h3>
+      <p class="card-sub">ระบบออกเลขที่ PR ให้ และส่งเข้าขั้นอนุมัติทันที — ระบุวันที่ต้องใช้ให้ชัดเพื่อให้ระบบเตือนเมื่อผู้ขายส่งไม่ทัน</p>
+      <div class="modal-grid">
+        <div class="form-field modal-grid-wide"><label for="p2pNewItem">รายการ / สเปก *</label><input id="p2pNewItem" placeholder="เช่น ลูกปืน 6205-2RS"></div>
+        <div class="form-field"><label for="p2pNewQty">จำนวน *</label><input type="number" id="p2pNewQty" min="1"></div>
+        <div class="form-field"><label for="p2pNewUnit">หน่วย</label><input id="p2pNewUnit"></div>
+        <div class="form-field"><label for="p2pNewNeed">วันที่ต้องใช้ (Need-by)</label><input type="date" id="p2pNewNeed"></div>
+        <div class="form-field"><label for="p2pNewWo">ใช้กับงาน (WO / MT)</label><input id="p2pNewWo" placeholder="เช่น WO-2026-087"></div>
+        <div class="form-field"><label for="p2pNewValue">มูลค่าประมาณ (บาท)</label><input type="number" id="p2pNewValue"></div>
+        <div class="form-field"><label for="p2pNewNote">เหตุผล / หมายเหตุ</label><input id="p2pNewNote"></div>
+      </div>
+      <div class="modal-actions">
+        <button id="p2pNewCancel" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="p2pNewSave" class="btn-primary" type="button">เปิดคำขอซื้อ</button>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-backdrop" id="bomNewBackdrop">
     <div class="modal">
       <h3>สร้าง BOM รุ่นใหม่</h3>
@@ -1389,25 +1521,27 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="data.js?v=20260924h"></script>
-  <script src="priority-matrix.js?v=20260924h"></script>
-  <script src="capacity-planning.js?v=20260924h"></script>
-  <script src="master-schedule.js?v=20260924h"></script>
-  <script src="make-or-buy.js?v=20260924h"></script>
-  <script src="resource.js?v=20260924h"></script>
-  <script src="procurement.js?v=20260924h"></script>
-  <script src="workorder.js?v=20260924h"></script>
-  <script src="alerts.js?v=20260924h"></script>
-  <script src="overview-charts.js?v=20260924h"></script>
-  <script src="pilot.js?v=20260924h"></script>
-  <script src="dept-data.js?v=20260924h"></script>
-  <script src="dept-samples.js?v=20260924h"></script>
-  <script src="dept.js?v=20260924h"></script>
-  <script src="bom.js?v=20260924h"></script>
-  <script src="docview.js?v=20260924h"></script>
-  <script src="auth.js?v=20260924h"></script>
-  <script src="admin.js?v=20260924h"></script>
-  <script src="plans.js?v=20260924h"></script>
-  <script src="app.js?v=20260924h"></script>
+  <script src="data.js?v=20260924i"></script>
+  <script src="priority-matrix.js?v=20260924i"></script>
+  <script src="capacity-planning.js?v=20260924i"></script>
+  <script src="master-schedule.js?v=20260924i"></script>
+  <script src="make-or-buy.js?v=20260924i"></script>
+  <script src="resource.js?v=20260924i"></script>
+  <script src="procurement.js?v=20260924i"></script>
+  <script src="workorder.js?v=20260924i"></script>
+  <script src="alerts.js?v=20260924i"></script>
+  <script src="overview-charts.js?v=20260924i"></script>
+  <script src="pilot.js?v=20260924i"></script>
+  <script src="dept-data.js?v=20260924i"></script>
+  <script src="dept-samples.js?v=20260924i"></script>
+  <script src="dept.js?v=20260924i"></script>
+  <script src="bom.js?v=20260924i"></script>
+  <script src="docview.js?v=20260924i"></script>
+  <script src="p2p-data.js?v=20260924i"></script>
+  <script src="p2p.js?v=20260924i"></script>
+  <script src="auth.js?v=20260924i"></script>
+  <script src="admin.js?v=20260924i"></script>
+  <script src="plans.js?v=20260924i"></script>
+  <script src="app.js?v=20260924i"></script>
 </body>
 </html>

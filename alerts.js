@@ -49,6 +49,13 @@ function computeAlerts() {
     });
   }
 
+  // Procurement: only the urgent items from the Procure-to-Pay tracker
+  if (typeof p2pAllExceptions === "function" && typeof P2P_CASES !== "undefined" && P2P_CASES.length) {
+    p2pAllExceptions().filter((x) => x.sev === "critical").slice(0, 6).forEach((x) => {
+      alerts.push({ type: "จัดซื้อ (ติดตาม)", detail: `${x.c.pr} ${x.c.item} — ${x.text} · ผู้รับผิดชอบ: ${x.owner}`, severity: "critical" });
+    });
+  }
+
   MACHINE_STATUS.filter((m) => m.status !== "ใช้งานปกติ").forEach((m) => {
     alerts.push({
       type: "เครื่องจักร",

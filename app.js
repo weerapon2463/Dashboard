@@ -15,6 +15,7 @@ const VIEW_TITLES = {
   procurement: "จัดซื้อ (PR / PO / ซัพพลายเออร์)",
   workorder: "ใบสั่งผลิต & BOM",
   plans: "แผนงานของฉัน",
+  p2p: "ติดตามจัดซื้อ — PR → PO → ส่งของ → รับของ → ตรวจรับ → จ่ายเงิน",
   admin: "ผู้ดูแลระบบ — ผู้ใช้ สิทธิ์ และประวัติการใช้งาน",
 };
 
@@ -26,10 +27,10 @@ const ROLES = [
 ];
 
 const MODULE_ACCESS = {
-  operator: ["overview", "dept", "mytasks", "workorder"],
-  depthead: ["overview", "pilot", "dept", "mytasks", "priority", "workorder", "resource"],
-  plant: ["overview", "pilot", "dept", "mytasks", "priority", "capacity", "schedule", "makeorbuy", "resource", "procurement", "workorder"],
-  group: ["overview", "pilot", "dept", "capacity", "schedule", "makeorbuy"],
+  operator: ["overview", "dept", "p2p", "mytasks", "workorder"],
+  depthead: ["overview", "pilot", "dept", "p2p", "mytasks", "priority", "workorder", "resource"],
+  plant: ["overview", "pilot", "dept", "p2p", "mytasks", "priority", "capacity", "schedule", "makeorbuy", "resource", "procurement", "workorder"],
+  group: ["overview", "pilot", "dept", "p2p", "capacity", "schedule", "makeorbuy"],
 };
 
 const ROLE_STORAGE_KEY = "y2j-role-v1";
@@ -67,6 +68,7 @@ function switchView(view) {
   if (view === "pilot" && typeof renderPilot === "function") renderPilot();
   if (view === "dept" && typeof renderDept === "function") renderDept();
   if (view === "plans" && typeof renderPlans === "function") renderPlans();
+  if (view === "p2p" && typeof renderP2P === "function") renderP2P();
   if (view === "admin" && typeof renderAdmin === "function") renderAdmin();
   if (view === "mytasks") renderMyTasks();
   if (view === "priority") renderPriorityMatrix();
@@ -213,6 +215,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (hasDept) { initDeptInteractions(); initBomInteractions(); }
   if (hasDept && typeof initDocView === "function") initDocView();
   if (typeof initPlans === "function") initPlans();
+  if (typeof initP2P === "function") { initP2P(); renderP2P(); renderAlerts(); }
   if (typeof initAdmin === "function") initAdmin();
   populateCapacityFilter();
   populateBOMFilter();

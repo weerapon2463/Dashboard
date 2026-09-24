@@ -37,7 +37,7 @@ const CROSS_CREATE_TYPES = ["mtr", "ncr", "saf", "mreq", "ecr"];
 const ALL_VIEWS = [
   ["overview", "ภาพรวม"], ["pilot", "ผลทดสอบนำร่อง"], ["dept", "งานตามแผนก / เอกสาร"], ["plans", "แผนงานของฉัน"],
   ["mytasks", "งานของฉัน"], ["priority", "Priority Matrix"], ["capacity", "Capacity Planning"], ["schedule", "Master Schedule"],
-  ["makeorbuy", "Make-or-Buy"], ["resource", "ทรัพยากรการผลิต"], ["procurement", "จัดซื้อ"], ["workorder", "ใบสั่งผลิต & BOM"],
+  ["makeorbuy", "Make-or-Buy"], ["resource", "ทรัพยากรการผลิต"], ["p2p", "ติดตามจัดซื้อ (PR→PO→รับของ)"], ["procurement", "จัดซื้อ"], ["workorder", "ใบสั่งผลิต & BOM"],
   ["admin", "ผู้ดูแลระบบ (Admin)"],
 ];
 

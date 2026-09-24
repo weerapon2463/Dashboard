@@ -786,3 +786,41 @@ html, body {
   .perm-grid { grid-template-columns: 1fr; }
   .login-users { grid-template-columns: 1fr; }
 }
+
+/* ---- Procure-to-Pay tracker ---- */
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.data-table th.num { text-align: right; }
+.p2p-stepper { display: inline-flex; gap: 3px; align-items: center; }
+.p2p-dot { width: 9px; height: 9px; border-radius: 999px; background: var(--gridline); border: 1px solid var(--baseline); }
+.p2p-dot.done { background: var(--status-good); border-color: var(--status-good); }
+.p2p-dot.cur { width: 12px; height: 12px; background: var(--series-1); border-color: var(--series-1); }
+.p2p-dot.cur.risk { background: var(--status-warning); border-color: var(--status-warning); }
+.p2p-dot.cur.late { background: var(--status-critical); border-color: var(--status-critical); }
+.p2p-dot.cancel { opacity: .35; }
+.p2p-issues { display: flex; flex-direction: column; gap: 8px; max-height: 420px; overflow-y: auto; }
+.p2p-issue { border: 1px solid var(--border-hairline); border-left: 4px solid var(--status-warning); border-radius: 8px; padding: 8px 12px; background: var(--surface-1); }
+.p2p-issue-critical { border-left-color: var(--status-critical); }
+.p2p-issue-main { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; font-size: 13px; }
+.p2p-issue-sev { font-size: 11.5px; font-weight: 800; color: #a06a00; }
+.p2p-issue-critical .p2p-issue-sev { color: var(--status-critical); }
+.p2p-issue-item { color: var(--text-secondary); }
+.p2p-issue-text { font-size: 13.5px; font-weight: 600; margin-top: 2px; }
+.p2p-issue-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.p2p-issue-meta strong { color: var(--text-secondary); }
+.p2p-bar-cell { min-width: 140px; }
+.p2p-bar-track { position: relative; height: 12px; background: var(--surface-1); border: 1px solid var(--gridline); border-radius: 4px; }
+.p2p-bar { position: absolute; left: 0; top: 0; bottom: 0; background: var(--series-1); border-radius: 3px; }
+.p2p-bar.over { background: var(--status-critical); }
+.p2p-sla { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text-primary); }
+.p2p-over { font-size: 10.5px; font-weight: 800; color: var(--status-critical); }
+.p2p-late-num { color: var(--status-critical); font-weight: 800; }
+.p2p-case-list { white-space: normal !important; font-size: 12px; color: var(--text-secondary); max-width: 260px; }
+.p2p-tl-done td:first-child { border-left: 3px solid #1b7a1b; }
+.p2p-tl-ok td:first-child, .p2p-tl-risk td:first-child, .p2p-tl-late td:first-child { border-left: 3px solid #1f5fa8; background: #eef4fb; }
+.p2p-tl-late td:first-child { border-left-color: #b42323; background: #fbeeee; }
+.p2p-sheet-issue { margin-bottom: 6px; color: #9a6500; font-weight: 700; }
+.p2p-sheet-issue.critical { color: #b42323; }
+.p2p-sheet-issue span { font-weight: 400; color: #5d5d5d; font-size: 12px; }
+
+.p2p-stack { display: grid; grid-template-columns: 1fr; gap: 18px; }
+@media (min-width: 1500px) { .p2p-stack { grid-template-columns: 1fr 1fr; } }
