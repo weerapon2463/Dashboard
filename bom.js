@@ -48,6 +48,8 @@ function initBomData() {
     if (!MASTER_BOM[m]) MASTER_BOM[m] = [];
     if (!BOM_META[m]) BOM_META[m] = bomDefaultMeta(m);
     bomEnsureStructure(m);
+    // a released BOM is the state of its current revision — keep a copy so revisions can be compared later
+    if (BOM_META[m].status === BOM_RELEASED) bomSnapshot(m, false);
   });
   bomModel = MACHINE_MODELS[0] || null;
   return hadStored;
@@ -102,6 +104,17 @@ function bomAddSampleChildren(onlyModel) {
     });
   });
   return added;
+}
+
+// Frozen copy of a revision's lines (BOM_META[model].snapshots[rev]); newest 12 kept
+function bomSnapshot(model, overwrite) {
+  const meta = BOM_META[model];
+  if (!meta) return;
+  meta.snapshots = meta.snapshots || {};
+  if (meta.snapshots[meta.rev] && !overwrite) return;
+  meta.snapshots[meta.rev] = { at: new Date().toISOString().slice(0, 10), lines: JSON.parse(JSON.stringify(MASTER_BOM[model] || [])) };
+  const revs = Object.keys(meta.snapshots);
+  if (revs.length > 12) delete meta.snapshots[revs[0]];
 }
 
 function bomHasChildren(model, id) { return (MASTER_BOM[model] || []).some((l) => l.parent === id); }
@@ -350,6 +363,7 @@ function saveBomRev() {
   const note = document.getElementById("bomRevNote").value.trim();
   if (!note) { document.getElementById("bomRevNote").focus(); return; }
   const meta = BOM_META[bomModel];
+  bomSnapshot(bomModel, false); // the outgoing revision as it was released
   meta.rev = bomNextRev(meta.rev);
   meta.status = BOM_DRAFT;
   meta.history.push({ rev: meta.rev, date: new Date().toISOString().slice(0, 10), note, ref: document.getElementById("bomRevRef").value });
@@ -366,6 +380,7 @@ function releaseBom() {
   if (lines.some((l) => !l.part || !(Number(l.qty) > 0))) { showToast("มีรายการที่ยังไม่มีชื่อชิ้นส่วนหรือจำนวน", "warn"); return; }
   if (!confirm(`อนุมัติใช้งาน BOM ${bomModel} Rev.${meta.rev}? หลังอนุมัติจะแก้ไขได้โดยออก Revision ใหม่เท่านั้น`)) return;
   meta.status = BOM_RELEASED;
+  bomSnapshot(bomModel, true);
   bomAudit("อนุมัติใช้งาน BOM", `Rev.${meta.rev}`);
   const last = meta.history[meta.history.length - 1];
   if (last && last.rev === meta.rev) last.date = new Date().toISOString().slice(0, 10);

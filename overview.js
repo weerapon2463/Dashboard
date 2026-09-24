@@ -25,12 +25,15 @@ const OV_WIDGETS = {
   alerts: { title: "แจ้งเตือนความล่าช้าและความเสี่ยง", sub: "รวมทุกความเสี่ยงจากทุกโมดูล", size: "full" },
   legacyStats: { title: "ตัวชี้วัดการวางแผน", sub: "Priority Matrix · Capacity · Master Schedule · Make-or-Buy · ทรัพยากร", size: "full" },
   about: { title: "เกี่ยวกับ Dashboard นี้", sub: "", size: "full" },
+  rndProjects: { title: "โครงการ R&D", sub: "ความคืบหน้าเทียบแผน · Milestone ถัดไป", size: "half" },
+  rndChanges: { title: "การเปลี่ยนแปลงทางวิศวกรรมที่ยังไม่ครบ", sub: "ECR → EO → BOM → แบบ → WI → หน้างาน", size: "half" },
 };
 
 const OV_PRESETS = [
-  { id: "exec", name: "ผู้บริหาร", widgets: ["hero", "flow", "woProgress", "health", "p2pPipeline", "service", "activity", "pilot", "docsLoad", "alerts"] },
+  { id: "exec", name: "ผู้บริหาร", widgets: ["hero", "flow", "rndProjects", "woProgress", "health", "p2pPipeline", "service", "activity", "pilot", "docsLoad", "alerts"] },
   { id: "prod", name: "ฝ่ายผลิต / วางแผน", widgets: ["hero", "woProgress", "reqAging", "stockHealth", "capacity", "woStatus", "legacyStats", "alerts"] },
   { id: "store", name: "คลัง & จัดซื้อ", widgets: ["hero", "reqAging", "stockHealth", "p2pPipeline", "flow", "activity"] },
+  { id: "rnd", name: "R&D / วิศวกรรม", widgets: ["rndProjects", "rndChanges", "woProgress", "health", "activity", "docsLoad"] },
   { id: "svc", name: "บริการหลังการขาย", widgets: ["hero", "service", "flow", "stockHealth", "activity"] },
 ];
 
@@ -44,6 +47,7 @@ function ovDefaultPreset() {
   if (["plant", "group", "admin"].includes(u.role)) return "exec";
   if (["wh", "pur"].includes(u.dept)) return "store";
   if (u.dept === "sales") return "svc";
+  if (u.dept === "rnd") return "rnd";
   return "prod";
 }
 function ovFromPreset(id) {
@@ -318,6 +322,28 @@ const OV_RENDER = {
       ${ovGo("pilot", "ดูผล Pilot ทั้งหมด →")}`;
   },
 
+  rndProjects() {
+    if (typeof RD === "undefined") return "";
+    const list = RD.projects.filter((p) => !["เสร็จแล้ว", "ยกเลิก"].includes(p.status));
+    const tq = typeof rdTqOpen === "function" ? rdTqOpen() : [];
+    const tqNote = tq.length ? `<div class="ov-row-head"><span>คำถามทางเทคนิค (TQ) รอคำตอบ <strong>${tq.length}</strong>${tq.filter(rdTqLate).length ? ` · ${bxPill(`เลยกำหนด ${tq.filter(rdTqLate).length}`, "critical")}` : ""}</span>${ovGo("rnd", "ตอบ TQ →", "tq")}</div>` : "";
+    if (!list.length) return tqNote + ovEmpty("ยังไม่มีโครงการ R&D ที่กำลังทำ") + ovGo("rnd", "สร้างโครงการ →");
+    return `<div class="ov-rows">${list.map((p) => {
+      const h = rdHealth(p), prog = rdProgress(p), m = rdNextMilestone(p);
+      return `<div class="ov-row" data-tip="${ovEsc(`${p.id} ${p.name} · ${prog}% · ${h[0]}${m ? ` · ถัดไป: ${m.name} ${formatThaiDate(m.end)}` : ""}`)}">
+        <div class="ov-row-head"><strong>${ovEsc(p.id)}</strong> <span class="muted-inline">${ovEsc(p.name).slice(0, 40)}</span><span class="ov-row-right"><strong>${prog}%</strong> ${bxPill(h[0], h[1])}</span></div>
+        <div class="ov-bar ov-bar-${h[1] === "critical" ? "critical" : h[1] === "warning" ? "warning" : "good"}"><span style="width:${prog}%"></span></div>
+        ${m ? `<div class="muted-inline">◆ ${ovEsc(m.name)} · ${formatThaiDate(m.end)}</div>` : ""}</div>`;
+    }).join("")}</div>${tqNote}${ovGo("rnd", "เปิด R&D Workbench →")}`;
+  },
+  rndChanges() {
+    if (typeof rdOpenChanges !== "function") return "";
+    const list = rdOpenChanges();
+    if (!list.length) return ovEmpty("✓ ทุก ECR ดำเนินการครบแล้ว");
+    return `<div class="ov-rows">${list.slice(0, 6).map((c) => `<div class="ov-row" data-tip="${ovEsc(`${c.ecr.no} ${c.ecr.title} · ค้าง: ${c.pending.map((x) => x.label).join(", ")}`)}">
+      <div class="ov-row-head"><strong>${ovEsc(c.ecr.no)}</strong> <span class="muted-inline">${ovEsc(c.ecr.title).slice(0, 36)}</span><span class="ov-row-right">${bxPill(`ต่อไป: ${c.pending[0].label}`, "warning")} <span class="muted-inline">${c.age} วัน</span></span></div>
+      <div class="rd-dots">${c.steps.map((s) => `<span class="rd-dot ${s.skip ? "rd-skip" : s.ok ? "rd-ok" : "rd-no"}" title="${ovEsc(s.label)}"></span>`).join("")}</div></div>`).join("")}</div>${ovGo("rnd", "ติดตามการเปลี่ยนแปลง →", "change")}`;
+  },
   woStatus() { return `<div class="chart-wrap chart-wrap-md"><canvas id="woStatusChart"></canvas></div>`; },
   capacity() { return `<div class="chart-wrap chart-wrap-md"><canvas id="capacitySnapshotChart"></canvas></div>`; },
   alerts() {
@@ -370,6 +396,7 @@ function ovGoTo(view, extra) {
   if (view === "service" && extra) svTab = extra;
   if (view === "admin" && extra && typeof adminTab !== "undefined") adminTab = extra;
   if (view === "reports" && extra && typeof rpApplyView === "function") rpApplyView(extra);
+  if (view === "rnd" && extra && typeof rdTab !== "undefined") rdTab = extra;
   switchView(view);
 }
 

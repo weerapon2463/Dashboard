@@ -15,6 +15,7 @@ function icRun() {
   const models = new Set(MACHINE_MODELS);
   const woIds = new Set(WORK_ORDERS.map((w) => w.wo));
   const svcIds = new Set(docs("svc").map((d) => d.no));
+  const prefixes = new Set(Object.values(DOC_TYPES).map((d) => d.prefix).filter(Boolean));
   const allDocNos = new Set();
   Object.keys(DEPT_DOCS).forEach((t) => docs(t).forEach((d) => allDocNos.add(d.no)));
 
@@ -147,7 +148,6 @@ function icRun() {
   });
 
   /* ---- document references ---- */
-  const prefixes = new Set(Object.values(DOC_TYPES).map((d) => d.prefix).filter(Boolean));
   Object.keys(DEPT_DOCS).forEach((t) => docs(t).forEach((d) => {
     Object.keys(d).forEach((k) => {
       if (["no", "files", "items", "log", "visibility"].includes(k)) return;
@@ -158,6 +158,26 @@ function icRun() {
       });
     });
   }));
+
+  /* ---- R&D projects & engineering changes ---- */
+  if (typeof RD !== "undefined") {
+    RD.projects.filter((p) => ["วางแผน", "กำลังดำเนินการ"].includes(p.status)).forEach((p) => {
+      const late = (p.tasks || []).filter(rdTaskLate);
+      if (p.target && bxToday() > p.target && rdProgress(p) < 100) add("warn", "R&D", `${p.id} ${p.name}: เลยกำหนดเสร็จ (${formatThaiDate(p.target)}) ความคืบหน้า ${rdProgress(p)}%`, "");
+      else if (late.length) add("info", "R&D", `${p.id}: งานเลยกำหนด ${late.length} งาน (${late.slice(0, 3).map((t) => t.name).join(", ")})`, "");
+      (p.tasks || []).forEach((t) => String(t.ref || "").match(DOC_NO_PATTERN)?.forEach((no) => { if (prefixes.has(no.split("-")[0]) && !allDocNos.has(no)) add("warn", "R&D", `${p.id} งาน "${t.name}": อ้างถึง ${no} ที่ไม่มีในระบบ`, ""); }));
+    });
+  }
+  if (typeof rdTqLate === "function") docs("tq").filter(rdTqLate).forEach((d) => add(/ด่วนมาก/.test(d.priority || "") ? "error" : "warn", "R&D", `${d.no} ยังไม่ได้ตอบ เลยกำหนด ${bxDaysBetween(rdTqDue(d), bxToday())} วัน (${d.fromDept || ""}${/ด่วนมาก/.test(d.priority || "") ? " — หน้างานหยุดรอ" : ""})`, `doc:${d.no}`));
+  docs("ecr").filter((d) => d.status === "อนุมัติ").forEach((d) => {
+    const eos = docs("eo").filter((e) => e.ref === d.no && e.status !== "ยกเลิก");
+    const age = bxDaysBetween(d.date, bxToday());
+    if (!eos.length && age > 14) add("warn", "R&D", `${d.no} อนุมัติแล้ว ${age} วัน แต่ยังไม่ออก EO`, `doc:${d.no}`);
+  });
+  docs("eo").filter((e) => e.status === "มีผลใช้งาน" && e.model && MASTER_BOM[e.model]).forEach((e) => {
+    const refs = typeof bomRefsToDoc === "function" ? bomRefsToDoc(e.no).concat(e.ref ? bomRefsToDoc(e.ref) : []) : [];
+    if (!refs.length) add("warn", "R&D", `${e.no} มีผลใช้งานแล้ว แต่ BOM ${e.model} ยังไม่มี Revision ที่อ้างถึง`, `doc:${e.no}`);
+  });
 
   /* ---- users / groups ---- */
   if (typeof AUTH !== "undefined" && AUTH) {

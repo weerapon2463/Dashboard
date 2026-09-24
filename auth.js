@@ -32,13 +32,13 @@ const PERM_LEVELS = [
 const PERM_RANK = { none: 0, view: 1, create: 2, manage: 3 };
 
 // Anyone may raise these, whatever their department (repair, defect, safety, material, change request)
-const CROSS_CREATE_TYPES = ["mtr", "ncr", "saf", "mreq", "ecr", "svc"];
+const CROSS_CREATE_TYPES = ["mtr", "ncr", "saf", "mreq", "ecr", "svc", "tq"];
 
 const ALL_VIEWS = [
   ["overview", "ภาพรวม"], ["pilot", "ผลทดสอบนำร่อง"], ["dept", "งานตามแผนก / เอกสาร"], ["plans", "แผนงานของฉัน"],
   ["mytasks", "งานของฉัน"], ["priority", "Priority Matrix"], ["capacity", "Capacity Planning"], ["schedule", "Master Schedule"],
   ["makeorbuy", "Make-or-Buy"], ["resource", "ทรัพยากรการผลิต"], ["p2p", "ติดตามจัดซื้อ (PR→PO→รับของ)"], ["procurement", "จัดซื้อ"], ["workorder", "ใบสั่งผลิต & BOM"],
-  ["bomx", "BOM & เบิกวัสดุ"], ["service", "บริการหลังการขาย"], ["reports", "รายงาน"],
+  ["rnd", "R&D Workbench"], ["bomx", "BOM & เบิกวัสดุ"], ["service", "บริการหลังการขาย"], ["reports", "รายงาน"],
   ["admin", "ผู้ดูแลระบบ (Admin)"],
 ];
 
@@ -54,6 +54,7 @@ const GROUP_ABILITIES = [
 // Starting groups — admin can rename, change or delete them (Admin › กลุ่มผู้ใช้)
 function authDefaultGroups() {
   return [
+    { id: "g-rnd", name: "วิศวกร R&D", desc: "วางแผนโครงการพัฒนา ดูแล BOM แบบ ECR/EO WI และข้อมูลชิ้นส่วน", modules: ["rnd", "bomx", "dept", "reports", "service"], docPerms: { tq: "manage", ecr: "manage", eo: "create", dwg: "manage", wi: "manage", bom: "manage" }, abilities: [], members: ["rnd"] },
     { id: "g-tech", name: "ช่างประกอบ / ช่างเทคนิค", desc: "เบิกวัสดุตาม BOM ดูใบสั่งผลิตและงานของตัวเอง", modules: ["bomx", "workorder", "mytasks", "service"], docPerms: { mreq: "create", dpr: "create", ncr: "create" }, abilities: ["request"], members: ["op1"] },
     { id: "g-lead", name: "หัวหน้างาน / ผู้อนุมัติเบิก", desc: "อนุมัติใบเบิก สั่งเบิกแทนและมอบหมายช่างรับของ", modules: ["bomx", "workorder", "reports"], docPerms: { mreq: "manage", dpr: "manage" }, abilities: ["request", "approve"], members: ["prod"] },
     { id: "g-store", name: "คลังสินค้า", desc: "จ่ายของตามใบเบิก รับของเข้าคลัง ปรับยอดคงคลัง", modules: ["bomx", "workorder", "p2p"], docPerms: { grn: "manage", stk: "manage", mreq: "create" }, abilities: ["issue", "stock"], members: ["store"] },
@@ -125,6 +126,16 @@ function authLoad() {
         if (u.company === undefined) { u.company = u.role === "admin" || u.role === "group" ? "" : "y2j"; migrated = true; }
       });
       if (!Array.isArray(AUTH.groups)) { authApplyDefaultMembers(AUTH); migrated = true; }
+      // groups added in later versions arrive once, with their default members
+      authDefaultGroups().forEach((g) => {
+        const seen = AUTH.groupsSeen = AUTH.groupsSeen || AUTH.groups.map((x) => x.id);
+        if (seen.includes(g.id)) return;
+        const { members, ...grp } = g;
+        if (!authGroupById(g.id)) AUTH.groups.push(grp);
+        AUTH.users.forEach((u) => { if (members.includes(u.username) && !(u.groups || []).includes(g.id)) u.groups = (u.groups || []).concat(g.id); });
+        seen.push(g.id);
+        migrated = true;
+      });
       if (migrated) authSave();
       return;
     }
@@ -207,6 +218,7 @@ function authAllowedModules(user) {
   const list = Array.isArray(u.modules) ? u.modules.slice() : roleDefaultModules(u.role);
   // pages granted by the user's groups are added to the role defaults (not to a hand-picked list)
   if (!Array.isArray(u.modules)) authUserGroups(u).forEach((g) => (g.modules || []).forEach((m) => { if (!list.includes(m)) list.push(m); }));
+  if (!Array.isArray(u.modules) && u.dept === "rnd" && !list.includes("rnd")) list.push("rnd");
   if (u.role === "admin" && !list.includes("admin")) list.push("admin");
   if (u.role !== "admin") return list.filter((v) => v !== "admin");
   return list;

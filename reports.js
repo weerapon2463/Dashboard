@@ -17,7 +17,7 @@ const RP_PRESETS = [
   { id: "p-pur", name: "จัดซื้อ — PR/PO ผู้ขาย ของที่ต้องสั่ง", sections: ["mrp", "p2p", "supplier"] },
   { id: "p-svc", name: "บริการหลังการขาย — งานบริการ เคลม อะไหล่", sections: ["service", "claims", "stock"] },
   { id: "p-qc", name: "QC — ของเสีย เคลม ผู้ขาย", sections: ["quality", "claims", "supplier"] },
-  { id: "p-eng", name: "วิศวกรรม — BOM การเปลี่ยนแปลง เคลม", sections: ["bom", "claims", "quality"] },
+  { id: "p-eng", name: "วิศวกรรม — โครงการ R&D, BOM, การเปลี่ยนแปลง, เคลม", sections: ["rnd", "bom", "claims", "quality"] },
 ];
 
 const RP_SECTIONS = [
@@ -33,6 +33,7 @@ const RP_SECTIONS = [
   ["service", "บริการหลังการขาย — งานเปิด"],
   ["claims", "งานเคลม — ติดตามกับผู้ขาย"],
   ["bom", "สถานะ BOM ทุกรุ่น"],
+  ["rnd", "โครงการ R&D และการเปลี่ยนแปลงทางวิศวกรรม"],
   ["activity", "กิจกรรมล่าสุดในระบบ (ผู้จัดการ/ผู้ดูแล)"],
   ["integrity", "ความสอดคล้องของข้อมูลข้ามโมดูล"],
 ];
@@ -188,6 +189,15 @@ const RP_BLOCKS = {
         const t = bxTree(m);
         return `<tr>${rpTd(escapeHtml(m))}${rpTd(escapeHtml(meta.rev || ""))}${rpTd(escapeHtml(meta.status || ""))}${rpTd((MASTER_BOM[m] || []).length, 1)}${rpTd(t.filter((r) => r.line && !r.hasKids).length, 1)}${rpTd(`${last.date ? formatThaiDate(last.date) : "—"} ${escapeHtml(last.note || "")}`)}${rpTd(escapeHtml(last.ref || ""))}</tr>`;
       }));
+  },
+  rnd() {
+    if (typeof RD === "undefined") return "";
+    const projects = RD.projects.filter((p) => p.status !== "ยกเลิก" && rpModelOk(p.model));
+    const changes = typeof rdOpenChanges === "function" ? rdOpenChanges().filter((c) => rpModelOk(c.ecr.model)) : [];
+    return rpTable(["โครงการ", "ประเภท", "รุ่น", "หัวหน้าโครงการ", "#ความคืบหน้า", "สถานะ", "Milestone ถัดไป", "กำหนดเสร็จ"],
+      projects.map((p) => { const h = rdHealth(p); const m = rdNextMilestone(p); return `<tr>${rpTd(`${escapeHtml(p.id)} ${escapeHtml(p.name)}`)}${rpTd(escapeHtml((RD_TYPES[p.type] || {}).name || ""))}${rpTd(escapeHtml(p.model || ""))}${rpTd(escapeHtml(rdUserName(p.owner)))}${rpTd(`${rdProgress(p)}%`, 1)}${rpTd(bxPill(h[0], h[1]))}${rpTd(m ? `${escapeHtml(m.name)} ${formatThaiDate(m.end)}` : "—")}${rpTd(p.target ? formatThaiDate(p.target) : "—")}</tr>`; }), "ยังไม่มีโครงการ R&D")
+      + `<div class="rp-sub">การเปลี่ยนแปลงทางวิศวกรรมที่ยังไม่ครบ</div>`
+      + rpTable(["ECR", "เรื่อง", "รุ่น", "#อายุ (วัน)", "ขั้นที่ค้าง"], changes.map((c) => `<tr>${rpTd(escapeHtml(c.ecr.no))}${rpTd(escapeHtml(c.ecr.title))}${rpTd(escapeHtml(c.ecr.model || ""))}${rpTd(c.age, 1)}${rpTd(escapeHtml(c.pending.map((x) => x.label).join(" → ")))}</tr>`), "ทุก ECR ครบแล้ว");
   },
   integrity() {
     if (typeof icRun !== "function") return "";

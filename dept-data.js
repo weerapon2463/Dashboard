@@ -21,8 +21,8 @@ const DEPT_WORKSPACES = [
     id: "rnd",
     name: "R&D / วิศวกรรม",
     desc: "ควบคุมแบบ รายการวัสดุ และการเปลี่ยนแปลงทางวิศวกรรม — ทุกการเปลี่ยนแปลงเริ่มจาก ECR → อนุมัติ → ออก EO → ปรับ BOM / WI / แบบ",
-    docTypes: ["ecr", "eo", "bom", "wi", "dwg"],
-    tools: [{ view: "bomx", label: "BOM หลายระดับ / อ้างอิงชิ้นส่วน" }, { view: "workorder", label: "ใบสั่งผลิต & การเบิกวัสดุ" }, { view: "makeorbuy", label: "Make-or-Buy" }],
+    docTypes: ["tq", "ecr", "eo", "bom", "wi", "dwg"],
+    tools: [{ view: "rnd", label: "R&D Workbench — แผนงาน / การเปลี่ยนแปลง / เปรียบเทียบ BOM" }, { view: "bomx", label: "BOM หลายระดับ / อ้างอิงชิ้นส่วน" }, { view: "workorder", label: "ใบสั่งผลิต & การเบิกวัสดุ" }, { view: "makeorbuy", label: "Make-or-Buy" }],
   },
   {
     id: "plan",
@@ -78,6 +78,30 @@ const DEPT_WORKSPACES = [
 // Field types: text, textarea, number, date, select (options), model, line, ref (refType = another doc type id)
 const DOC_TYPES = {
   /* ---------------- R&D ---------------- */
+  tq: {
+    name: "TQ — คำถามทางเทคนิค (Technical Query)",
+    abbr: "TQ",
+    prefix: "TQ",
+    purpose: "ไลน์ผลิต QC จัดซื้อ ผู้ขาย หรือลูกค้า ถามวิศวกรรมเมื่อแบบ/สเปกไม่ชัด — มีกำหนดตอบ ติดตามได้ และแปลงเป็น ECR ได้ถ้าต้องแก้แบบ",
+    fields: [
+      { key: "title", label: "คำถาม / ประเด็นทางเทคนิค", type: "text", required: true },
+      { key: "model", label: "รุ่นเครื่องจักร", type: "model" },
+      { key: "partCode", label: "ชิ้นส่วนที่เกี่ยวข้อง", type: "part" },
+      { key: "fromDept", label: "ผู้ถามมาจาก", type: "select", options: ["ฝ่ายผลิต", "QC", "จัดซื้อ", "คลังสินค้า", "ขาย / บริการ", "วางแผน", "ผู้ขาย", "ลูกค้า"] },
+      { key: "ref", label: "อ้างอิงงาน (WO / PO / SO / SV / DWG)", type: "text" },
+      { key: "priority", label: "ความเร่งด่วน", type: "select", options: ["ด่วนมาก — หยุดงานรอคำตอบ", "ด่วน", "ปกติ"] },
+      { key: "need", label: "ต้องการคำตอบภายใน", type: "date" },
+      { key: "owner", label: "ผู้ถาม", type: "text" },
+      { key: "date", label: "วันที่ถาม", type: "date" },
+      { key: "detail", label: "รายละเอียดคำถาม (แนบรูป/แบบได้หลังบันทึก)", type: "textarea" },
+      { key: "answer", label: "คำตอบจาก R&D", type: "textarea" },
+      { key: "answeredBy", label: "ผู้ตอบ", type: "text" },
+    ],
+    cols: ["partCode", "fromDept", "priority", "need"],
+    statuses: [["ส่งคำถาม", "warning"], ["R&D กำลังพิจารณา", "info"], ["ตอบแล้ว", "good"], ["ต้องแก้แบบ (เปิด ECR)", "critical"], ["ปิด", "neutral"]],
+    flow: ["ส่งคำถาม", "R&D กำลังพิจารณา", "ตอบแล้ว", "ปิด"],
+    closed: ["ปิด"],
+  },
   ecr: {
     name: "ECR — คำขอเปลี่ยนแปลงทางวิศวกรรม",
     abbr: "ECR",

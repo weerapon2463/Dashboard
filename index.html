@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Dashboard | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260926h">
+<link rel="stylesheet" href="style.css?v=20260926m">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -35,7 +35,7 @@
 
   <div class="app-shell">
     <!-- Sidebar -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="sidebarNav">
       <div class="brand">
         <div class="brand-mark">Y2J</div>
         <div class="brand-text">
@@ -84,6 +84,9 @@
         <button class="nav-item" data-view="workorder">
           <span class="nav-icon">◆</span> ใบสั่งผลิต &amp; BOM
         </button>
+        <button class="nav-item" data-view="rnd">
+          <span class="nav-icon">◆</span> R&amp;D Workbench
+        </button>
         <button class="nav-item" data-view="bomx">
           <span class="nav-icon">◆</span> BOM &amp; เบิกวัสดุ / คลัง
         </button>
@@ -106,6 +109,7 @@
     <!-- Main -->
     <main class="main">
       <header class="topbar">
+        <button type="button" class="menu-toggle" id="menuToggle" aria-label="เปิดเมนู" aria-expanded="false" aria-controls="sidebarNav">☰</button>
         <div class="topbar-title" id="viewTitle">ภาพรวมการผลิต</div>
         <div class="topbar-actions">
           <span class="data-badge">ข้อมูลตัวอย่าง (Sample Data)</span>
@@ -117,6 +121,7 @@
           </label>
           <span class="sync-chip" id="syncChip" hidden></span>
           <div class="user-chip" id="userChip" hidden></div>
+          <button class="theme-toggle density-toggle" id="densityBtn" type="button" title="ขนาดการแสดงผลของเครื่องนี้">Aa</button>
           <button class="theme-toggle" id="themeToggle" title="สลับโหมดสี">🌓</button>
         </div>
       </header>
@@ -618,6 +623,21 @@
             </table>
           </div>
         </div>
+      </section>
+
+      <!-- R&D Workbench (rnd.js) -->
+      <section class="view" id="view-rnd">
+        <div class="stat-grid rd-stat-grid" id="rdStats"></div>
+        <div class="dept-tabs bx-tabs" role="tablist" aria-label="R&D Workbench">
+          <button class="dept-tab" type="button" data-rdtab="projects">แผนงานโครงการ</button>
+          <button class="dept-tab" type="button" data-rdtab="tq">คำถามทางเทคนิค (TQ) <span class="dept-tab-count" id="rdTqCount">0</span></button>
+          <button class="dept-tab" type="button" data-rdtab="change">ติดตามการเปลี่ยนแปลง (ECR/EO)</button>
+          <button class="dept-tab" type="button" data-rdtab="compare">เปรียบเทียบ BOM</button>
+          <button class="dept-tab" type="button" data-rdtab="parts">คลังชิ้นส่วน &amp; ต้นทุน</button>
+          <button class="dept-tab" type="button" data-rdtab="feedback">ข้อมูลย้อนกลับจากหน้างาน</button>
+          <button class="dept-tab" type="button" data-rdtab="workload">ภาระงานทีม</button>
+        </div>
+        <div id="rdPane"></div>
       </section>
 
       <!-- BOM & requisitions (bomx.js) -->
@@ -1175,6 +1195,8 @@
         </div>
       </section>
     </main>
+    <div class="nav-overlay" id="navOverlay" hidden></div>
+    <nav class="bottom-bar" id="bottomBar" aria-label="เมนูลัด"></nav>
   </div>
 
   <div class="modal-backdrop" id="woAddBackdrop">
@@ -1418,6 +1440,10 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="rdBackdrop">
+    <div class="modal modal-xwide" id="rdBody"></div>
+  </div>
+
   <div class="modal-backdrop" id="supBackdrop">
     <div class="modal modal-xwide" id="supBody"></div>
   </div>
@@ -1647,36 +1673,37 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260926h"></script>
-  <script src="data.js?v=20260926h"></script>
-  <script src="priority-matrix.js?v=20260926h"></script>
-  <script src="capacity-planning.js?v=20260926h"></script>
-  <script src="master-schedule.js?v=20260926h"></script>
-  <script src="make-or-buy.js?v=20260926h"></script>
-  <script src="resource.js?v=20260926h"></script>
-  <script src="procurement.js?v=20260926h"></script>
-  <script src="workorder.js?v=20260926h"></script>
-  <script src="alerts.js?v=20260926h"></script>
-  <script src="overview-charts.js?v=20260926h"></script>
-  <script src="pilot.js?v=20260926h"></script>
-  <script src="pilot-measure.js?v=20260926h"></script>
-  <script src="dept-data.js?v=20260926h"></script>
-  <script src="dept-samples.js?v=20260926h"></script>
-  <script src="org.js?v=20260926h"></script>
-  <script src="dept.js?v=20260926h"></script>
-  <script src="bom.js?v=20260926h"></script>
-  <script src="bomx.js?v=20260926h"></script>
-  <script src="service.js?v=20260926h"></script>
-  <script src="reports.js?v=20260926h"></script>
-  <script src="integrity.js?v=20260926h"></script>
-  <script src="overview.js?v=20260926h"></script>
-  <script src="docview.js?v=20260926h"></script>
-  <script src="p2p-data.js?v=20260926h"></script>
-  <script src="p2p.js?v=20260926h"></script>
-  <script src="suppliers.js?v=20260926h"></script>
-  <script src="auth.js?v=20260926h"></script>
-  <script src="admin.js?v=20260926h"></script>
-  <script src="plans.js?v=20260926h"></script>
-  <script src="app.js?v=20260926h"></script>
+  <script src="storage.js?v=20260926m"></script>
+  <script src="data.js?v=20260926m"></script>
+  <script src="priority-matrix.js?v=20260926m"></script>
+  <script src="capacity-planning.js?v=20260926m"></script>
+  <script src="master-schedule.js?v=20260926m"></script>
+  <script src="make-or-buy.js?v=20260926m"></script>
+  <script src="resource.js?v=20260926m"></script>
+  <script src="procurement.js?v=20260926m"></script>
+  <script src="workorder.js?v=20260926m"></script>
+  <script src="alerts.js?v=20260926m"></script>
+  <script src="overview-charts.js?v=20260926m"></script>
+  <script src="pilot.js?v=20260926m"></script>
+  <script src="pilot-measure.js?v=20260926m"></script>
+  <script src="dept-data.js?v=20260926m"></script>
+  <script src="dept-samples.js?v=20260926m"></script>
+  <script src="org.js?v=20260926m"></script>
+  <script src="dept.js?v=20260926m"></script>
+  <script src="bom.js?v=20260926m"></script>
+  <script src="bomx.js?v=20260926m"></script>
+  <script src="service.js?v=20260926m"></script>
+  <script src="reports.js?v=20260926m"></script>
+  <script src="integrity.js?v=20260926m"></script>
+  <script src="overview.js?v=20260926m"></script>
+  <script src="rnd.js?v=20260926m"></script>
+  <script src="docview.js?v=20260926m"></script>
+  <script src="p2p-data.js?v=20260926m"></script>
+  <script src="p2p.js?v=20260926m"></script>
+  <script src="suppliers.js?v=20260926m"></script>
+  <script src="auth.js?v=20260926m"></script>
+  <script src="admin.js?v=20260926m"></script>
+  <script src="plans.js?v=20260926m"></script>
+  <script src="app.js?v=20260926m"></script>
 </body>
 </html>
