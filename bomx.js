@@ -18,6 +18,11 @@ let bxTab = "tree";
 let bxRef = "";
 let bxDetailKey = "";
 let bxTreeSearch = "";
+// Which assemblies are open in the multi-level BOM ("model|lineId"); remembered on this device
+const BX_OPEN_KEY = "y2j-bomx-open-v1";
+let bxOpen = (() => { try { return new Set(JSON.parse(localStorage.getItem(BX_OPEN_KEY) || "[]")); } catch (e) { return new Set(); } })();
+function bxSaveOpen() { try { localStorage.setItem(BX_OPEN_KEY, JSON.stringify([...bxOpen].slice(-500))); } catch (e) { /* per-device only */ } }
+function bxIsOpen(model, id) { return bxOpen.has(`${model}|${id}`); }
 let bxPickSearch = "";
 let bxReqFilter = "open";
 let bxReqSearch = "";
@@ -361,7 +366,23 @@ function renderBxTree(pane) {
   const rows = bxTree(bxModel);
   const q = bxTreeSearch.trim().toLowerCase();
   const match = (r) => !q || [r.line.code, r.line.part, r.line.station, r.line.op, r.no].some((v) => String(v || "").toLowerCase().includes(q));
-  const visible = rows.filter((r) => r.isGroup ? rows.some((x) => x.line && x.group === r.group && match(x)) : match(r));
+  // a part picked from elsewhere (link, search result) opens its assemblies
+  const focus = bxDetailKey ? rows.find((r) => r.line && bxKey(r.line) === bxDetailKey) : null;
+  if (focus && focus.path.some((p) => !bxIsOpen(bxModel, p.id))) { focus.path.forEach((p) => bxOpen.add(`${bxModel}|${p.id}`)); bxSaveOpen(); }
+  let shown;
+  if (q) {
+    // searching: every match plus the assemblies above it, whatever is collapsed
+    const hits = rows.filter((r) => r.line && match(r));
+    const anc = new Set();
+    hits.forEach((r) => r.path.forEach((p) => anc.add(p.id)));
+    shown = (r) => match(r) || anc.has(r.line.id);
+  } else {
+    shown = (r) => r.path.every((p) => bxIsOpen(bxModel, p.id));
+  }
+  const lineRows = rows.filter((r) => r.line && shown(r));
+  const visible = rows.filter((r) => r.isGroup ? lineRows.some((x) => x.group === r.group) : lineRows.includes(r));
+  const assyIds = rows.filter((r) => r.line && r.hasKids).map((r) => r.line.id);
+  const openCount = assyIds.filter((id) => bxIsOpen(bxModel, id)).length;
   const leafCount = rows.filter((r) => r.line && !r.hasKids).length;
   const assyCount = rows.filter((r) => r.line && r.hasKids).length;
 
@@ -388,6 +409,11 @@ function renderBxTree(pane) {
           <label for="bxTreeSearch">ค้นหา:</label>
           <input type="text" id="bxTreeSearch" class="wo-search" placeholder="รหัส / ชื่อ / สถานี / เลขข้อ" value="${bxEsc(bxTreeSearch)}">
         </div>
+        ${assyIds.length ? `<div class="filter-row bx-tree-tools">
+          <button type="button" class="btn-chip" id="bxExpandAll">▾ ขยายทั้งหมด</button>
+          <button type="button" class="btn-chip" id="bxCollapseAll">▸ ย่อทั้งหมด (เฉพาะตัวหลัก)</button>
+          <span class="muted-inline">แสดง ${lineRows.length} จาก ${rows.filter((r) => r.line).length} รายการ · เปิดอยู่ ${openCount}/${assyIds.length} ชุดประกอบ${q ? " · กำลังค้นหา: แสดงทุกรายการที่ตรง" : ""}</span>
+        </div>` : ""}
         ${canEdit && !isDraft ? `<p class="muted-note">🔒 BOM นี้อนุมัติใช้งานแล้ว — แก้ไขโครงสร้างได้หลังกด "ออก Revision ใหม่เพื่อแก้ไข" (บันทึกประวัติและอ้างอิง ECR/EO ให้)</p>` : ""}
         ${canEdit && !rows.some((r) => r.line && r.line.parent) ? `<p class="muted-note">BOM นี้ยังไม่มีชิ้นย่อย — ${editable ? `กด "+ ชิ้นย่อย" ที่ชุดประกอบ หรือ <button type="button" class="btn-chip" id="bxSampleKids">เติมชิ้นย่อยตัวอย่าง</button>` : "ออก Revision ใหม่เพื่อเพิ่มชิ้นย่อย"}</p>` : ""}
         <div class="table-scroll">
@@ -425,6 +451,18 @@ function renderBxTree(pane) {
     showToast(`เพิ่มชิ้นย่อยตัวอย่าง ${n} รายการ`, "good");
   });
   pane.querySelectorAll("[data-addgroup]").forEach((b) => b.addEventListener("click", () => bxOpenLineModal(bxModel, null, "", b.dataset.addgroup)));
+  pane.querySelectorAll("[data-tog]").forEach((b) => b.addEventListener("click", () => {
+    const k = `${bxModel}|${b.dataset.tog}`;
+    if (bxOpen.has(k)) {
+      // closing an assembly also closes everything inside it
+      bxOpen.delete(k);
+      bxDescendants(bxModel, b.dataset.tog).forEach((id) => bxOpen.delete(`${bxModel}|${id}`));
+    } else bxOpen.add(k);
+    bxSaveOpen();
+    renderBomx();
+  }));
+  if ($("bxExpandAll")) $("bxExpandAll").addEventListener("click", () => { assyIds.forEach((id) => bxOpen.add(`${bxModel}|${id}`)); bxSaveOpen(); renderBomx(); });
+  if ($("bxCollapseAll")) $("bxCollapseAll").addEventListener("click", () => { assyIds.forEach((id) => bxOpen.delete(`${bxModel}|${id}`)); bxSaveOpen(); renderBomx(); });
   pane.querySelectorAll("[data-addkid]").forEach((b) => b.addEventListener("click", () => bxOpenLineModal(bxModel, null, b.dataset.addkid, "")));
   pane.querySelectorAll("[data-editline]").forEach((b) => b.addEventListener("click", () => bxOpenLineModal(bxModel, b.dataset.editline)));
   pane.querySelectorAll("[data-delline]").forEach((b) => b.addEventListener("click", () => bxDeleteLine(bxModel, b.dataset.delline)));
@@ -445,7 +483,9 @@ function bxTreeRowHtml(r, editable) {
   return `<tr class="${r.hasKids ? "bx-assy-row" : ""}${key && key === bxDetailKey ? " bx-selected" : ""}">
     <td class="bx-itemno">${bxEsc(r.no)}</td>
     <td class="mono-cell">${bxEsc(l.code || "—")}${typeof pcChips === "function" && (pcParse(l.code) || pcParseStd(l.code)) ? `<div>${pcChips(l.code)}</div>` : ""}</td>
-    <td><span class="bx-indent" style="padding-left:${(r.depth - 1) * 18}px">${r.depth > 1 ? "└ " : ""}<button type="button" class="bx-link" data-detail="${bxEsc(key)}">${bxEsc(l.part || "(ไม่มีชื่อ)")}</button>${r.hasKids ? ` <span class="pill pill-schedule">ชุดประกอบ</span>` : ""}</span></td>
+    <td><span class="bx-indent" style="padding-left:${(r.depth - 1) * 20}px">${r.hasKids
+      ? `<button type="button" class="bx-tog" data-tog="${bxEsc(l.id)}" aria-expanded="${bxIsOpen(bxModel, l.id)}" aria-label="${bxIsOpen(bxModel, l.id) ? "ย่อ" : "ขยาย"} ${bxEsc(l.part)}">${bxIsOpen(bxModel, l.id) ? "▾" : "▸"}</button>`
+      : `<span class="bx-tog-space">${r.depth > 1 ? "└" : ""}</span>`}<button type="button" class="bx-link" data-detail="${bxEsc(key)}">${bxEsc(l.part || "(ไม่มีชื่อ)")}</button>${r.hasKids ? ` <span class="pill pill-schedule">ชุดประกอบ · ${(MASTER_BOM[bxModel] || []).filter((c) => c.parent === l.id).length} รายการ</span>` : ""}</span></td>
     <td class="num">${bxFmt(l.qty)}</td>
     <td class="num"><strong>${bxFmt(r.per)}</strong></td>
     <td>${bxEsc(l.unit || "")}</td>
@@ -657,6 +697,7 @@ function bxSaveLine() {
       lines.forEach((l, i) => { if (desc.has(l.id)) at = i + 1; });
     }
     lines.splice(at, 0, line);
+    if (parent) { bxOpen.add(`${model}|${parent}`); bxSaveOpen(); }
     bomAudit("เพิ่มรายการ BOM", `Rev.${rev} ${parent ? "ชิ้นย่อย" : "ระดับบน"}: ${data.code ? data.code + " " : ""}${part}`);
   }
   document.getElementById("bxLineBackdrop").classList.remove("open");
