@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Dashboard | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260926d">
+<link rel="stylesheet" href="style.css?v=20260926f">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -123,92 +123,14 @@
 
       <!-- Overview -->
       <section class="view active" id="view-overview">
-        <div class="stat-grid">
-          <div class="stat-tile">
-            <div class="stat-label">งานที่ต้องทำก่อน (Do First)</div>
-            <div class="stat-value" id="statDoFirst">-</div>
-            <div class="stat-note">จาก Priority Matrix</div>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-label">Utilization เฉลี่ยทุกไลน์</div>
-            <div class="stat-value" id="statUtil">-</div>
-            <div class="stat-note">สัปดาห์นี้</div>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-label">โครงการที่กำลังผลิต</div>
-            <div class="stat-value" id="statActiveProjects">-</div>
-            <div class="stat-note">จาก Master Schedule</div>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-label">ชิ้นส่วนแนะนำให้ "ซื้อ"</div>
-            <div class="stat-value" id="statBuyRec">-</div>
-            <div class="stat-note">จาก Make-or-Buy</div>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-label">ไลน์ที่ขาดกำลังคน</div>
-            <div class="stat-value" id="statLaborGap">-</div>
-            <div class="stat-note">จาก Resource Management</div>
-          </div>
-          <div class="stat-tile">
-            <div class="stat-label">เครื่องจักรที่ต้องซ่อมบำรุง</div>
-            <div class="stat-value" id="statMachineIssue">-</div>
-            <div class="stat-note">จาก Resource Management</div>
-          </div>
+        <div class="ov-toolbar">
+          <label class="role-picker" for="ovPreset">มุมมองภาพรวม:
+            <select id="ovPreset"></select>
+          </label>
+          <button type="button" class="btn-secondary" id="ovEditBtn">⚙ ปรับแต่งหน้านี้</button>
         </div>
-
-        <div class="overview-charts">
-          <div class="card">
-            <div class="card-header">
-              <h3>สถานะใบสั่งผลิตทั้งหมด</h3>
-              <p class="card-sub">นับทุกใบสั่งผลิต แบ่งตามสถานะปัจจุบัน</p>
-            </div>
-            <div class="card-body">
-              <div class="chart-wrap chart-wrap-md">
-                <canvas id="woStatusChart"></canvas>
-              </div>
-            </div>
-          </div>
-          <div class="card">
-            <div class="card-header">
-              <h3>Utilization รายไลน์ผลิต — สัปดาห์นี้</h3>
-              <p class="card-sub">เส้นประ = 100% ของกำลังการผลิต ดูรายละเอียด 10 สัปดาห์ล่วงหน้าได้ที่ Capacity Planning</p>
-            </div>
-            <div class="card-body">
-              <div class="chart-wrap chart-wrap-md">
-                <canvas id="capacitySnapshotChart"></canvas>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <h3>แจ้งเตือนความล่าช้าและความเสี่ยง</h3>
-            <p class="card-sub">รวมทุกความเสี่ยงจากทุกโมดูล — PO/PR ล่าช้าหรือรออนุมัติ ใบสั่งผลิตล่าช้า เครื่องมือเกินสอบเทียบ เครื่องจักรผิดปกติ และกำลังคนขาด</p>
-          </div>
-          <div class="card-body table-scroll">
-            <table class="data-table" id="alertsTable">
-              <thead>
-                <tr>
-                  <th>ประเภท</th>
-                  <th>รายละเอียด</th>
-                  <th>ระดับ</th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-            <p class="muted-note" id="alertsEmptyNote" style="display:none;">ไม่มีรายการแจ้งเตือนในขณะนี้</p>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header">
-            <h3>เกี่ยวกับ Dashboard นี้</h3>
-          </div>
-          <div class="card-body">
-            <p>Production Dashboard เป็นเครื่องมือสนับสนุนการตัดสินใจสำหรับฝ่ายผลิต Y2J Machinery ให้ผู้บริหารเห็นข้อมูลจากหน้างานจริงแบบครอบคลุมทุกมิติของการบริหารการผลิตทั้งบริษัท — งาน กำลังการผลิต แผนงาน ต้นทุน คน เครื่องจักร เครื่องมือ และการจัดซื้อ ประกอบด้วย 7 โมดูลหลัก: การจัดลำดับความสำคัญงาน (Priority Matrix), การวางแผนกำลังการผลิต (Capacity Planning), ตารางแผนการผลิตรวม (Master Schedule), เครื่องมือช่วยตัดสินใจผลิตเองหรือซื้อ (Make-or-Buy Decision Support), การบริหารทรัพยากรการผลิต — คน เครื่องจักร และเครื่องมือวัด (Resource Management), การจัดซื้อ — PR / PO / ซัพพลายเออร์ (Procurement) และใบสั่งผลิตที่จัดกลุ่มเป็นโปรเจกต์ตาม PO พร้อม Master BOM และการเบิกวัสดุประกอบ (Work Orders &amp; BOM)</p>
-            <p class="muted-note">เวอร์ชันนี้ใช้ข้อมูลตัวอย่าง (mock data) สำหรับสาธิตแนวคิด — ขั้นต่อไปคือเชื่อมข้อมูลจริงจากหน้างานและระบบ Stock/BOM</p>
-          </div>
-        </div>
+        <div class="ov-grid" id="ovGrid"></div>
+        <div class="ov-tip" id="ovTip" role="tooltip" hidden></div>
       </section>
 
       <!-- Pilot Test: real before/after results from the pilot project -->
@@ -1710,33 +1632,34 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260926d"></script>
-  <script src="data.js?v=20260926d"></script>
-  <script src="priority-matrix.js?v=20260926d"></script>
-  <script src="capacity-planning.js?v=20260926d"></script>
-  <script src="master-schedule.js?v=20260926d"></script>
-  <script src="make-or-buy.js?v=20260926d"></script>
-  <script src="resource.js?v=20260926d"></script>
-  <script src="procurement.js?v=20260926d"></script>
-  <script src="workorder.js?v=20260926d"></script>
-  <script src="alerts.js?v=20260926d"></script>
-  <script src="overview-charts.js?v=20260926d"></script>
-  <script src="pilot.js?v=20260926d"></script>
-  <script src="dept-data.js?v=20260926d"></script>
-  <script src="dept-samples.js?v=20260926d"></script>
-  <script src="org.js?v=20260926d"></script>
-  <script src="dept.js?v=20260926d"></script>
-  <script src="bom.js?v=20260926d"></script>
-  <script src="bomx.js?v=20260926d"></script>
-  <script src="service.js?v=20260926d"></script>
-  <script src="reports.js?v=20260926d"></script>
-  <script src="integrity.js?v=20260926d"></script>
-  <script src="docview.js?v=20260926d"></script>
-  <script src="p2p-data.js?v=20260926d"></script>
-  <script src="p2p.js?v=20260926d"></script>
-  <script src="auth.js?v=20260926d"></script>
-  <script src="admin.js?v=20260926d"></script>
-  <script src="plans.js?v=20260926d"></script>
-  <script src="app.js?v=20260926d"></script>
+  <script src="storage.js?v=20260926f"></script>
+  <script src="data.js?v=20260926f"></script>
+  <script src="priority-matrix.js?v=20260926f"></script>
+  <script src="capacity-planning.js?v=20260926f"></script>
+  <script src="master-schedule.js?v=20260926f"></script>
+  <script src="make-or-buy.js?v=20260926f"></script>
+  <script src="resource.js?v=20260926f"></script>
+  <script src="procurement.js?v=20260926f"></script>
+  <script src="workorder.js?v=20260926f"></script>
+  <script src="alerts.js?v=20260926f"></script>
+  <script src="overview-charts.js?v=20260926f"></script>
+  <script src="pilot.js?v=20260926f"></script>
+  <script src="dept-data.js?v=20260926f"></script>
+  <script src="dept-samples.js?v=20260926f"></script>
+  <script src="org.js?v=20260926f"></script>
+  <script src="dept.js?v=20260926f"></script>
+  <script src="bom.js?v=20260926f"></script>
+  <script src="bomx.js?v=20260926f"></script>
+  <script src="service.js?v=20260926f"></script>
+  <script src="reports.js?v=20260926f"></script>
+  <script src="integrity.js?v=20260926f"></script>
+  <script src="overview.js?v=20260926f"></script>
+  <script src="docview.js?v=20260926f"></script>
+  <script src="p2p-data.js?v=20260926f"></script>
+  <script src="p2p.js?v=20260926f"></script>
+  <script src="auth.js?v=20260926f"></script>
+  <script src="admin.js?v=20260926f"></script>
+  <script src="plans.js?v=20260926f"></script>
+  <script src="app.js?v=20260926f"></script>
 </body>
 </html>

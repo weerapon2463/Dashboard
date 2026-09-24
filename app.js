@@ -67,7 +67,7 @@ function switchView(view) {
 
   // Re-render the relevant chart in case it needs a resize/redraw
   // (canvas charts drawn while display:none report zero size)
-  if (view === "overview") renderOverviewCharts();
+  if (view === "overview") { if (typeof renderOverview === "function") renderOverview(); else renderOverviewCharts(); }
   if (view === "pilot" && typeof renderPilot === "function") renderPilot();
   if (view === "dept" && typeof renderDept === "function") renderDept();
   if (view === "plans" && typeof renderPlans === "function") renderPlans();
@@ -238,6 +238,7 @@ function appStart() {
   if (hasDept && typeof initBomx === "function") initBomx();
   if (hasDept && typeof initService === "function") initService();
   if (hasDept && typeof initReports === "function") initReports();
+  if (hasDept && typeof initOverview === "function") initOverview();
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();
@@ -254,6 +255,7 @@ function appStart() {
   renderOverviewCharts();
   renderAlerts();
   if (hasPilot) renderPilot();
+  if (typeof renderOverview === "function") renderOverview();
   if (hasDept) renderDept();
   markWOInitialStatus(hadStoredWorkOrders);
   markProcInitialStatus(hadStoredProcurement);
