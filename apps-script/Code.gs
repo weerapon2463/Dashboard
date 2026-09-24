@@ -23,6 +23,9 @@ const CHUNK = 45000;
 // with "=", "+", "-" or digits into a formula or a number. Stripped again when reading.
 const CHUNK_MARK = "~";
 const FILE_FOLDER = "Y2J Dashboard — ไฟล์แนบ";
+// Left empty in the public repo. An automated deploy (clasp) fills it in so the first request
+// completes setup by itself; with it empty, run setup() manually as described above.
+const PRESET_TOKEN = "";
 
 /* ------------------------------------------------------------------ setup */
 
@@ -31,7 +34,7 @@ function setup() {
   const props = PropertiesService.getScriptProperties();
   let token = props.getProperty("TOKEN");
   if (!token) {
-    token = Utilities.getUuid().replace(/-/g, "").slice(0, 24);
+    token = PRESET_TOKEN || Utilities.getUuid().replace(/-/g, "").slice(0, 24);
     props.setProperty("TOKEN", token);
   }
   props.setProperty("SHEET_ID", ss.getId());
@@ -68,7 +71,8 @@ function doPost(e) {
 
 function handle_(p) {
   try {
-    const token = PropertiesService.getScriptProperties().getProperty("TOKEN");
+    let token = PropertiesService.getScriptProperties().getProperty("TOKEN");
+    if (!token && PRESET_TOKEN && p.token === PRESET_TOKEN) token = setup(); // first request after an automated deploy
     if (!token) return json_({ ok: false, error: "ยังไม่ได้รัน setup() ใน Apps Script" });
     if (p.token !== token) return json_({ ok: false, error: "รหัสลับไม่ถูกต้อง" });
     switch (p.action) {
@@ -116,7 +120,7 @@ function readRows_(withValues) {
   const width = Math.max(5, sh.getLastColumn());
   const vals = sh.getRange(2, 1, last - 1, width).getValues();
   return vals.map((r, i) => {
-    const o = { row: i + 2, key: String(r[0]), version: Number(r[1]) || 0, updatedAt: r[2] ? new Date(r[2]).toISOString() : "", updatedBy: String(r[3] || "") };
+    const o = { row: i + 2, key: String(r[0]), version: Number(r[1]) || 0, updatedAt: r[2] instanceof Date ? r[2].toISOString() : String(r[2] || ""), updatedBy: String(r[3] || "") };
     if (withValues) o.value = r.slice(5, 5 + (Number(r[4]) || 0)).map((c) => { const t = String(c); return t.charAt(0) === CHUNK_MARK ? t.slice(1) : t; }).join("");
     return o;
   }).filter((o) => o.key);
@@ -159,7 +163,8 @@ function push_(p) {
     const version = curVersion + 1;
     const rowIdx = cur ? cur.row : sh.getLastRow() + 1;
     const width = Math.max(sh.getLastColumn(), 5 + chunks.length);
-    const line = [key, version, new Date(), String(p.by || ""), chunks.length].concat(chunks);
+    // ISO text, not a Date: the row is text-formatted so a Date would be re-parsed in the wrong timezone
+    const line = [key, version, new Date().toISOString(), String(p.by || ""), chunks.length].concat(chunks);
     while (line.length < width) line.push("");
     if (sh.getMaxColumns() < width) sh.insertColumnsAfter(sh.getMaxColumns(), width - sh.getMaxColumns());
     sh.getRange(rowIdx, 1, 1, width).setNumberFormat("@").setValues([line]);
