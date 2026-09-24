@@ -1,18 +1,20 @@
 /* ==========================================================================
-   มาตรฐานรหัสชิ้นส่วน (company part-number standard), e.g. K01W05269-00-00
-     K      prefix
-     01     group    (01 CHASSIS … 15 ELECTRICAL)
-     W      type     (A ASSEMBLY, W WELDMENT, S SINGLE PART …)
-     05269  running number (5 digits)
-     -00    variant / dash number        → part number = K01W05269-00
-     -00    revision (drawing file name) → Rev.00, Rev.01 …
-   The lists are editable by R&D (stored in y2j-rnd-v1.codeStd); these are
-   the defaults given by the engineering team.
+   มาตรฐานรหัสชิ้นส่วน R&D — ตามเอกสาร "Code R_D_Rev.03" ของบริษัท
+     K 13 A 0 6552 - 00 - 01
+     │ │  │ │ │      │    └ Rev. (การแก้ไขแบบ)
+     │ │  │ │ │      └ E/O  (Engineering Order)
+     │ │  │ │ └ P/N 4 หลัก
+     │ │  │ └ 0 = รหัสเก่าที่มีอยู่แล้ว / 1 = ชิ้นงานที่สร้างขึ้นใหม่
+     │ │  └ Work/Type (A Assembly, W Weldment, S Single part …)
+     │ └ Item = ลำดับไอเทมในรถตัดอ้อย (01 CHASSIS … 15 ELECTRICAL)
+     └ รหัสรถ = แบรนด์ (T TIGER, K KUMIKI …)
+   Part number used by BOM and drawings = everything up to the E/O (K13A06552-00);
+   the revision is the drawing revision. Standard parts use P-codes (P2xxxx …) and
+   bolt/nut codes (PHB05-020B-1 …). Lists are editable in R&D Workbench.
    ========================================================================== */
 
 const PC_DEFAULT = {
-  prefix: "K",
-  numDigits: 5,
+  brands: [["T", "TIGER"], ["K", "KUMIKI"], ["B", "YT3000"]],
   groups: [
     ["01", "CHASSIS"], ["02", "CROP"], ["03", "ELEVATOR"], ["04", "PRIMARY EXT"], ["05", "SHREDDER TOPPER"], ["06", "CABIN"],
     ["07", "TRANSMISSION"], ["09", "ENGINE BOX"], ["10", "ROLLER"], ["11", "CHOPPER DRUM"], ["12", "PLATFORM & GUARDRAILS"],
@@ -23,41 +25,52 @@ const PC_DEFAULT = {
     ["M", "MACHINE"], ["P", "PAINT / COLOUR"], ["S", "SINGLE PART"], ["W", "WELDMENT"],
   ],
 };
+// Standard parts (P'Code) — first digit after P is the group
+const PC_STD_GROUPS = { 1: "P'Code เดิม", 2: "P'Code เดิม", 3: "Parts STD ทั่วไป / ชิ้นงานใหม่", 4: "Sticker / Nameplate", 5: "ไฟฟ้า / อิเล็กทรอนิกส์", 6: "ของเหลว / น้ำมัน / น้ำยาหล่อเย็น", 7: "Fitting Hyd. / ท่อ Hose" };
+const PC_FASTENERS = { HB: "HEX BOLT", B: "HEX BOLT (นิ้ว)", CS: "BOLT COUNTER SUNK", BT: "BOLT หัวจมกลม", ST: "STUD BOLT", SS: "ตัวหนอน", HN: "HEX NUT", NN: "NYLON NUT", SC: "SOCKET BOLT", SW: "SPRING WASHER", PW: "WASHER", GN: "GREASE NIPPLE", SP: "SPECIAL PART" };
+const PC_GRADES = { A: "non steel", B: "8.8", C: "10.9", D: "12.9", E: "A2 SUS (10.9)", F: "A4 SUS (12.9)" };
 let PC_CACHE = null;
 
 function pcStd() {
   if (PC_CACHE) return PC_CACHE;
   let saved = null;
   try { const r = JSON.parse(localStorage.getItem("y2j-rnd-v1") || "null"); saved = r && r.codeStd; } catch (e) { saved = null; }
+  // settings saved by the first version (single "prefix") fall back to the brand list
+  if (saved && !Array.isArray(saved.brands)) saved = Object.assign({}, saved, { brands: PC_DEFAULT.brands });
   PC_CACHE = Object.assign({}, PC_DEFAULT, saved || {});
   return PC_CACHE;
 }
 function pcReset() { PC_CACHE = null; }
-function pcRegex() {
-  const s = pcStd();
-  const p = String(s.prefix || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`^${p}(\\d{2})([A-Za-z])(\\d{${Number(s.numDigits) || 5}})(?:-(\\d{2}))?(?:-(\\d{2}))?(?:\\.[A-Za-z0-9]+)?$`);
-}
+const PC_RE = /^([A-Za-z])(\d{2})([A-Za-z])([01])(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?(?:\.[A-Za-z0-9]+)?$/;
 
-// Returns null when the text does not follow the standard
+// Returns null when the text is not a part code of the standard
 function pcParse(code) {
-  const m = pcRegex().exec(String(code || "").trim());
+  const m = PC_RE.exec(String(code || "").trim());
   if (!m) return null;
   const s = pcStd();
-  const type = m[2].toUpperCase();
-  const g = s.groups.find((x) => x[0] === m[1]);
+  const brand = m[1].toUpperCase(), type = m[3].toUpperCase();
+  const b = s.brands.find((x) => x[0] === brand);
+  const g = s.groups.find((x) => x[0] === m[2]);
   const t = s.types.find((x) => x[0] === type);
-  const variant = m[4] || "00";
+  const eo = m[6] || "00";
   return {
-    group: m[1], groupName: g ? g[1] : "", groupLabel: `${m[1]} | ${g ? g[1] : "ไม่อยู่ในมาตรฐาน"}`,
-    type, typeName: t ? t[1] : "", num: m[3], variant, rev: m[5] === undefined ? null : m[5],
-    partNo: `${s.prefix}${m[1]}${type}${m[3]}-${variant}`, known: !!g && !!t,
+    brand, brandName: b ? b[1] : "", group: m[2], groupName: g ? g[1] : "", groupLabel: `${m[2]} | ${g ? g[1] : "ไม่อยู่ในมาตรฐาน"}`,
+    type, typeName: t ? t[1] : "", isNew: m[4] === "1", pn: m[5], num: m[4] + m[5], eo, rev: m[7] === undefined ? null : m[7],
+    partNo: `${brand}${m[2]}${type}${m[4]}${m[5]}-${eo}`, known: !!b && !!g && !!t,
   };
 }
-// Part number without the revision (what the BOM and the drawing register should share)
+// Standard part / fastener codes → description, or null
+function pcParseStd(code) {
+  const c = String(code || "").trim().toUpperCase();
+  let m = /^P(\d)(\d{4})$/.exec(c);
+  if (m) return { kind: "std", label: `P${m[1]} · ${PC_STD_GROUPS[m[1]] || "ว่าง"}` };
+  m = /^P([A-Z]{1,2})(\d{2})-(\d{3})([A-F])?(?:-(\d))?$/.exec(c);
+  if (m && PC_FASTENERS[m[1]]) return { kind: "fastener", label: `${PC_FASTENERS[m[1]]} M${Number(m[2])}${Number(m[3]) ? `×${Number(m[3])}` : ""}${m[4] ? ` · ${PC_GRADES[m[4]]}` : ""}${m[5] !== undefined ? ` · ชุบ ${m[5]}` : ""}` };
+  return null;
+}
+// Part number without the revision (what the BOM and the drawing register share)
 function pcPartNo(code) { const p = pcParse(code); return p ? p.partNo : String(code || "").trim(); }
 
-// Every code the system knows about (BOM, stock, drawings, part library, extra list)
 function pcKnownCodes(extra) {
   const out = new Set(extra || []);
   Object.keys(typeof MASTER_BOM !== "undefined" ? MASTER_BOM : {}).forEach((m) => (MASTER_BOM[m] || []).forEach((l) => { if (l.code) out.add(l.code); }));
@@ -67,26 +80,35 @@ function pcKnownCodes(extra) {
   return [...out];
 }
 
-// Next free part number for a group + type. Running numbers are counted per type across all groups,
-// so the same number is never issued twice for one type.
-function pcNext(group, type, extra) {
-  const s = pcStd();
-  const digits = Number(s.numDigits) || 5;
+// Next new part code (flag 1) for brand + item + type: P/N counted within that brand/item/type
+function pcNext(brand, group, type, extra) {
   let max = 0;
-  pcKnownCodes(extra).forEach((c) => { const p = pcParse(c); if (p && p.type === type) max = Math.max(max, Number(p.num)); });
-  return `${s.prefix}${group}${type}${String(max + 1).padStart(digits, "0")}-00`;
+  pcKnownCodes(extra).forEach((c) => { const p = pcParse(c); if (p && p.brand === brand && p.group === group && p.type === type && p.isNew) max = Math.max(max, Number(p.pn)); });
+  return `${brand}${group}${type}1${String(max + 1).padStart(4, "0")}-00`;
 }
 function pcNextRev(code) {
   const p = pcParse(code);
   if (!p) return "";
   return `${p.partNo}-${String((p.rev === null ? -1 : Number(p.rev)) + 1).padStart(2, "0")}`;
 }
-
-// Small labels: group · type (· Rev)
-function pcChips(code) {
+function pcNextEo(code) {
   const p = pcParse(code);
   if (!p) return "";
-  return `<span class="pc-chip" title="${escapeHtml(p.groupLabel)}">${escapeHtml(p.group)} ${escapeHtml(p.groupName || "?")}</span><span class="pc-chip pc-type" title="${escapeHtml(p.type)} = ${escapeHtml(p.typeName || "ไม่อยู่ในมาตรฐาน")}">${escapeHtml(p.type)} ${escapeHtml(p.typeName || "?")}</span>${p.rev !== null ? `<span class="pc-chip">Rev.${escapeHtml(p.rev)}</span>` : ""}`;
+  return `${p.brand}${p.group}${p.type}${p.num}-${String(Number(p.eo) + 1).padStart(2, "0")}-00`;
+}
+
+function pcChips(code) {
+  const p = pcParse(code);
+  if (!p) {
+    const s = pcParseStd(code);
+    return s ? `<span class="pc-chip pc-std" title="ชิ้นส่วนมาตรฐาน">STD</span><span class="pc-chip">${escapeHtml(s.label)}</span>` : "";
+  }
+  return `<span class="pc-chip pc-brand" title="แบรนด์">${escapeHtml(p.brand)} ${escapeHtml(p.brandName || "?")}</span>`
+    + `<span class="pc-chip" title="${escapeHtml(p.groupLabel)}">${escapeHtml(p.group)} ${escapeHtml(p.groupName || "?")}</span>`
+    + `<span class="pc-chip pc-type" title="${escapeHtml(p.type)} = ${escapeHtml(p.typeName || "ไม่อยู่ในมาตรฐาน")}">${escapeHtml(p.type)} ${escapeHtml(p.typeName || "?")}</span>`
+    + (p.isNew ? `<span class="pc-chip" title="1 = ชิ้นงานที่สร้างขึ้นใหม่">ใหม่</span>` : "")
+    + (p.eo !== "00" ? `<span class="pc-chip" title="Engineering Order">E/O ${escapeHtml(p.eo)}</span>` : "")
+    + (p.rev !== null ? `<span class="pc-chip">Rev.${escapeHtml(p.rev)}</span>` : "");
 }
 
 // File names (Inventor .idw/.iam/.ipt, PDF, DWG …) → parsed rows; the highest revision of each part wins

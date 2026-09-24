@@ -1103,3 +1103,6 @@ html[data-density="compact"] body { zoom: 0.9; }
 .rd-dwg-scroll { max-height: 320px; overflow: auto; }
 .rd-legacy { margin-top: 8px; font-size: 13px; }
 .rd-legacy summary { cursor: pointer; color: var(--text-secondary); }
+
+.pc-chip.pc-brand { background: color-mix(in srgb, var(--series-7) 14%, transparent); color: var(--series-7); }
+.pc-chip.pc-std { background: color-mix(in srgb, var(--series-3) 16%, transparent); color: var(--series-3); }

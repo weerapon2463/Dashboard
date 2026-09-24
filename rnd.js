@@ -738,16 +738,17 @@ function renderRdParts(pane) {
           <tbody>${MACHINE_MODELS.map((m) => { const r = rdRollup(m); return `<tr><td>${rdEsc(m)}</td><td>${rdEsc((BOM_META[m] || {}).rev || "")}</td><td class="num">${r.priced ? `${Math.round(r.cost).toLocaleString("th-TH")} บาท` : "—"}</td><td class="num">${r.weighed ? `${bxFmt(r.weight)} กก.` : "—"}</td><td><div class="bx-bar"><span style="width:${r.n ? (r.priced / r.n) * 100 : 0}%"></span></div> <span class="muted-inline">ราคา ${r.priced}/${r.n}</span></td></tr>`; }).join("")}</tbody></table></div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>สร้างรหัสชิ้นส่วนตามมาตรฐาน</h3><p class="card-sub">${rdEsc(std.prefix)} + กลุ่ม 2 หลัก + ประเภท 1 ตัว + เลขรัน ${std.numDigits} หลัก + "-00" (เช่น K01W05269-00) · เลขรันนับต่อประเภททุกกลุ่ม ไม่ออกเลขซ้ำ · ไฟล์แบบต่อท้าย Rev. เช่น -00, -01</p></div>
+        <div class="card-header"><h3>สร้างรหัสชิ้นส่วนตามมาตรฐาน (Code R_D Rev.03)</h3><p class="card-sub">รหัสรถ + Item 2 หลัก + Work/Type + 1 (ชิ้นงานใหม่) + P/N 4 หลัก + "-E/O" + "-Rev." เช่น K13A06552-00-01 · P/N นับต่อ แบรนด์ + Item + ประเภท ไม่ออกเลขซ้ำกับรหัสที่มีในระบบ</p></div>
         <div class="card-body">
           <div class="filter-row">
-            <label for="rdStdGroup">กลุ่ม:</label><select id="rdStdGroup">${std.groups.map((g) => `<option value="${rdEsc(g[0])}">${rdEsc(g[0])} | ${rdEsc(g[1])}</option>`).join("")}</select>
+            <label for="rdStdBrand">รหัสรถ:</label><select id="rdStdBrand">${std.brands.map((b) => `<option value="${rdEsc(b[0])}">${rdEsc(b[0])} | ${rdEsc(b[1])}</option>`).join("")}</select>
+            <label for="rdStdGroup">Item:</label><select id="rdStdGroup">${std.groups.map((g) => `<option value="${rdEsc(g[0])}">${rdEsc(g[0])} | ${rdEsc(g[1])}</option>`).join("")}</select>
             <label for="rdStdType">ประเภท:</label><select id="rdStdType">${std.types.map((t) => `<option value="${rdEsc(t[0])}">${rdEsc(t[0])} | ${rdEsc(t[1])}</option>`).join("")}</select>
             <button type="button" class="btn-primary" id="rdStdGen">ออกรหัสใหม่</button>
             <strong class="mono-cell" id="rdStdOut"></strong>
           </div>
           <div class="filter-row">
-            <label for="rdRevIn">Rev. ถัดไปของ:</label><input id="rdRevIn" class="wo-search" placeholder="เช่น K01S10238-00-01"><button type="button" class="btn-secondary" id="rdRevGen">คำนวณ</button><strong class="mono-cell" id="rdRevOut"></strong>
+            <label for="rdRevIn">จากรหัส:</label><input id="rdRevIn" class="wo-search" placeholder="เช่น K13A06552-00-01"><button type="button" class="btn-secondary" id="rdRevGen">Rev. ถัดไป</button><button type="button" class="btn-secondary" id="rdEoGen">E/O ถัดไป</button><strong class="mono-cell" id="rdRevOut"></strong>
           </div>
           <details class="rd-legacy"><summary>รหัสแบบเดิม (FR / GR / …)</summary>
             <div class="filter-row">
@@ -775,11 +776,11 @@ function renderRdParts(pane) {
         </div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>มาตรฐานรหัส — กลุ่มและประเภท</h3><p class="card-sub">แก้ไขหรือเพิ่มได้ (บรรทัดละรายการ รูปแบบ "รหัส | ชื่อ") มีผลกับการอ่านรหัส การจัดกลุ่ม BOM และการออกรหัสทั้งระบบ</p></div>
+        <div class="card-header"><h3>มาตรฐานรหัส — แบรนด์ Item และประเภท</h3><p class="card-sub">แก้ไขหรือเพิ่มได้ (บรรทัดละรายการ รูปแบบ "รหัส | ชื่อ") มีผลกับการอ่านรหัส การจัดกลุ่ม BOM และการออกรหัสทั้งระบบ</p></div>
         <div class="card-body">
           <div class="modal-grid">
-            <div class="form-field"><label for="rdStdPrefix">ตัวนำหน้า</label><input id="rdStdPrefix" value="${rdEsc(std.prefix)}"${can ? "" : " disabled"}></div>
-            <div class="form-field"><label for="rdStdDigits">จำนวนหลักเลขรัน</label><input id="rdStdDigits" type="number" min="3" max="8" value="${rdEsc(std.numDigits)}"${can ? "" : " disabled"}></div>
+            <div class="form-field"><label for="rdStdBrands">รหัสรถ / แบรนด์ (1 ตัวอักษร)</label><textarea id="rdStdBrands" rows="4"${can ? "" : " disabled"}>${rdEsc(std.brands.map((b) => `${b[0]} | ${b[1]}`).join("\n"))}</textarea></div>
+            <div class="form-field"><label>อ้างอิง</label><div class="muted-inline">ตามเอกสาร P CODE › Code R_D_Rev.03 — ชิ้นส่วนมาตรฐานใช้ P'Code (P1–P7) และรหัสน็อต/สกรู เช่น PHB05-020B-1 ระบบอ่านให้อัตโนมัติ</div></div>
             <div class="form-field"><label for="rdStdGroups">กลุ่ม (2 หลัก)</label><textarea id="rdStdGroups" rows="8"${can ? "" : " disabled"}>${rdEsc(std.groups.map((g) => `${g[0]} | ${g[1]}`).join("\n"))}</textarea></div>
             <div class="form-field"><label for="rdStdTypes">ประเภท (1 ตัวอักษร)</label><textarea id="rdStdTypes" rows="8"${can ? "" : " disabled"}>${rdEsc(std.types.map((t) => `${t[0]} | ${t[1]}`).join("\n"))}</textarea></div>
           </div>
@@ -802,7 +803,7 @@ function renderRdParts(pane) {
             if (n && (byName[n] || []).length > 1) flags.push(bxPill(`ชื่อซ้ำ ${byName[n].length} รหัส`, "info"));
             const inp = (k, v, num) => can ? `<input class="bom-inline rd-part" data-key="${rdEsc(p.key)}" data-k="${k}"${num ? ' type="number" step="any" min="0"' : ""} value="${rdEsc(v ?? "")}" aria-label="${k} ${rdEsc(p.key)}">` : rdEsc(v ?? "—");
             return `<tr><td class="mono-cell"><button type="button" class="bx-link" data-rdpart="${rdEsc(p.key)}" data-model="${rdEsc(p.models[0] || "")}">${rdEsc(p.key)}</button></td>
-              <td>${typeof pcChips === "function" ? pcChips(p.key) || '<span class="muted-inline">รหัสแบบเดิม</span>' : ""}</td>
+              <td>${typeof pcChips === "function" ? pcChips(p.key) || '<span class="muted-inline">ไม่ตรงมาตรฐาน</span>' : ""}</td>
               <td>${can && !p.models.length ? `<input class="bom-inline rd-part" data-key="${rdEsc(p.key)}" data-k="name" value="${rdEsc(p.line.part)}" placeholder="ชื่อชิ้นส่วน" aria-label="ชื่อ ${rdEsc(p.key)}">` : rdEsc(p.line.part)}</td><td class="muted-inline">${rdEsc(p.models.join(", "))}</td><td>${rdEsc(p.line.source || "—")}</td>
               <td>${p.line.code ? bomDrawingCell(p.line) : "—"}</td><td class="muted-inline">${rdEsc(suppliersOf(p.key).join(", "))}</td>
               <td class="num">${inp("cost", m.cost, true)}</td><td class="num">${inp("weight", m.weight, true)}</td><td>${inp("material", m.material)}</td><td>${flags.join(" ")}</td></tr>`;
@@ -812,7 +813,7 @@ function renderRdParts(pane) {
     </div>`;
   const copy = (code, msg) => { if (navigator.clipboard) navigator.clipboard.writeText(code).then(() => showToast(msg, "good"), () => {}); };
   document.getElementById("rdStdGen").addEventListener("click", () => {
-    const code = pcNext(document.getElementById("rdStdGroup").value, document.getElementById("rdStdType").value);
+    const code = pcNext(document.getElementById("rdStdBrand").value, document.getElementById("rdStdGroup").value, document.getElementById("rdStdType").value);
     document.getElementById("rdStdOut").textContent = code;
     copy(code, `คัดลอก ${code} แล้ว — ใช้ตอนเพิ่มรายการใน BOM`);
   });
@@ -820,6 +821,11 @@ function renderRdParts(pane) {
     const n = pcNextRev(document.getElementById("rdRevIn").value.trim());
     document.getElementById("rdRevOut").textContent = n || "รหัสไม่ตรงมาตรฐาน";
     if (n) copy(n, `คัดลอก ${n} แล้ว`);
+  });
+  document.getElementById("rdEoGen").addEventListener("click", () => {
+    const n = pcNextEo(document.getElementById("rdRevIn").value.trim());
+    document.getElementById("rdRevOut").textContent = n || "รหัสไม่ตรงมาตรฐาน";
+    if (n) copy(n, `คัดลอก ${n} แล้ว — ใช้เมื่อออก EO เปลี่ยนชิ้นงาน`);
   });
   const dwgNames = [];
   const addFiles = (fl) => { [...fl].forEach((f) => dwgNames.push(f.name)); const ta = document.getElementById("rdDwgNames"); ta.value = (ta.value ? ta.value + "\n" : "") + [...fl].map((f) => f.name).join("\n"); rdDwgPreview(); };
@@ -829,11 +835,11 @@ function renderRdParts(pane) {
   if (document.getElementById("rdStdSave")) {
     const readList = (id, keyRe) => document.getElementById(id).value.split(/\n/).map((x) => x.split("|").map((y) => y.trim())).filter((x) => x[0] && keyRe.test(x[0])).map((x) => [x[0].toUpperCase(), x[1] || ""]);
     document.getElementById("rdStdSave").addEventListener("click", () => {
-      const groups = readList("rdStdGroups", /^\d{2}$/), types = readList("rdStdTypes", /^[A-Za-z]$/);
-      if (!groups.length || !types.length) { showToast("ต้องมีอย่างน้อย 1 กลุ่มและ 1 ประเภท", "warn"); return; }
-      RD.codeStd = { prefix: document.getElementById("rdStdPrefix").value.trim() || "K", numDigits: Math.max(3, Math.min(8, Number(document.getElementById("rdStdDigits").value) || 5)), groups, types };
+      const groups = readList("rdStdGroups", /^\d{2}$/), types = readList("rdStdTypes", /^[A-Za-z]$/), brands = readList("rdStdBrands", /^[A-Za-z]$/);
+      if (!groups.length || !types.length || !brands.length) { showToast("ต้องมีอย่างน้อย 1 แบรนด์ 1 Item และ 1 ประเภท", "warn"); return; }
+      RD.codeStd = { brands, groups, types };
       rdSave();
-      rdAudit("แก้มาตรฐานรหัสชิ้นส่วน", "มาตรฐานรหัส", `${RD.codeStd.prefix} · ${groups.length} กลุ่ม · ${types.length} ประเภท · เลขรัน ${RD.codeStd.numDigits} หลัก`);
+      rdAudit("แก้มาตรฐานรหัสชิ้นส่วน", "มาตรฐานรหัส", `${brands.map((b) => b[0]).join("/")} · ${groups.length} Item · ${types.length} ประเภท`);
       renderRnd();
       showToast("บันทึกมาตรฐานรหัสแล้ว", "good");
     });
