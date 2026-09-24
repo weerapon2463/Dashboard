@@ -148,6 +148,7 @@ function renderBomEditor() {
         <td><input class="bom-inline bom-qty" type="number" min="0" step="any" data-i="${i}" data-k="qty" value="${escapeHtml(String(l.qty ?? ""))}" aria-label="จำนวนต่อคัน"></td>
         <td><select class="bom-inline" data-i="${i}" data-k="unit" aria-label="หน่วย">${opts(BOM_UNITS.includes(l.unit) ? BOM_UNITS : [l.unit, ...BOM_UNITS], l.unit)}</select></td>
         <td><select class="bom-inline" data-i="${i}" data-k="source" aria-label="ผลิตเองหรือซื้อ">${opts(BOM_SOURCES, l.source || "ซื้อ")}</select></td>
+        <td>${bomDrawingCell(l)}</td>
         <td><input class="bom-inline" data-i="${i}" data-k="note" value="${escapeHtml(l.note || "")}" aria-label="หมายเหตุ"></td>
         <td><button class="btn-chip" type="button" data-del="${i}" aria-label="ลบรายการ ${i + 1}">ลบ</button></td>
       `;
@@ -159,6 +160,7 @@ function renderBomEditor() {
         <td>${escapeHtml(String(l.qty ?? ""))}</td>
         <td>${escapeHtml(l.unit || "")}</td>
         <td>${escapeHtml(l.source || "—")}</td>
+        <td>${bomDrawingCell(l)}</td>
         <td>${escapeHtml(l.note || "")}</td>
         <td></td>
       `;
@@ -166,6 +168,7 @@ function renderBomEditor() {
     tbody.appendChild(tr);
   });
   document.getElementById("bomEmptyNote").hidden = lines.length > 0;
+  wireDrawingChips(tbody);
 
   tbody.querySelectorAll(".bom-inline").forEach((el) => el.addEventListener("change", () => {
     const line = MASTER_BOM[bomModel][Number(el.dataset.i)];
@@ -281,6 +284,7 @@ function initBomInteractions() {
   document.getElementById("bomReleaseBtn").addEventListener("click", releaseBom);
   document.getElementById("bomRevBtn").addEventListener("click", openBomRevModal);
   document.getElementById("bomExportBtn").addEventListener("click", exportBomCsv);
+  document.getElementById("bomSheetBtn").addEventListener("click", () => openBomSheet(bomModel));
   document.getElementById("bomAddLineBtn").addEventListener("click", () => {
     MASTER_BOM[bomModel].push({ code: "", part: "", qty: 1, unit: "ชิ้น", source: "ซื้อ", note: "" });
     afterBomMutation();

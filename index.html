@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Dashboard | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260924e">
+<link rel="stylesheet" href="style.css?v=20260924g">
 </head>
 <body>
   <div class="app-shell">
@@ -339,7 +339,10 @@
               <h3 id="deptRegTitle"></h3>
               <p class="card-sub" id="deptRegSub"></p>
             </div>
-            <button id="deptAddBtn" class="btn-primary" type="button">+ สร้างใหม่</button>
+            <div class="pilot-toolbar">
+              <button id="dwgRegBtn" class="btn-primary" type="button" hidden>📎 ลงทะเบียนแบบ (แนบไฟล์)</button>
+              <button id="deptAddBtn" class="btn-primary" type="button">+ สร้างใหม่</button>
+            </div>
           </div>
           <div class="card-body table-scroll">
             <div class="filter-row">
@@ -374,6 +377,7 @@
               <span class="muted-inline" id="bomEdStats"></span>
             </div>
             <div class="pilot-toolbar bom-actions">
+              <button id="bomSheetBtn" class="btn-primary" type="button">📄 ดูเอกสาร BOM / คำนวณจำนวน</button>
               <button id="bomAddLineBtn" class="btn-secondary" type="button">+ เพิ่มรายการ</button>
               <button id="bomReleaseBtn" class="btn-primary" type="button">อนุมัติใช้งาน (Release)</button>
               <button id="bomRevBtn" class="btn-secondary" type="button">ออก Revision ใหม่เพื่อแก้ไข</button>
@@ -390,6 +394,7 @@
                     <th>จำนวน/คัน</th>
                     <th>หน่วย</th>
                     <th>ผลิตเอง/ซื้อ</th>
+                    <th>แบบ (Drawing)</th>
                     <th>หมายเหตุ</th>
                     <th></th>
                   </tr>
@@ -1155,23 +1160,80 @@
     </div>
   </div>
 
+  <div class="modal-backdrop docview-backdrop" id="docViewBackdrop">
+    <div class="docview-wrap">
+      <div class="docview-actions" id="docViewActions"></div>
+      <article class="paper" id="docPaper"></article>
+      <input type="file" id="docAttachInput" multiple accept="image/*,application/pdf,.dwg,.dxf,.step,.stp,.xlsx,.xls,.docx,.doc" hidden>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="formSetBackdrop">
+    <div class="modal modal-wide">
+      <h3>ออกแบบฟอร์มเอกสาร</h3>
+      <p class="card-sub">หัวกระดาษ โลโก้ ช่องลายเซ็น และท้ายกระดาษ — ใช้กับเอกสารทุกชนิดและ BOM ทั้งตอนพิมพ์และไฟล์ PDF</p>
+      <div class="fs-logo-row">
+        <div class="fs-logo-preview" id="fsLogoPreview"></div>
+        <div class="pilot-toolbar">
+          <label class="btn-secondary" for="fsLogoFile">อัปโหลดโลโก้</label>
+          <button id="fsLogoRemove" class="btn-secondary" type="button">ใช้ตัวอักษร Y2J</button>
+        </div>
+        <input type="file" id="fsLogoFile" accept="image/*" hidden>
+      </div>
+      <div class="modal-grid">
+        <div class="form-field"><label for="fs_companyTh">ชื่อบริษัท (ภาษาไทย)</label><input id="fs_companyTh" placeholder="ชื่อบริษัทตามหนังสือรับรอง"></div>
+        <div class="form-field"><label for="fs_companyEn">ชื่อบริษัท (อังกฤษ)</label><input id="fs_companyEn"></div>
+        <div class="form-field modal-grid-wide"><label for="fs_address">ที่อยู่ / เบอร์โทร / เลขผู้เสียภาษี</label><input id="fs_address" placeholder="บรรทัดใต้ชื่อบริษัท"></div>
+        <div class="form-field"><label for="fs_sig1">ช่องลายเซ็นที่ 1</label><input id="fs_sig1"></div>
+        <div class="form-field"><label for="fs_sig2">ช่องลายเซ็นที่ 2</label><input id="fs_sig2"></div>
+        <div class="form-field"><label for="fs_sig3">ช่องลายเซ็นที่ 3</label><input id="fs_sig3"></div>
+        <div class="form-field"><label for="fs_footer">ข้อความท้ายกระดาษ</label><input id="fs_footer" placeholder="เช่น เอกสารควบคุม ห้ามทำสำเนาโดยไม่ได้รับอนุญาต"></div>
+      </div>
+      <label class="fs-check"><input type="checkbox" id="fs_showFlow"> แสดงขั้นตอนสถานะ (Workflow) บนเอกสาร</label>
+      <div class="modal-actions">
+        <button id="fsResetBtn" class="btn-secondary" type="button">คืนค่าเริ่มต้น</button>
+        <button id="fsCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="fsSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="dwgRegBackdrop">
+    <div class="modal modal-wide">
+      <h3>ลงทะเบียนแบบ (Drawing)</h3>
+      <p class="card-sub">ลากไฟล์แบบมาวาง หรือกดเลือกได้หลายไฟล์พร้อมกัน (PDF, รูปภาพ, DWG/DXF) — ระบบออกเลขที่ DWG ให้อัตโนมัติ และผูกกับชิ้นส่วนใน BOM ได้ทันที</p>
+      <label class="dwg-drop" id="dwgDrop" for="dwgRegFiles">
+        <span class="dwg-drop-icon">⬆</span>
+        <span>ลากไฟล์มาวางที่นี่ หรือ <u>กดเพื่อเลือกไฟล์</u></span>
+        <span class="muted-inline">ไฟล์ละไม่เกิน 15 MB · เก็บไว้ในเครื่องนี้</span>
+      </label>
+      <input type="file" id="dwgRegFiles" multiple accept="application/pdf,image/*,.dwg,.dxf,.step,.stp" hidden>
+      <div id="dwgRegRows"></div>
+      <div class="modal-actions">
+        <button id="dwgRegCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="dwgRegSaveBtn" class="btn-primary" type="button">ลงทะเบียน</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="data.js?v=20260924e"></script>
-  <script src="priority-matrix.js?v=20260924e"></script>
-  <script src="capacity-planning.js?v=20260924e"></script>
-  <script src="master-schedule.js?v=20260924e"></script>
-  <script src="make-or-buy.js?v=20260924e"></script>
-  <script src="resource.js?v=20260924e"></script>
-  <script src="procurement.js?v=20260924e"></script>
-  <script src="workorder.js?v=20260924e"></script>
-  <script src="alerts.js?v=20260924e"></script>
-  <script src="overview-charts.js?v=20260924e"></script>
-  <script src="pilot.js?v=20260924e"></script>
-  <script src="dept-data.js?v=20260924e"></script>
-  <script src="dept-samples.js?v=20260924e"></script>
-  <script src="dept.js?v=20260924e"></script>
-  <script src="bom.js?v=20260924e"></script>
-  <script src="app.js?v=20260924e"></script>
+  <script src="data.js?v=20260924g"></script>
+  <script src="priority-matrix.js?v=20260924g"></script>
+  <script src="capacity-planning.js?v=20260924g"></script>
+  <script src="master-schedule.js?v=20260924g"></script>
+  <script src="make-or-buy.js?v=20260924g"></script>
+  <script src="resource.js?v=20260924g"></script>
+  <script src="procurement.js?v=20260924g"></script>
+  <script src="workorder.js?v=20260924g"></script>
+  <script src="alerts.js?v=20260924g"></script>
+  <script src="overview-charts.js?v=20260924g"></script>
+  <script src="pilot.js?v=20260924g"></script>
+  <script src="dept-data.js?v=20260924g"></script>
+  <script src="dept-samples.js?v=20260924g"></script>
+  <script src="dept.js?v=20260924g"></script>
+  <script src="bom.js?v=20260924g"></script>
+  <script src="docview.js?v=20260924g"></script>
+  <script src="app.js?v=20260924g"></script>
 </body>
 </html>

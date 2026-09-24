@@ -194,6 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (hasPilot) initPilotInteractions();
   const hadStoredDept = hasDept ? initDeptData() : false;
   if (hasDept) { initDeptInteractions(); initBomInteractions(); }
+  if (hasDept && typeof initDocView === "function") initDocView();
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();

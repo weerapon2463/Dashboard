@@ -23,9 +23,13 @@ const DOC_SAMPLES = {
     { no: "WI-2026-003", status: "อนุมัติใช้งาน", title: "การเชื่อมโครงฐาน — ค่ากระแส/แรงดันมาตรฐาน", model: "", line: "ไลน์เชื่อม", rev: "B", ref: "", owner: "หัวหน้าไลน์เชื่อม", date: "2026-09-22", link: "" },
   ],
   dwg: [
-    { no: "DWG-2026-001", status: "อนุมัติ (Released)", title: "ใบมีดตัดอ้อย SK5 ชุบแข็ง", model: "YT6500", rev: "B", owner: "วิศวกรออกแบบ", date: "2026-09-05", link: "" },
-    { no: "DWG-2026-002", status: "รอตรวจแบบ", title: "แคลมป์ยึดสายไฮดรอลิก (ตำแหน่งใหม่)", model: "YT7500", rev: "A", owner: "วิศวกรออกแบบ", date: "2026-09-18", link: "" },
-    { no: "DWG-2026-003", status: "กำลังออกแบบ", title: "กล่องขั้วต่อสายไฟกันน้ำ IP67", model: "W250", rev: "A", owner: "วิศวกรไฟฟ้า", date: "2026-09-22", link: "" },
+    { no: "DWG-2026-001", status: "อนุมัติ (Released)", title: "ใบมีดตัดอ้อย SK5 ชุบแข็ง", partCode: "BL-1001B", model: "YT6500", rev: "B", owner: "วิศวกรออกแบบ", date: "2026-09-05", link: "" },
+    { no: "DWG-2026-002", status: "รอตรวจแบบ", title: "แคลมป์ยึดสายไฮดรอลิก (ตำแหน่งใหม่)", partCode: "", model: "YT7500", rev: "A", owner: "วิศวกรออกแบบ", date: "2026-09-18", link: "" },
+    { no: "DWG-2026-003", status: "กำลังออกแบบ", title: "กล่องขั้วต่อสายไฟกันน้ำ IP67", partCode: "", model: "W250", rev: "A", owner: "วิศวกรไฟฟ้า", date: "2026-09-22", link: "" },
+    { no: "DWG-2026-004", status: "อนุมัติ (Released)", title: "ใบมีดตัดอ้อย (มาตรฐาน)", partCode: "BL-1001", model: "", rev: "A", owner: "วิศวกรออกแบบ", date: "2026-01-12", link: "" },
+    { no: "DWG-2026-005", status: "อนุมัติ (Released)", title: "ปลอกสายไฮดรอลิก", partCode: "HY-3001", model: "", rev: "A", owner: "วิศวกรออกแบบ", date: "2026-01-15", link: "" },
+    { no: "DWG-2026-006", status: "อนุมัติ (Released)", title: "ชุดยึดเครื่องยนต์", partCode: "FR-4010", model: "", rev: "C", owner: "วิศวกรออกแบบ", date: "2026-07-08", link: "" },
+    { no: "DWG-2026-007", status: "อนุมัติ (Released)", title: "โซ่ลำเลียงอ้อย — ข้อโซ่และหมุด", partCode: "CV-5001", model: "", rev: "B", owner: "วิศวกรออกแบบ", date: "2026-04-20", link: "" },
   ],
   plan: [
     { no: "PLN-2026-001", status: "เสร็จตามแผน", title: "สัปดาห์ที่ 38", model: "YT3000", qty: 2, line: "ไลน์ประกอบ 1", owner: "ฝ่ายวางแผน", date: "2026-09-14" },

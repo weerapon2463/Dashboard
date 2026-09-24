@@ -231,6 +231,7 @@ function renderDeptRegister() {
   addBtn.hidden = !deptCanCreate(role);
   addBtn.textContent = `+ สร้าง ${def.abbr} ใหม่`;
   document.getElementById("deptSampleBtn").hidden = !deptCanManage(role);
+  document.getElementById("dwgRegBtn").hidden = !(deptDocType === "dwg" && deptCanCreate(role));
 
   // status filter options follow the selected document type
   const statusSel = document.getElementById("deptStatusFilter");
@@ -268,12 +269,13 @@ function renderDeptRegister() {
     const tr = document.createElement("tr");
     tr.innerHTML = `
       <td class="mono-cell">${escapeHtml(d.no)}</td>
-      <td class="dept-title-cell">${escapeHtml(d[titleField.key] || "")}</td>
+      <td class="dept-title-cell"><button type="button" class="link-btn" data-action="view" data-index="${i}">${escapeHtml(d[titleField.key] || "")}</button>${(d.files || []).length ? ` <span class="attach-count" title="ไฟล์แนบ">📎${d.files.length}</span>` : ""}</td>
       ${def.cols.map((k) => `<td>${deptCellText(fieldsByKey[k], d[k])}</td>`).join("")}
       <td><span class="pill ${DOC_TONE_PILL[deptStatusTone(deptDocType, d.status)]}">${escapeHtml(d.status)}</span></td>
       <td class="wo-actions-cell">
         ${canManage && next ? `<button class="btn-chip" type="button" data-action="next" data-index="${i}">→ ${escapeHtml(next)}</button>` : ""}
-        <button class="btn-chip" type="button" data-action="open" data-index="${i}">${canManage ? "แก้ไข" : "ดู"}</button>
+        <button class="btn-chip" type="button" data-action="view" data-index="${i}">ดูเอกสาร</button>
+        ${canManage ? `<button class="btn-chip" type="button" data-action="open" data-index="${i}">แก้ไข</button>` : ""}
       </td>
     `;
     tbody.appendChild(tr);
@@ -295,6 +297,7 @@ function renderDeptRegister() {
     showToast(`${doc.no} → ${next}`, "good");
   }));
   tbody.querySelectorAll("[data-action='open']").forEach((b) => b.addEventListener("click", () => openDeptModal(deptDocType, Number(b.dataset.index))));
+  tbody.querySelectorAll("[data-action='view']").forEach((b) => b.addEventListener("click", () => openDocView(deptDocType, Number(b.dataset.index))));
 }
 
 /* ---- modal ------------------------------------------------------------- */
@@ -335,6 +338,12 @@ function deptFieldInput(field, value, disabled, example) {
     case "line":
       input = `<select id="${id}"${dis}>${opts(PROD_LINES, true)}</select>`;
       break;
+    case "part": {
+      const parts = (typeof bomPartOptions === "function" ? bomPartOptions() : []).map((p) => ({ value: p.code, label: `${p.code} — ${p.part}` }));
+      if (v && !parts.some((p) => p.value === v)) parts.unshift({ value: v, label: v });
+      input = `<select id="${id}"${dis}>${opts(parts, true)}</select>`;
+      break;
+    }
     case "ref": {
       const refs = (DEPT_DOCS[field.refType] || []).map((d) => ({ value: d.no, label: `${d.no} — ${d[DOC_TYPES[field.refType].fields[0].key] || ""}` }));
       if (v && !refs.some((r) => r.value === v)) refs.unshift({ value: v, label: v });
@@ -460,6 +469,7 @@ function initDeptInteractions() {
   document.getElementById("deptAddBtn").addEventListener("click", () => openDeptModal(deptDocType, null));
   document.getElementById("deptExportBtn").addEventListener("click", exportDeptCsv);
   document.getElementById("deptSampleBtn").addEventListener("click", fillDeptSamples);
+  document.getElementById("dwgRegBtn").addEventListener("click", () => openDwgRegModal(""));
   document.getElementById("deptSearch").addEventListener("input", renderDeptRegister);
   document.getElementById("deptStatusFilter").addEventListener("change", renderDeptRegister);
   document.getElementById("deptDocCancelBtn").addEventListener("click", closeDeptModal);
