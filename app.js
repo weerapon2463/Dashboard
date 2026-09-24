@@ -61,7 +61,7 @@ function switchView(view) {
   // Re-render the relevant chart in case it needs a resize/redraw
   // (canvas charts drawn while display:none report zero size)
   if (view === "overview") renderOverviewCharts();
-  if (view === "pilot") renderPilot();
+  if (view === "pilot" && typeof renderPilot === "function") renderPilot();
   if (view === "mytasks") renderMyTasks();
   if (view === "priority") renderPriorityMatrix();
   if (view === "capacity") renderCapacityChart(document.getElementById("capacityLineFilter").value);
@@ -116,6 +116,11 @@ function initRoleSelect() {
   select.value = role;
   applyModuleAccess(role);
 
+  window.addEventListener("pageshow", () => {
+    const r = getStoredRole();
+    if (select.value !== r) { select.value = r; applyModuleAccess(r); }
+  });
+
   select.addEventListener("change", () => {
     try {
       localStorage.setItem(ROLE_STORAGE_KEY, select.value);
@@ -162,7 +167,7 @@ function refreshAllCharts() {
   renderMyTasks();
   renderOverviewCharts();
   renderAlerts();
-  renderPilot();
+  if (typeof renderPilot === "function") renderPilot();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -177,8 +182,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const hadStoredPriority = initPriorityData();
   initPriorityInteractions();
   const hadStoredResource = initResourceData();
-  const hadStoredPilot = initPilotData();
-  initPilotInteractions();
+  // Guarded: if a cached older index.html lacks pilot.js, the rest of the app must still start
+  const hasPilot = typeof initPilotData === "function";
+  const hadStoredPilot = hasPilot ? initPilotData() : false;
+  if (hasPilot) initPilotInteractions();
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();
@@ -194,11 +201,11 @@ document.addEventListener("DOMContentLoaded", () => {
   renderMyTasks();
   renderOverviewCharts();
   renderAlerts();
-  renderPilot();
+  if (hasPilot) renderPilot();
   markWOInitialStatus(hadStoredWorkOrders);
   markProcInitialStatus(hadStoredProcurement);
   markMSInitialStatus(hadStoredSchedule);
   markPMInitialStatus(hadStoredPriority);
   markResInitialStatus(hadStoredResource);
-  markPilotInitialStatus(hadStoredPilot);
+  if (hasPilot) markPilotInitialStatus(hadStoredPilot);
 });
