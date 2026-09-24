@@ -82,6 +82,7 @@ function handle_(p) {
       case "push": return json_(push_(p));
       case "upload": return json_(upload_(p));
       case "file": return json_(file_(p.id));
+      case "bomfiles": return json_(bomFiles_(p.company === "y2j" ? "" : p.company));
       default: return json_({ ok: false, error: "unknown action" });
     }
   } catch (err) {
@@ -205,11 +206,50 @@ function file_(id) {
 
 /* ------------------------------------------------------------------ readable report tabs */
 
-// One tab per BOM (model) plus an index tab; tabs of models that no longer exist are removed
+// One separate Google Sheet FILE per BOM (model) in a Drive folder, plus an index tab with links in
+// this spreadsheet. Files of models that no longer exist are moved to the Drive trash.
+function bomFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty("BOM_FOLDER_ID");
+  if (id) { try { return DriveApp.getFolderById(id); } catch (err) { /* recreate */ } }
+  const f = DriveApp.createFolder("Y2J Dashboard — BOM");
+  props.setProperty("BOM_FOLDER_ID", f.getId());
+  return f;
+}
+
+function companyInfo_(co) {
+  try {
+    const auth = JSON.parse(readAll_(true, ["y2j-auth-v1"])["y2j-auth-v1"].value);
+    const c = (auth.companies || []).filter((x) => x.id === (co || "y2j"))[0];
+    if (c) return c;
+  } catch (err) { /* fall through */ }
+  return { id: co || "y2j", name: co ? co : "Y2J Machinery Co., Ltd.", short: co ? co.toUpperCase() : "Y2J" };
+}
+
+function bomFileProp_(co, model) { return "BOMFILE_" + (co || "y2j") + "_" + model; }
+
+function bomFile_(co, model, title) {
+  const props = PropertiesService.getScriptProperties();
+  const key = bomFileProp_(co, model);
+  const id = props.getProperty(key);
+  if (id) {
+    try {
+      const f = DriveApp.getFileById(id);
+      if (!f.isTrashed()) { if (f.getName() !== title) f.setName(title); return SpreadsheetApp.openById(id); }
+    } catch (err) { /* recreate below */ }
+  }
+  const ss = SpreadsheetApp.create(title);
+  DriveApp.getFileById(ss.getId()).moveTo(bomFolder_());
+  props.setProperty(key, ss.getId());
+  return ss;
+}
+
 function mirrorBom_(d, co, tab) {
   const models = d.models || [];
   const meta = d.meta || {};
   const bom = d.bom || {};
+  const comp = companyInfo_(co);
+  const safe = (v) => (typeof v === "string" && /^[=+\-@]/.test(v) ? "'" + v : v);
   // drawing registered for each part code (latest non-cancelled), from the same company's documents
   const drawings = {};
   try {
@@ -220,34 +260,80 @@ function mirrorBom_(d, co, tab) {
       if (!cur || String(x.rev) > String(cur.rev)) drawings[x.partCode] = x;
     });
   } catch (err) { /* no drawings yet */ }
-  const tabName = (m) => tab("BOM-" + String(m).replace(/[\[\]\*\?\/\:]/g, "-"));
-  writeTab_(tab("BOM (สารบัญ)"), ["รุ่น / เลขที่ BOM", "Revision", "สถานะ", "จำนวนรายการ", "ผลิตเอง", "ซื้อ", "แก้ไขล่าสุด", "แท็บ"],
-    models.map((m) => {
-      const lines = bom[m] || [];
-      const mt = meta[m] || {};
-      const hist = mt.history || [];
-      const last = hist[hist.length - 1] || {};
-      const make = lines.filter((l) => l.source === "ผลิตเอง").length;
-      return ["BOM-" + m, mt.rev || "", mt.status || "", lines.length, make, lines.length - make, last.date || "", tabName(m)];
-    }));
+
+  const index = [];
   models.forEach((m) => {
     const mt = meta[m] || {};
-    writeTab_(tabName(m), ["ลำดับ", "รหัสชิ้นส่วน", "ชื่อชิ้นส่วน", "จำนวน/คัน", "หน่วย", "ผลิตเอง/ซื้อ", "แบบ (Drawing)", "หมายเหตุ", "BOM Rev.", "สถานะ BOM"],
-      (bom[m] || []).map((l, i) => {
-        const dw = drawings[l.code];
-        return [i + 1, l.code || "", l.part || "", l.qty, l.unit || "", l.source || "", dw ? dw.no + " Rev." + (dw.rev || "-") : "", l.note || "", mt.rev || "", mt.status || ""];
-      }));
+    const lines = bom[m] || [];
+    const hist = mt.history || [];
+    const last = hist[hist.length - 1] || {};
+    const ss = bomFile_(co, m, "BOM-" + m + " — " + (comp.short || comp.name));
+    const sh = ss.getSheets()[0];
+    sh.setName("BOM");
+    sh.clear();
+    const head = [
+      ["ใบรายการวัสดุ (Bill of Materials)", ""],
+      ["บริษัท", comp.name],
+      ["เลขที่ BOM", "BOM-" + m],
+      ["รุ่นเครื่องจักร", m],
+      ["Revision", mt.rev || ""],
+      ["สถานะ", mt.status || ""],
+      ["แก้ไขล่าสุด", (last.date || "") + (last.note ? " — " + last.note : "") + (last.ref ? " (" + last.ref + ")" : "")],
+      ["อัปเดตจาก Dashboard", new Date().toISOString().replace("T", " ").slice(0, 16) + " UTC"],
+    ];
+    sh.getRange(1, 1, head.length, 2).setValues(head.map((r) => r.map(safe)));
+    sh.getRange(1, 1).setFontWeight("bold").setFontSize(14);
+    sh.getRange(2, 1, head.length - 1, 1).setFontWeight("bold").setBackground("#f1f3f4");
+    const header = ["ลำดับ", "รหัสชิ้นส่วน", "ชื่อชิ้นส่วน", "จำนวน/คัน", "หน่วย", "ผลิตเอง/ซื้อ", "แบบ (Drawing)", "หมายเหตุ"];
+    const rows = lines.map((l, i) => {
+      const dw = drawings[l.code];
+      return [i + 1, l.code || "", l.part || "", l.qty, l.unit || "", l.source || "", dw ? dw.no + " Rev." + (dw.rev || "-") : "", l.note || ""].map(safe);
+    });
+    const top = head.length + 2;
+    sh.getRange(top, 1, 1, header.length).setValues([header]).setFontWeight("bold").setBackground("#e8eef7");
+    if (rows.length) sh.getRange(top + 1, 1, rows.length, header.length).setValues(rows);
+    sh.setFrozenRows(top);
+    sh.autoResizeColumns(1, header.length);
+    // revision history on a second tab
+    const hs = ss.getSheetByName("ประวัติ Revision") || ss.insertSheet("ประวัติ Revision");
+    hs.clear();
+    hs.getRange(1, 1, 1, 4).setValues([["Rev.", "วันที่", "รายละเอียด", "อ้างอิง"]]).setFontWeight("bold").setBackground("#e8eef7");
+    if (hist.length) hs.getRange(2, 1, hist.length, 4).setValues(hist.slice().reverse().map((h) => [h.rev || "", h.date || "", h.note || "", h.ref || ""].map(safe)));
+    const make = lines.filter((l) => l.source === "ผลิตเอง").length;
+    index.push(["BOM-" + m, mt.rev || "", mt.status || "", lines.length, make, lines.length - make, last.date || "", ss.getUrl()]);
   });
-  // remove tabs of models that were deleted/renamed (only this company's BOM tabs)
-  const keep = {};
-  models.forEach((m) => { keep[tabName(m)] = true; });
-  const ss = sheet_();
-  ss.getSheets().forEach((sh) => {
+  writeTab_(tab("BOM (สารบัญ)"), ["เลขที่ BOM", "Revision", "สถานะ", "จำนวนรายการ", "ผลิตเอง", "ซื้อ", "แก้ไขล่าสุด", "ไฟล์ Google Sheet"], index);
+
+  // models removed from the dashboard: trash their files (recoverable from Drive trash for 30 days)
+  const props = PropertiesService.getScriptProperties();
+  const prefix = "BOMFILE_" + (co || "y2j") + "_";
+  Object.keys(props.getProperties()).forEach((k) => {
+    if (k.indexOf(prefix) !== 0) return;
+    const model = k.slice(prefix.length);
+    if (models.indexOf(model) >= 0) return;
+    try { DriveApp.getFileById(props.getProperty(k)).setTrashed(true); } catch (err) { /* already gone */ }
+    props.deleteProperty(k);
+  });
+  // earlier versions put one tab per BOM in this spreadsheet — remove those
+  const main = sheet_();
+  main.getSheets().forEach((sh) => {
     const n = sh.getName();
     const mine = co ? n.indexOf("BOM-") === 0 && n.slice(-(" (" + co + ")").length) === " (" + co + ")" : n.indexOf("BOM-") === 0 && !/ \([a-z0-9]{2,12}\)$/.test(n);
-    if (mine && !keep[n] && ss.getSheets().length > 1) ss.deleteSheet(sh);
+    if (mine && main.getSheets().length > 1) main.deleteSheet(sh);
   });
 }
+
+function bomFiles_(co) {
+  const props = PropertiesService.getScriptProperties().getProperties();
+  const prefix = "BOMFILE_" + (co || "y2j") + "_";
+  const out = {};
+  Object.keys(props).forEach((k) => {
+    if (k.indexOf(prefix) === 0) out[k.slice(prefix.length)] = "https://docs.google.com/spreadsheets/d/" + props[k] + "/edit";
+  });
+  return { ok: true, files: out, folder: PropertiesService.getScriptProperties().getProperty("BOM_FOLDER_ID") || "" };
+}
+
+/* ------------------------------------------------------------------ */
 
 function writeTab_(name, header, rows) {
   const ss = sheet_();

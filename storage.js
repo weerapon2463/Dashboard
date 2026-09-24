@@ -398,6 +398,7 @@ const Y2JStore = (() => {
   return {
     ready, test, connect, disconnect, forceUpload, setupLink, uploadFile, fetchFile, flush,
     company: () => company, setCompany,
+    bomFiles: () => api("bomfiles", { company }),
     isRemote, config: () => Object.assign({}, cfg), status: () => Object.assign({ pending: [...dirty] }, status),
     sharedKeys: SHARED, merge3,
   };

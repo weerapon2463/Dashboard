@@ -131,6 +131,7 @@ function renderBomEditor() {
     return;
   }
   document.getElementById("bomSheetBtn").hidden = false;
+  bomShowSheetLink();
 
   const sel = document.getElementById("bomEdModel");
   sel.innerHTML = MACHINE_MODELS.map((m) => `<option value="${escapeHtml(m)}">${escapeHtml(m)} — Rev.${escapeHtml(BOM_META[m].rev)}</option>`).join("");
@@ -213,6 +214,25 @@ function renderBomEditor() {
   hist.innerHTML = meta.history.slice().reverse().map((h) => `
     <li><strong>Rev.${escapeHtml(h.rev)}</strong>${h.date ? ` · ${formatThaiDate(h.date)}` : ""} — ${escapeHtml(h.note || "")}${h.ref ? ` <span class="pill pill-schedule">${escapeHtml(h.ref)}</span>` : ""}</li>
   `).join("");
+}
+
+/* ---- link to this BOM's own Google Sheet file (Sheets storage mode) ------------- */
+
+let bomFilesCache = null; // { at, files: { model: url } }
+
+async function bomShowSheetLink() {
+  const link = document.getElementById("bomSheetLink");
+  if (!link) return;
+  link.hidden = true;
+  if (typeof Y2JStore === "undefined" || !Y2JStore.isRemote()) return;
+  try {
+    if (!bomFilesCache || Date.now() - bomFilesCache.at > 60000 || !bomFilesCache.files[bomModel]) {
+      const res = await Y2JStore.bomFiles();
+      bomFilesCache = { at: Date.now(), files: res.files || {} };
+    }
+    const url = bomFilesCache.files[bomModel];
+    if (url) { link.href = url; link.hidden = false; }
+  } catch (e) { /* offline — no link */ }
 }
 
 /* ---- actions ------------------------------------------------------------ */

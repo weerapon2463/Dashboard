@@ -855,3 +855,5 @@ html, body {
 .org-logo-big span { font-weight: 800; font-size: 18px; color: #1f5fa8; }
 .dp-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 .dp-types .vis-group { border: 1px solid var(--border-hairline); border-radius: 8px; padding: 8px 10px; flex-direction: column; flex-wrap: nowrap; }
+
+.bom-sheet-link { text-decoration: none; display: inline-flex; align-items: center; }
