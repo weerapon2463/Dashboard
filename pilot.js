@@ -156,6 +156,7 @@ function renderPilot() {
   renderPilotTable(canEdit);
   renderPilotChart();
   renderPilotFeedback(canEdit);
+  if (typeof renderPilotMeasured === "function") renderPilotMeasured();
 
   document.querySelectorAll(".pilot-edit-only").forEach((el) => { el.hidden = !canEdit; });
 }
@@ -466,6 +467,7 @@ function initPilotInteractions() {
     el.addEventListener("change", () => {
       PILOT.info[infoMap[id]] = el.value.trim();
       savePilot();
+      if ((id === "pilotStart" || id === "pilotEnd") && typeof renderPilotMeasured === "function") renderPilotMeasured();
     });
   });
   const rate = document.getElementById("pilotLaborRate");

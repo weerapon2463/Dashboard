@@ -53,6 +53,16 @@ function showToast(message, type) {
   }, 2600);
 }
 
+// Pilot results are real measurements, so the "sample data" badge would mislead there. With Google Sheets
+// connected the data is real; only pages still built on fixed example figures keep the badge.
+function updateDataBadge(view) {
+  const badge = document.querySelector(".data-badge");
+  if (!badge) return;
+  const remote = typeof Y2JStore !== "undefined" && Y2JStore.isRemote();
+  badge.hidden = view === "pilot" || (remote && !["capacity", "makeorbuy"].includes(view));
+  badge.textContent = remote ? "หน้านี้ยังใช้ข้อมูลตัวอย่าง" : "ข้อมูลตัวอย่าง (Sample Data)";
+}
+
 function switchView(view) {
   document.querySelectorAll(".nav-item").forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.view === view);
@@ -61,9 +71,7 @@ function switchView(view) {
     section.classList.toggle("active", section.id === `view-${view}`);
   });
   document.getElementById("viewTitle").textContent = VIEW_TITLES[view] || "";
-  // Pilot results are real measurements, so the "sample data" badge would mislead there
-  const badge = document.querySelector(".data-badge");
-  if (badge) badge.hidden = view === "pilot";
+  updateDataBadge(view);
 
   // Re-render the relevant chart in case it needs a resize/redraw
   // (canvas charts drawn while display:none report zero size)
@@ -235,6 +243,7 @@ function appStart() {
   if (typeof initPlans === "function") initPlans();
   if (typeof initP2P === "function") { initP2P(); renderP2P(); renderAlerts(); }
   if (typeof initAdmin === "function") initAdmin();
+  if (typeof initSuppliers === "function") initSuppliers();
   if (hasDept && typeof initBomx === "function") initBomx();
   if (hasDept && typeof initService === "function") initService();
   if (hasDept && typeof initReports === "function") initReports();
@@ -272,6 +281,8 @@ function appStart() {
     const btn = back && document.querySelector(`.nav-item[data-view="${back}"]`);
     if (btn && !btn.hidden) switchView(back);
   } catch (e) { /* ignore */ }
+  const activeNav = document.querySelector(".nav-item.active");
+  updateDataBadge(activeNav ? activeNav.dataset.view : "overview");
   // Shared link to one BOM item (?bom=<model>&item=<part code>)
   if (hasDept && typeof bxHandleDeepLink === "function") bxHandleDeepLink();
 }

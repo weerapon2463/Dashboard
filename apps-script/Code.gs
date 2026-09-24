@@ -284,14 +284,21 @@ function mirrorBom_(d, co, tab) {
     sh.getRange(1, 1, head.length, 2).setValues(head.map((r) => r.map(safe)));
     sh.getRange(1, 1).setFontWeight("bold").setFontSize(14);
     sh.getRange(2, 1, head.length - 1, 1).setFontWeight("bold").setBackground("#f1f3f4");
-    const header = ["ลำดับ", "รหัสชิ้นส่วน", "ชื่อชิ้นส่วน", "จำนวน/คัน", "หน่วย", "ผลิตเอง/ซื้อ", "แบบ (Drawing)", "หมายเหตุ"];
-    const rows = lines.map((l, i) => {
+    const header = ["ข้อ", "ระดับ", "รหัสชิ้นส่วน", "ชื่อชิ้นส่วน", "จำนวน/ชุดแม่", "รวม/คัน", "หน่วย", "ผลิตเอง/ซื้อ", "ใช้ที่ (ผู้รับไปใช้ต่อ)", "ขั้นตอน", "แบบ (Drawing)", "หมายเหตุ"];
+    const rows = bomTree_(lines).map((r) => {
+      if (r.group) return [r.no, "กลุ่มงาน", "", r.group, "", "", "", "", "", "", "", ""].map(safe);
+      const l = r.line;
       const dw = drawings[l.code];
-      return [i + 1, l.code || "", l.part || "", l.qty, l.unit || "", l.source || "", dw ? dw.no + " Rev." + (dw.rev || "-") : "", l.note || ""].map(safe);
+      return [r.no, r.depth, l.code || "", "  ".repeat(r.depth - 1) + (l.part || ""), l.qty, r.per, l.unit || "", l.source || "", l.station || "", l.op || "",
+        dw ? dw.no + " Rev." + (dw.rev || "-") : "", l.note || ""].map(safe);
     });
     const top = head.length + 2;
     sh.getRange(top, 1, 1, header.length).setValues([header]).setFontWeight("bold").setBackground("#e8eef7");
-    if (rows.length) sh.getRange(top + 1, 1, rows.length, header.length).setValues(rows);
+    if (rows.length) {
+      sh.getRange(top + 1, 1, rows.length, header.length).setValues(rows).setFontWeight("normal").setBackground(null);
+      sh.getRange(top + 1, 1, rows.length, 1).setNumberFormat("@");
+      rows.forEach((r, i) => { if (r[1] === "กลุ่มงาน") sh.getRange(top + 1 + i, 1, 1, header.length).setFontWeight("bold").setBackground("#f1f3f4"); });
+    }
     sh.setFrozenRows(top);
     sh.autoResizeColumns(1, header.length);
     // revision history on a second tab
@@ -321,6 +328,35 @@ function mirrorBom_(d, co, tab) {
     const mine = co ? n.indexOf("BOM-") === 0 && n.slice(-(" (" + co + ")").length) === " (" + co + ")" : n.indexOf("BOM-") === 0 && !/ \([a-z0-9]{2,12}\)$/.test(n);
     if (mine && main.getSheets().length > 1) main.deleteSheet(sh);
   });
+}
+
+// Same numbering as the dashboard: group › assembly › sub-part, with quantity per machine
+const BOM_GROUP_BY_PREFIX_ = { FR: "โครงสร้างและตัวถัง (Frame)", BL: "ชุดตัด (Cutting)", GR: "ระบบขับเคลื่อน (Drive)", CV: "ระบบลำเลียง (Conveyor)", HY: "ระบบไฮดรอลิก (Hydraulic)", EL: "ระบบไฟฟ้าและควบคุม (Electrical)" };
+function bomTree_(lines) {
+  const ids = {};
+  lines.forEach((l, i) => { if (!l.id) l.id = "L" + (i + 1); ids[l.id] = true; });
+  const groupOf = (l) => l.group || BOM_GROUP_BY_PREFIX_[String(l.code || "").slice(0, 2).toUpperCase()] || "ทั่วไป";
+  const order = Object.keys(BOM_GROUP_BY_PREFIX_).map((k) => BOM_GROUP_BY_PREFIX_[k]);
+  const tops = lines.filter((l) => !l.parent || !ids[l.parent]);
+  const groups = [];
+  tops.forEach((l) => { const g = groupOf(l); if (groups.indexOf(g) < 0) groups.push(g); });
+  const rank = (g) => { const i = order.indexOf(g); return i < 0 ? 99 : i; };
+  groups.sort((a, b) => rank(a) - rank(b));
+  const out = [];
+  const seen = {};
+  const walk = (list, prefix, depth, mult) => list.forEach((l, i) => {
+    if (seen[l.id] || depth > 10) return;
+    seen[l.id] = true;
+    const no = prefix + "." + (i + 1);
+    const per = (Number(l.qty) || 0) * mult;
+    out.push({ line: l, no: no, depth: depth, per: per });
+    walk(lines.filter((c) => c.parent === l.id), no, depth + 1, per);
+  });
+  groups.forEach((g, gi) => {
+    out.push({ group: g, no: String(gi + 1) });
+    walk(tops.filter((l) => groupOf(l) === g), String(gi + 1), 1, 1);
+  });
+  return out;
 }
 
 function bomFiles_(co) {
@@ -378,6 +414,39 @@ function mirror_(key, value) {
       VIS_[(doc.visibility && doc.visibility.mode) || "all"] || "", who(doc.createdBy), doc.createdAt || "", who(doc.updatedBy), doc.updatedAt || "", (doc.files || []).length,
     ])));
     writeTab_(tab("เอกสาร"), ["ชนิด", "เลขที่", "เรื่อง", "สถานะ", "รุ่น", "ผู้รับผิดชอบ", "วันที่", "การมองเห็น", "สร้างโดย", "สร้างเมื่อ", "แก้ล่าสุดโดย", "แก้เมื่อ", "ไฟล์แนบ"], rows);
+  }
+  if (key === "y2j-dept-docs-v1") {
+    const mcByNo = {};
+    (d.mc || []).forEach((m) => { mcByNo[m.no] = m; });
+    const reqRows = [];
+    (d.mreq || []).filter((r) => r.items && r.items.length).forEach((r) => r.items.forEach((it) => {
+      const out = ["รออนุมัติ", "อนุมัติ", "จ่ายบางส่วน"].indexOf(r.status) >= 0 ? Math.max(0, (Number(it.req) || 0) - (Number(it.issued) || 0)) : 0;
+      reqRows.push([r.no, r.status, r.wo || "", r.model || "", r.purpose || "", r.owner || "", r.requestedBy || who(r.createdBy), r.date || "",
+        it.item || "", it.code || "", it.part || "", it.unit || "", Number(it.req) || 0, Number(it.issued) || 0, Number(it.ret) || 0, out]);
+    }));
+    writeTab_(tab("ใบเบิกวัสดุ"), ["ใบเบิก", "สถานะ", "งาน (WO/SV)", "รุ่น", "ประเภท", "ผู้รับของ", "สั่งเบิกโดย", "วันที่", "ข้อ BOM", "รหัส", "รายการ", "หน่วย", "ขอ", "จ่ายแล้ว", "คืน", "ค้างจ่าย"], reqRows);
+    const today = Utilities.formatDate(new Date(), "Asia/Bangkok", "yyyy-MM-dd");
+    const warrantyEnd = (m) => {
+      if (!m) return "";
+      if (m.warranty) return m.warranty;
+      if (!m.delivered) return "";
+      const x = new Date(m.delivered + "T00:00:00");
+      x.setFullYear(x.getFullYear() + 1);
+      return Utilities.formatDate(x, "Asia/Bangkok", "yyyy-MM-dd");
+    };
+    writeTab_(tab("ทะเบียนเครื่องลูกค้า"), ["เลขทะเบียน", "หมายเลขเครื่อง", "รุ่น", "BOM Rev.", "ลูกค้า", "สถานที่", "ส่งมอบ", "ประกันถึง", "ในประกัน", "ชั่วโมงใช้งาน", "SO", "WO", "สถานะ"],
+      (d.mc || []).map((m) => { const e = warrantyEnd(m); return [m.no, m.title || "", m.model || "", m.rev || "", m.customer || "", m.location || "", m.delivered || "", e, e && today <= e ? "ใช่" : "ไม่", m.hours || "", m.so || "", m.wo || "", m.status || ""]; }));
+    writeTab_(tab("งานบริการ & เคลม"), ["ใบงาน", "สถานะ", "งาน", "เครื่อง", "ลูกค้า", "รุ่น", "ประเภท", "ความเร่งด่วน", "ช่าง", "รับแจ้ง", "นัดหมาย", "ค่าบริการ", "สาเหตุเคลม", "ผู้ขาย", "สถานะเคลม", "เลขที่เคลม", "มูลค่าเคลม"],
+      (d.svc || []).map((v) => { const m = mcByNo[v.machine]; return [v.no, v.status || "", v.title || "", m ? m.title : (v.machine || ""), v.customer || (m && m.customer) || "", v.model || (m && m.model) || "", v.kind || "", v.priority || "", v.tech || "", v.date || "", v.appt || "", v.cost || "", v.claimCause || "", v.supplier || "", v.claimStatus || "", v.claimRef || "", v.claimAmount || ""]; }));
+  }
+  if (key === "y2j-stock-v1") {
+    const items = d.items || {};
+    writeTab_(tab("คงคลัง"), ["รหัส", "ที่เก็บ", "คงคลัง", "จุดสั่งซื้อ", "สถานะ"],
+      Object.keys(items).sort().map((k) => { const it = items[k]; const q = Number(it.qty) || 0, mn = Number(it.min) || 0; return [k, it.loc || "", q, mn || "", q <= 0 ? "หมด" : mn && q <= mn ? "ถึงจุดสั่งซื้อ" : "ปกติ"]; }));
+  }
+  if (key === "y2j-procurement-v1" && d.suppliers) {
+    writeTab_(tab("ผู้ขาย"), ["ผู้ขาย", "ประเภท", "ผู้ติดต่อ", "โทร", "อีเมล", "เงื่อนไขชำระ", "Lead time (วัน)", "คะแนน", "ชิ้นส่วนที่ซื้อ", "สถานะ"],
+      d.suppliers.map((x) => [x.name, x.category || "", x.contact || "", x.phone || "", x.email || "", x.terms || "", x.leadTime || "", x.rating || "", x.parts || "", x.status || ""]));
   }
   if (key === "y2j-p2p-v1") {
     writeTab_(tab("จัดซื้อ"), ["PR", "รายการ", "จำนวน", "หน่วย", "ผู้ขอ", "ผู้ขาย", "PO", "มูลค่า", "วันที่ต้องใช้", "นัดส่ง", "ขั้นล่าสุด", "เมื่อ", "โดย", "สถานะ", "ประเด็นค้าง"],

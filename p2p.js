@@ -498,7 +498,7 @@ function openP2PStep(caseId, stageId) {
   field("p2pStepDate", "วันที่ดำเนินการ", `<input type="date" id="p2pStepDate" value="${p2pToday()}">`);
   if (st.id === "approve") field("p2pStepResult", "ผลการพิจารณา", `<select id="p2pStepResult"><option value="approve">อนุมัติ</option><option value="reject">ไม่อนุมัติ</option></select>`);
   if (st.id === "rfq") {
-    field("p2pStepSupplier", "ผู้ขายที่เลือก *", `<select id="p2pStepSupplier"><option value="">— เลือก —</option>${SUPPLIER_LIST.map((s) => `<option${s.name === c.supplier ? " selected" : ""}>${escapeHtml(s.name)}</option>`).join("")}</select>`);
+    field("p2pStepSupplier", "ผู้ขายที่เลือก *", `<select id="p2pStepSupplier"><option value="">— เลือก —</option>${SUPPLIER_LIST.filter((s) => s.status !== "เลิกใช้" || s.name === c.supplier).map((s) => `<option value="${escapeHtml(s.name)}"${s.name === c.supplier ? " selected" : ""}>${escapeHtml(s.name)}${s.status === "On Hold" ? " (พักการสั่งซื้อ)" : ""}</option>`).join("")}</select>`);
     field("p2pStepValue", "มูลค่าที่ตกลง (บาท)", `<input type="number" id="p2pStepValue" value="${escapeHtml(c.value || "")}">`);
     field("p2pStepRef", "อ้างอิง RFQ (ถ้ามี)", `<input id="p2pStepRef" placeholder="เช่น RFQ-2026-004">`);
   }

@@ -23,7 +23,7 @@ function loadStoredProcurement() {
 
 function saveProcurement() {
   try {
-    localStorage.setItem(PROC_STORAGE_KEY, JSON.stringify({ pr: PR_LIST, po: PO_LIST }));
+    localStorage.setItem(PROC_STORAGE_KEY, JSON.stringify({ pr: PR_LIST, po: PO_LIST, suppliers: SUPPLIER_LIST }));
     markProcSaved();
   } catch (e) {
     markProcSaveFailed();
@@ -65,6 +65,10 @@ function initProcurementData() {
     stored.pr.forEach((p) => PR_LIST.push(p));
     PO_LIST.length = 0;
     stored.po.forEach((p) => PO_LIST.push(p));
+    if (Array.isArray(stored.suppliers) && stored.suppliers.length) {
+      SUPPLIER_LIST.length = 0;
+      stored.suppliers.forEach((x) => SUPPLIER_LIST.push(x));
+    }
     return true;
   }
   return false;
@@ -162,29 +166,10 @@ function renderPOTable() {
   });
 }
 
-function renderSupplierTable() {
-  const tbody = document.querySelector("#supplierTable tbody");
-  if (!tbody) return;
-  tbody.innerHTML = "";
-  SUPPLIER_LIST.forEach((s) => {
-    const status = SUPPLIER_STATUS_META[s.status] || "good";
-    const pillClass = status === "critical" ? "pill-critical" : status === "warning" ? "pill-warning" : "pill-good";
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${s.name}</td>
-      <td>${s.category}</td>
-      <td>${s.leadTime} วัน</td>
-      <td>${s.rating.toFixed(1)} / 5.0</td>
-      <td><span class="pill ${pillClass}">${s.status}</span></td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
 function updateProcurementStats() {
   const prPendingCount = PR_LIST.filter((pr) => pr.status === "รออนุมัติ").length;
   const poLateCount = PO_LIST.filter((po) => po.status === "ล่าช้า").length;
-  const supplierActiveCount = SUPPLIER_LIST.filter((s) => s.status === "Active").length;
+  const supplierActiveCount = SUPPLIER_LIST.filter((s) => s.status === "Active").length; // "On Hold" / "เลิกใช้" are not counted
 
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   set("procStatPRPending", prPendingCount);
