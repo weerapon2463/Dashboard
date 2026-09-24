@@ -113,7 +113,8 @@ function icRun() {
     MACHINE_MODELS.some((m) => { const r = bxRowFor(m, k); if (r) { line = r.line; return true; } return false; });
     const onOrder = line ? bxP2POnOrder(line) : 0;
     const gap = s.demand[k] - Number((bxStock(k) || {}).qty || 0);
-    if (gap > onOrder) add("warn", "คงคลัง", `${k}: ของไม่พอจ่าย ขาด ${bxFmt(gap)} แต่สั่งซื้ออยู่แค่ ${bxFmt(onOrder)} — ควรเปิด PR`, `part:${k}`);
+    if (line && line.source === "ผลิตเอง") add("warn", "คงคลัง", `${k}: ของไม่พอจ่าย ขาด ${bxFmt(gap)} — ชิ้นส่วนผลิตเอง ต้องสั่งผลิตเพิ่ม`, `part:${k}`);
+    else if (gap > onOrder) add("warn", "คงคลัง", `${k}: ของไม่พอจ่าย ขาด ${bxFmt(gap)} แต่สั่งซื้ออยู่แค่ ${bxFmt(onOrder)} — ควรเปิด PR`, `part:${k}`);
   });
 
   /* ---- service / installed base / claims ---- */

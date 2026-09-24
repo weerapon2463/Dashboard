@@ -434,6 +434,8 @@ function initWorkOrderInteractions() {
       const department = document.getElementById("woFormDept").value;
       const qty = Math.max(1, Number(document.getElementById("woFormQty").value) || 1);
       const dueIso = document.getElementById("woFormDue").value;
+      if (!MASTER_BOM[model] || !(MASTER_BOM[model] || []).length) showToast(`รุ่น ${model} ยังไม่มี BOM — เบิกวัสดุตามรายการไม่ได้จนกว่าจะสร้าง BOM`, "warn");
+      else if (BOM_META[model] && BOM_META[model].status !== BOM_RELEASED) showToast(`BOM ${model} ยังเป็นร่าง — ควรอนุมัติก่อนเริ่มผลิต`, "warn");
       const newWoId = generateWONumber();
       WORK_ORDERS.unshift({
         wo: newWoId,
@@ -445,6 +447,7 @@ function initWorkOrderInteractions() {
         issuedPct: 0,
         dueDate: dueIso ? formatThaiDate(dueIso) : "-",
       });
+      if (typeof auditLog === "function") auditLog("สร้างใบสั่งผลิต", newWoId, `${model} × ${qty} · ${department}${po ? ` · อ้างอิง ${po}` : ""}`);
       afterWOMutation();
       closeModal("woAddBackdrop");
       showToast(`เพิ่มใบสั่งผลิต ${newWoId} แล้ว`, "good");
@@ -473,6 +476,12 @@ function initWorkOrderInteractions() {
       if (!wo) return;
       let pct = Number(document.getElementById("woUpdatePct").value);
       if (isNaN(pct)) pct = wo.issuedPct;
+      // jobs drawing material through BOM requisitions: the % comes from what the store actually issued
+      if (typeof bxReqs === "function" && bxReqs().some((d) => d.wo === wo.wo)) {
+        closeModal("woUpdateBackdrop");
+        showToast(`${wo.wo}: % เบิกวัสดุคำนวณจากใบเบิกจริง (${wo.issuedPct}%) — แก้ได้ที่หน้า BOM & เบิกวัสดุ`, "warn");
+        return;
+      }
       pct = Math.max(0, Math.min(100, pct));
       wo.issuedPct = pct;
       if (pct >= 100) wo.status = "เสร็จสมบูรณ์";
@@ -488,8 +497,12 @@ function initWorkOrderInteractions() {
     updateCompleteBtn.addEventListener("click", () => {
       const wo = WORK_ORDERS.find((w) => w.wo === woPendingId);
       if (!wo) return;
-      wo.issuedPct = 100;
+      const reqs = typeof bxReqs === "function" ? bxReqs().filter((d) => d.wo === wo.wo) : [];
+      const open = reqs.filter((d) => BX_OPEN_REQ.includes(d.status));
+      if (open.length && !confirm(`${wo.wo} ยังมีใบเบิกค้าง (${open.map((d) => d.no).join(", ")}) — ปิดงานเลยหรือไม่?`)) return;
+      if (!reqs.length) wo.issuedPct = 100; // tracked jobs keep the % the requisitions show
       wo.status = "เสร็จสมบูรณ์";
+      if (typeof auditLog === "function") auditLog("ปิดใบสั่งผลิต", wo.wo, `${wo.model} × ${wo.qty} · เบิกวัสดุ ${wo.issuedPct}%${open.length ? ` · ใบเบิกค้าง ${open.map((d) => d.no).join(", ")}` : ""}`);
       afterWOMutation();
       closeModal("woUpdateBackdrop");
       showToast(`${wo.wo} เสร็จสมบูรณ์แล้ว`, "good");
