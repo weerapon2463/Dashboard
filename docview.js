@@ -152,7 +152,9 @@ function bomRefsToDoc(no) {
 // Latest non-cancelled drawing registered for a BOM part code
 function drawingForPart(code) {
   if (!code) return null;
-  const list = (DEPT_DOCS.dwg || []).filter((d) => d.partCode === code && d.status !== "ยกเลิก");
+  const norm = (c) => (typeof pcPartNo === "function" ? pcPartNo(c) : c);
+  const key = norm(code);
+  const list = (DEPT_DOCS.dwg || []).filter((d) => d.partCode && norm(d.partCode) === key && d.status !== "ยกเลิก");
   if (!list.length) return null;
   return list.sort((a, b) => String(b.rev || "").localeCompare(String(a.rev || "")) || String(b.no).localeCompare(String(a.no)))[0];
 }

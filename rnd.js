@@ -53,11 +53,12 @@ let rdMineOnly = false;
 function rdLoad() {
   try {
     const p = JSON.parse(localStorage.getItem(RD_STORAGE_KEY) || "null");
-    RD = p && typeof p === "object" ? { projects: Array.isArray(p.projects) ? p.projects : [], parts: p.parts || {} } : { projects: [], parts: {} };
+    RD = p && typeof p === "object" ? { projects: Array.isArray(p.projects) ? p.projects : [], parts: p.parts || {}, codeStd: p.codeStd || null } : { projects: [], parts: {}, codeStd: null };
   } catch (e) { RD = { projects: [], parts: {} }; }
 }
 function rdSave() {
   try { localStorage.setItem(RD_STORAGE_KEY, JSON.stringify(RD)); } catch (e) { showToast("บันทึกข้อมูล R&D ไม่สำเร็จ", "warn"); }
+  if (typeof pcReset === "function") pcReset();
 }
 const rdEsc = (v) => escapeHtml(v === undefined || v === null ? "" : String(v));
 function rdUser() { return typeof authCurrentUser === "function" ? authCurrentUser() : null; }
@@ -715,10 +716,19 @@ function renderRdParts(pane) {
   const can = rdCanCreate();
   const q = rdPartSearch.trim().toLowerCase();
   const parts = bxAllParts().filter((p) => p.line.code || p.key);
+  // codes that exist only in the drawing register or the part library also belong here
+  const have = new Set(parts.map((p) => p.key));
+  (DEPT_DOCS.dwg || []).filter((d) => d.partCode && d.status !== "ยกเลิก").forEach((d) => {
+    const k = typeof pcPartNo === "function" ? pcPartNo(d.partCode) : d.partCode;
+    if (!have.has(k)) { have.add(k); parts.push({ key: k, line: { code: k, part: d.title || "", source: "" }, models: d.model ? [d.model] : [] }); }
+  });
+  Object.keys(RD.parts).forEach((k) => { if (!have.has(k)) { have.add(k); parts.push({ key: k, line: { code: k, part: RD.parts[k].name || "", source: "" }, models: [] }); } });
   const byName = {};
   parts.forEach((p) => { const n = bxShortName(p.line.part); if (n) (byName[n] = byName[n] || []).push(p.key); });
   const suppliersOf = (code) => (typeof SUPPLIER_LIST !== "undefined" ? SUPPLIER_LIST : []).filter((s) => String(s.parts || "").split(/[,\s]+/).includes(code)).map((s) => s.name);
-  const list = parts.filter((p) => !q || [p.key, p.line.part, (RD.parts[p.key] || {}).material].some((v) => String(v || "").toLowerCase().includes(q)));
+  const list = parts.filter((p) => { const pc = typeof pcParse === "function" ? pcParse(p.key) : null; return !q || [p.key, p.line.part, (RD.parts[p.key] || {}).material, pc && pc.groupLabel, pc && `${pc.type} ${pc.typeName}`].some((v) => String(v || "").toLowerCase().includes(q)); })
+    .sort((a, b) => a.key.localeCompare(b.key));
+  const std = pcStd();
   const prefixes = ["FR", "BL", "GR", "CV", "HY", "EL"];
   pane.innerHTML = `
     <div class="p2p-stack">
@@ -728,14 +738,52 @@ function renderRdParts(pane) {
           <tbody>${MACHINE_MODELS.map((m) => { const r = rdRollup(m); return `<tr><td>${rdEsc(m)}</td><td>${rdEsc((BOM_META[m] || {}).rev || "")}</td><td class="num">${r.priced ? `${Math.round(r.cost).toLocaleString("th-TH")} บาท` : "—"}</td><td class="num">${r.weighed ? `${bxFmt(r.weight)} กก.` : "—"}</td><td><div class="bx-bar"><span style="width:${r.n ? (r.priced / r.n) * 100 : 0}%"></span></div> <span class="muted-inline">ราคา ${r.priced}/${r.n}</span></td></tr>`; }).join("")}</tbody></table></div>
       </div>
       <div class="card">
-        <div class="card-header"><h3>สร้างรหัสชิ้นส่วนใหม่</h3><p class="card-sub">ตามรูปแบบเดิม: หมวด-เลข 4 หลัก หรือ ชิ้นย่อยต่อท้ายรหัสชุดแม่ (-01, -02 …) · ระบบตรวจไม่ให้ซ้ำ</p></div>
+        <div class="card-header"><h3>สร้างรหัสชิ้นส่วนตามมาตรฐาน</h3><p class="card-sub">${rdEsc(std.prefix)} + กลุ่ม 2 หลัก + ประเภท 1 ตัว + เลขรัน ${std.numDigits} หลัก + "-00" (เช่น K01W05269-00) · เลขรันนับต่อประเภททุกกลุ่ม ไม่ออกเลขซ้ำ · ไฟล์แบบต่อท้าย Rev. เช่น -00, -01</p></div>
         <div class="card-body">
           <div class="filter-row">
-            <label for="rdPfx">หมวด:</label><select id="rdPfx">${prefixes.map((x) => `<option value="${x}">${x} — ${rdEsc(BOM_GROUP_BY_PREFIX[x])}</option>`).join("")}</select>
-            <label for="rdPar">หรือชิ้นย่อยของ:</label><input id="rdPar" list="rdParList" placeholder="รหัสชุดแม่ (ไม่ใส่ก็ได้)"><datalist id="rdParList">${parts.filter((p) => p.line.code).map((p) => `<option value="${rdEsc(p.line.code)}">${rdEsc(p.line.part)}</option>`).join("")}</datalist>
-            <button type="button" class="btn-primary" id="rdGen">สร้างรหัส</button>
-            <strong class="mono-cell" id="rdGenOut"></strong>
+            <label for="rdStdGroup">กลุ่ม:</label><select id="rdStdGroup">${std.groups.map((g) => `<option value="${rdEsc(g[0])}">${rdEsc(g[0])} | ${rdEsc(g[1])}</option>`).join("")}</select>
+            <label for="rdStdType">ประเภท:</label><select id="rdStdType">${std.types.map((t) => `<option value="${rdEsc(t[0])}">${rdEsc(t[0])} | ${rdEsc(t[1])}</option>`).join("")}</select>
+            <button type="button" class="btn-primary" id="rdStdGen">ออกรหัสใหม่</button>
+            <strong class="mono-cell" id="rdStdOut"></strong>
           </div>
+          <div class="filter-row">
+            <label for="rdRevIn">Rev. ถัดไปของ:</label><input id="rdRevIn" class="wo-search" placeholder="เช่น K01S10238-00-01"><button type="button" class="btn-secondary" id="rdRevGen">คำนวณ</button><strong class="mono-cell" id="rdRevOut"></strong>
+          </div>
+          <details class="rd-legacy"><summary>รหัสแบบเดิม (FR / GR / …)</summary>
+            <div class="filter-row">
+              <label for="rdPfx">หมวด:</label><select id="rdPfx">${prefixes.map((x) => `<option value="${x}">${x} — ${rdEsc(BOM_GROUP_BY_PREFIX[x])}</option>`).join("")}</select>
+              <label for="rdPar">หรือชิ้นย่อยของ:</label><input id="rdPar" list="rdParList" placeholder="รหัสชุดแม่"><datalist id="rdParList">${parts.filter((p) => p.line.code).map((p) => `<option value="${rdEsc(p.line.code)}">${rdEsc(p.line.part)}</option>`).join("")}</datalist>
+              <button type="button" class="btn-secondary" id="rdGen">สร้างรหัส</button><strong class="mono-cell" id="rdGenOut"></strong>
+            </div>
+          </details>
+        </div>
+      </div>
+    </div>
+    <div class="p2p-stack">
+      <div class="card">
+        <div class="card-header"><h3>นำเข้ารายชื่อไฟล์แบบ (Drawing)</h3><p class="card-sub">วางรายชื่อไฟล์ (เช่น K01W05269-00-00.idw บรรทัดละไฟล์) หรือเลือกโฟลเดอร์แบบ — ระบบอ่านเฉพาะชื่อไฟล์ ไม่อัปโหลดไฟล์ · ลงทะเบียนแบบให้ทุกชิ้นพร้อม Rev. จากชื่อไฟล์ (ถ้ามีหลาย Rev. ใช้ Rev. ล่าสุด)</p></div>
+        <div class="card-body">
+          <textarea id="rdDwgNames" rows="5" class="rd-names" placeholder="K01W05269-00-00.idw&#10;K01S10238-00-01.idw"></textarea>
+          <div class="filter-row">
+            <label class="btn-secondary rd-file-btn">เลือกโฟลเดอร์แบบ<input type="file" id="rdDwgFolder" webkitdirectory multiple hidden></label>
+            <label class="btn-secondary rd-file-btn">เลือกไฟล์<input type="file" id="rdDwgFiles" multiple hidden></label>
+            <label for="rdDwgStatus">สถานะ:</label><select id="rdDwgStatus"><option>อนุมัติ (Released)</option><option>รอตรวจแบบ</option><option>กำลังออกแบบ</option></select>
+            <label for="rdDwgModel">รุ่น:</label><select id="rdDwgModel"><option value="">—</option>${MACHINE_MODELS.map((m) => `<option>${rdEsc(m)}</option>`).join("")}</select>
+            <button type="button" class="btn-secondary" id="rdDwgPreview">ตรวจรายชื่อ</button>
+          </div>
+          <div id="rdDwgResult"></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>มาตรฐานรหัส — กลุ่มและประเภท</h3><p class="card-sub">แก้ไขหรือเพิ่มได้ (บรรทัดละรายการ รูปแบบ "รหัส | ชื่อ") มีผลกับการอ่านรหัส การจัดกลุ่ม BOM และการออกรหัสทั้งระบบ</p></div>
+        <div class="card-body">
+          <div class="modal-grid">
+            <div class="form-field"><label for="rdStdPrefix">ตัวนำหน้า</label><input id="rdStdPrefix" value="${rdEsc(std.prefix)}"${can ? "" : " disabled"}></div>
+            <div class="form-field"><label for="rdStdDigits">จำนวนหลักเลขรัน</label><input id="rdStdDigits" type="number" min="3" max="8" value="${rdEsc(std.numDigits)}"${can ? "" : " disabled"}></div>
+            <div class="form-field"><label for="rdStdGroups">กลุ่ม (2 หลัก)</label><textarea id="rdStdGroups" rows="8"${can ? "" : " disabled"}>${rdEsc(std.groups.map((g) => `${g[0]} | ${g[1]}`).join("\n"))}</textarea></div>
+            <div class="form-field"><label for="rdStdTypes">ประเภท (1 ตัวอักษร)</label><textarea id="rdStdTypes" rows="8"${can ? "" : " disabled"}>${rdEsc(std.types.map((t) => `${t[0]} | ${t[1]}`).join("\n"))}</textarea></div>
+          </div>
+          ${can ? `<div class="modal-actions"><button type="button" class="btn-secondary" id="rdStdReset">คืนค่ามาตรฐานตั้งต้น</button><button type="button" class="btn-primary" id="rdStdSave">บันทึกมาตรฐาน</button></div>` : ""}
         </div>
       </div>
     </div>
@@ -744,7 +792,7 @@ function renderRdParts(pane) {
       <div class="card-body table-scroll">
         <div class="filter-row"><label for="rdPartQ">ค้นหา:</label><input type="text" id="rdPartQ" class="wo-search" placeholder="รหัส / ชื่อ / วัสดุ" value="${rdEsc(rdPartSearch)}"></div>
         <table class="data-table">
-          <thead><tr><th>รหัส</th><th>ชื่อ</th><th>ใช้ในรุ่น</th><th>ทำ/ซื้อ</th><th>แบบ</th><th>ผู้ขาย</th><th class="num">ราคา/หน่วย</th><th class="num">น้ำหนัก (กก.)</th><th>วัสดุ / สเปก</th><th>ธง</th></tr></thead>
+          <thead><tr><th>รหัส</th><th>กลุ่ม / ประเภท</th><th>ชื่อ</th><th>ใช้ในรุ่น</th><th>ทำ/ซื้อ</th><th>แบบ</th><th>ผู้ขาย</th><th class="num">ราคา/หน่วย</th><th class="num">น้ำหนัก (กก.)</th><th>วัสดุ / สเปก</th><th>ธง</th></tr></thead>
           <tbody>${list.map((p) => {
             const m = RD.parts[p.key] || {};
             const dw = p.line.code ? drawingForPart(p.line.code) : null;
@@ -754,13 +802,46 @@ function renderRdParts(pane) {
             if (n && (byName[n] || []).length > 1) flags.push(bxPill(`ชื่อซ้ำ ${byName[n].length} รหัส`, "info"));
             const inp = (k, v, num) => can ? `<input class="bom-inline rd-part" data-key="${rdEsc(p.key)}" data-k="${k}"${num ? ' type="number" step="any" min="0"' : ""} value="${rdEsc(v ?? "")}" aria-label="${k} ${rdEsc(p.key)}">` : rdEsc(v ?? "—");
             return `<tr><td class="mono-cell"><button type="button" class="bx-link" data-rdpart="${rdEsc(p.key)}" data-model="${rdEsc(p.models[0] || "")}">${rdEsc(p.key)}</button></td>
-              <td>${rdEsc(p.line.part)}</td><td class="muted-inline">${rdEsc(p.models.join(", "))}</td><td>${rdEsc(p.line.source || "—")}</td>
+              <td>${typeof pcChips === "function" ? pcChips(p.key) || '<span class="muted-inline">รหัสแบบเดิม</span>' : ""}</td>
+              <td>${can && !p.models.length ? `<input class="bom-inline rd-part" data-key="${rdEsc(p.key)}" data-k="name" value="${rdEsc(p.line.part)}" placeholder="ชื่อชิ้นส่วน" aria-label="ชื่อ ${rdEsc(p.key)}">` : rdEsc(p.line.part)}</td><td class="muted-inline">${rdEsc(p.models.join(", "))}</td><td>${rdEsc(p.line.source || "—")}</td>
               <td>${p.line.code ? bomDrawingCell(p.line) : "—"}</td><td class="muted-inline">${rdEsc(suppliersOf(p.key).join(", "))}</td>
               <td class="num">${inp("cost", m.cost, true)}</td><td class="num">${inp("weight", m.weight, true)}</td><td>${inp("material", m.material)}</td><td>${flags.join(" ")}</td></tr>`;
           }).join("")}</tbody>
         </table>
       </div>
     </div>`;
+  const copy = (code, msg) => { if (navigator.clipboard) navigator.clipboard.writeText(code).then(() => showToast(msg, "good"), () => {}); };
+  document.getElementById("rdStdGen").addEventListener("click", () => {
+    const code = pcNext(document.getElementById("rdStdGroup").value, document.getElementById("rdStdType").value);
+    document.getElementById("rdStdOut").textContent = code;
+    copy(code, `คัดลอก ${code} แล้ว — ใช้ตอนเพิ่มรายการใน BOM`);
+  });
+  document.getElementById("rdRevGen").addEventListener("click", () => {
+    const n = pcNextRev(document.getElementById("rdRevIn").value.trim());
+    document.getElementById("rdRevOut").textContent = n || "รหัสไม่ตรงมาตรฐาน";
+    if (n) copy(n, `คัดลอก ${n} แล้ว`);
+  });
+  const dwgNames = [];
+  const addFiles = (fl) => { [...fl].forEach((f) => dwgNames.push(f.name)); const ta = document.getElementById("rdDwgNames"); ta.value = (ta.value ? ta.value + "\n" : "") + [...fl].map((f) => f.name).join("\n"); rdDwgPreview(); };
+  document.getElementById("rdDwgFolder").addEventListener("change", (e) => addFiles(e.target.files));
+  document.getElementById("rdDwgFiles").addEventListener("change", (e) => addFiles(e.target.files));
+  document.getElementById("rdDwgPreview").addEventListener("click", rdDwgPreview);
+  if (document.getElementById("rdStdSave")) {
+    const readList = (id, keyRe) => document.getElementById(id).value.split(/\n/).map((x) => x.split("|").map((y) => y.trim())).filter((x) => x[0] && keyRe.test(x[0])).map((x) => [x[0].toUpperCase(), x[1] || ""]);
+    document.getElementById("rdStdSave").addEventListener("click", () => {
+      const groups = readList("rdStdGroups", /^\d{2}$/), types = readList("rdStdTypes", /^[A-Za-z]$/);
+      if (!groups.length || !types.length) { showToast("ต้องมีอย่างน้อย 1 กลุ่มและ 1 ประเภท", "warn"); return; }
+      RD.codeStd = { prefix: document.getElementById("rdStdPrefix").value.trim() || "K", numDigits: Math.max(3, Math.min(8, Number(document.getElementById("rdStdDigits").value) || 5)), groups, types };
+      rdSave();
+      rdAudit("แก้มาตรฐานรหัสชิ้นส่วน", "มาตรฐานรหัส", `${RD.codeStd.prefix} · ${groups.length} กลุ่ม · ${types.length} ประเภท · เลขรัน ${RD.codeStd.numDigits} หลัก`);
+      renderRnd();
+      showToast("บันทึกมาตรฐานรหัสแล้ว", "good");
+    });
+    document.getElementById("rdStdReset").addEventListener("click", () => {
+      if (!confirm("คืนค่ามาตรฐานรหัสเป็นค่าตั้งต้น?")) return;
+      RD.codeStd = null; rdSave(); rdAudit("แก้มาตรฐานรหัสชิ้นส่วน", "มาตรฐานรหัส", "คืนค่าตั้งต้น"); renderRnd();
+    });
+  }
   document.getElementById("rdGen").addEventListener("click", () => {
     const code = rdNextPartCode(document.getElementById("rdPfx").value, document.getElementById("rdPar").value.trim());
     document.getElementById("rdGenOut").textContent = code;
@@ -774,9 +855,9 @@ function renderRdParts(pane) {
     const k = el.dataset.key, f = el.dataset.k;
     const rec = RD.parts[k] = RD.parts[k] || {};
     const before = rec[f];
-    rec[f] = f === "material" ? el.value.trim() : Number(el.value) || 0;
+    rec[f] = f === "material" || f === "name" ? el.value.trim() : Number(el.value) || 0;
     rdSave();
-    rdAudit("แก้ข้อมูลชิ้นส่วน", k, `${f === "cost" ? "ราคา" : f === "weight" ? "น้ำหนัก" : "วัสดุ"}: "${before ?? ""}" → "${rec[f]}"`);
+    rdAudit("แก้ข้อมูลชิ้นส่วน", k, `${f === "cost" ? "ราคา" : f === "weight" ? "น้ำหนัก" : f === "name" ? "ชื่อ" : "วัสดุ"}: "${before ?? ""}" → "${rec[f]}"`);
     renderRdStats();
   }));
   wireDrawingChips(pane);
@@ -784,6 +865,58 @@ function renderRdParts(pane) {
     if (!b.dataset.model) return;
     bxModel = b.dataset.model; bxDetailKey = b.dataset.rdpart; bxTab = "tree"; switchView("bomx");
   }));
+}
+
+/* ---- bulk drawing registration from file names ------------------------------------------ */
+
+let rdDwgPlan = [];
+function rdDwgPreview() {
+  const box = document.getElementById("rdDwgResult");
+  const names = document.getElementById("rdDwgNames").value.split(/\n/).map((x) => x.trim()).filter(Boolean);
+  if (!names.length) { box.innerHTML = '<p class="muted-inline">ยังไม่มีรายชื่อไฟล์</p>'; rdDwgPlan = []; return; }
+  const res = pcParseFileNames(names);
+  const bomName = (partNo) => { let n = ""; MACHINE_MODELS.some((m) => (MASTER_BOM[m] || []).some((l) => { if (l.code && pcPartNo(l.code) === partNo) { n = l.part; return true; } return false; })); return n; };
+  rdDwgPlan = res.rows.map((r) => {
+    const existing = (DEPT_DOCS.dwg || []).filter((d) => d.partCode && pcPartNo(d.partCode) === r.p.partNo && d.status !== "ยกเลิก");
+    const top = existing.sort((a, b) => String(b.rev).localeCompare(String(a.rev)))[0];
+    const state = !top ? "new" : String(top.rev) === r.rev ? "same" : String(r.rev) > String(top.rev) ? "newer" : "older";
+    return Object.assign(r, { state, top, name: bomName(r.p.partNo) || (RD.parts[r.p.partNo] || {}).name || "" });
+  });
+  const lbl = { new: ["ใหม่", "good"], newer: ["Rev. ใหม่กว่าที่มี", "info"], same: ["มีแล้ว (ข้าม)", "neutral"], older: ["เก่ากว่าที่มี (ข้าม)", "warning"] };
+  const add = rdDwgPlan.filter((r) => r.state === "new" || r.state === "newer").length;
+  box.innerHTML = `
+    <p class="muted-inline">อ่าน ${res.total} ชื่อ · ตรงมาตรฐาน ${res.rows.length} ชิ้น · จะลงทะเบียน ${add} แบบ${res.bad.length ? ` · ไม่ตรงมาตรฐาน ${res.bad.length}: ${rdEsc(res.bad.slice(0, 5).join(", "))}${res.bad.length > 5 ? " …" : ""}` : ""}</p>
+    <div class="table-scroll rd-dwg-scroll"><table class="data-table"><thead><tr><th>ไฟล์</th><th>Part No.</th><th>กลุ่ม / ประเภท</th><th>Rev.</th><th>ชื่อใน BOM</th><th>ผล</th></tr></thead>
+      <tbody>${rdDwgPlan.map((r) => `<tr><td class="muted-inline">${rdEsc(r.file)}</td><td class="mono-cell">${rdEsc(r.p.partNo)}</td><td>${pcChips(r.p.partNo)}</td><td>${rdEsc(r.rev)}</td><td>${rdEsc(r.name || "—")}</td><td>${bxPill(lbl[r.state][0], lbl[r.state][1])}</td></tr>`).join("")}</tbody></table></div>
+    ${add && rdCanCreate() ? `<div class="modal-actions"><button type="button" class="btn-primary" id="rdDwgImport">ลงทะเบียน ${add} แบบ</button></div>` : ""}`;
+  const b = document.getElementById("rdDwgImport");
+  if (b) b.addEventListener("click", rdDwgImport);
+}
+
+function rdDwgImport() {
+  const status = document.getElementById("rdDwgStatus").value;
+  const model = document.getElementById("rdDwgModel").value;
+  const me = rdUser();
+  const created = [];
+  rdDwgPlan.filter((r) => r.state === "new" || r.state === "newer").forEach((r) => {
+    const doc = {
+      no: deptNextNumber("dwg"), status, title: r.name || `${r.p.typeName || r.p.type} ${r.p.partNo}`, partCode: r.p.partNo, model,
+      rev: r.rev, owner: me ? me.name : "", date: bxToday(), link: r.file, files: [],
+    };
+    if (me) stampRecord(doc, true);
+    DEPT_DOCS.dwg = DEPT_DOCS.dwg || [];
+    DEPT_DOCS.dwg.push(doc);
+    if (!RD.parts[r.p.partNo]) RD.parts[r.p.partNo] = r.name ? {} : { name: "" };
+    created.push(`${doc.no} ${r.p.partNo} Rev.${r.rev}`);
+  });
+  saveDeptDocs();
+  rdSave();
+  rdAudit("ลงทะเบียนแบบจากรายชื่อไฟล์", `${created.length} แบบ`, created.slice(0, 20).join(", ") + (created.length > 20 ? " …" : ""));
+  if (typeof renderDept === "function") renderDept();
+  document.getElementById("rdDwgNames").value = "";
+  rdDwgPlan = [];
+  renderRnd();
+  showToast(`ลงทะเบียนแบบแล้ว ${created.length} รายการ`, "good");
 }
 
 /* ---- field feedback ------------------------------------------------------------------ */

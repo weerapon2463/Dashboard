@@ -105,9 +105,11 @@ function bxStockCell(key) {
 /* ---- BOM tree ------------------------------------------------------------- */
 
 function bxGroupRank(g) {
+  const k = /^(\d{2}) \|/.exec(g); // standard groups "01 | CHASSIS" … in number order, first
+  if (k) return Number(k[1]);
   const order = Object.values(BOM_GROUP_BY_PREFIX);
   const i = order.indexOf(g);
-  return i < 0 ? order.length + (g === BOM_GROUP_DEFAULT ? 1 : 0) : i;
+  return 100 + (i < 0 ? order.length + (g === BOM_GROUP_DEFAULT ? 1 : 0) : i);
 }
 
 // Ordered rows: group headers, then each line with its item number, depth and quantity per machine
@@ -442,7 +444,7 @@ function bxTreeRowHtml(r, editable) {
   const p2p = bxP2PFor(l).length;
   return `<tr class="${r.hasKids ? "bx-assy-row" : ""}${key && key === bxDetailKey ? " bx-selected" : ""}">
     <td class="bx-itemno">${bxEsc(r.no)}</td>
-    <td class="mono-cell">${bxEsc(l.code || "—")}</td>
+    <td class="mono-cell">${bxEsc(l.code || "—")}${typeof pcChips === "function" && pcParse(l.code) ? `<div>${pcChips(l.code)}</div>` : ""}</td>
     <td><span class="bx-indent" style="padding-left:${(r.depth - 1) * 18}px">${r.depth > 1 ? "└ " : ""}<button type="button" class="bx-link" data-detail="${bxEsc(key)}">${bxEsc(l.part || "(ไม่มีชื่อ)")}</button>${r.hasKids ? ` <span class="pill pill-schedule">ชุดประกอบ</span>` : ""}</span></td>
     <td class="num">${bxFmt(l.qty)}</td>
     <td class="num"><strong>${bxFmt(r.per)}</strong></td>
@@ -487,7 +489,7 @@ function renderBxDetail() {
     <div class="card bx-detail-card">
       <div class="card-header card-header-actions">
         <div>
-          <h3>${bxEsc(l.code || "")} ${bxEsc(l.part)}</h3>
+          <h3>${bxEsc(l.code || "")} ${bxEsc(l.part)}</h3>${typeof pcChips === "function" ? `<div>${pcChips(l.code)}</div>` : ""}
           <p class="card-sub">อ้างอิง: <strong>${bxEsc(refText)}</strong></p>
         </div>
         <div class="pilot-toolbar">
@@ -586,7 +588,7 @@ function bxOpenLineModal(model, id, parent, group) {
     <h3>${line ? `แก้ไขรายการ ${bxEsc(nos[id] || "")}` : parLine ? `เพิ่มชิ้นย่อยใต้ ${bxEsc(nos[par] || "")} ${bxEsc(parLine.part)}` : "เพิ่มรายการระดับบน"}</h3>
     <p class="card-sub">BOM-${bxEsc(model)} Rev.${bxEsc(BOM_META[model].rev)} (ร่าง) — การแก้ไขทุกครั้งบันทึกในประวัติการใช้งาน</p>
     <div class="modal-grid">
-      <div class="form-field"><label for="bxl_code">รหัสชิ้นส่วน</label><input id="bxl_code" value="${bxEsc(l.code)}" placeholder="เช่น GR-2001-05"></div>
+      <div class="form-field"><label for="bxl_code">รหัสชิ้นส่วน</label><input id="bxl_code" value="${bxEsc(l.code)}" placeholder="เช่น K01W05270-00"><div class="muted-inline" id="bxl_codeHint"></div></div>
       <div class="form-field"><label for="bxl_part">ชื่อชิ้นส่วน *</label><input id="bxl_part" value="${bxEsc(l.part)}"></div>
       <div class="form-field"><label for="bxl_qty">จำนวนต่อชุดแม่ *</label><input id="bxl_qty" type="number" min="0" step="any" value="${bxEsc(l.qty)}"></div>
       <div class="form-field"><label for="bxl_unit">หน่วย</label><select id="bxl_unit">${(BOM_UNITS.includes(l.unit) ? BOM_UNITS : [l.unit].concat(BOM_UNITS)).map((u) => opt(u, l.unit)).join("")}</select></div>
@@ -602,6 +604,20 @@ function bxOpenLineModal(model, id, parent, group) {
       <button type="button" class="btn-primary" id="bxl_save">บันทึก</button>
     </div>`;
   document.getElementById("bxl_parent").addEventListener("change", (e) => { document.getElementById("bxl_groupBox").hidden = !!e.target.value; });
+  const hint = () => {
+    const c = document.getElementById("bxl_code").value.trim();
+    const p = typeof pcParse === "function" ? pcParse(c) : null;
+    const el = document.getElementById("bxl_codeHint");
+    if (!c) { el.textContent = "ไม่ใส่ก็ได้ — สร้างรหัสตามมาตรฐานได้ที่ R&D Workbench › คลังชิ้นส่วน"; return; }
+    if (!p) { el.innerHTML = `<span class="bx-low">ไม่ตรงมาตรฐานรหัส (เช่น K01W05270-00) — ยังบันทึกได้</span>`; return; }
+    el.innerHTML = `${pcChips(c)}${p.known ? "" : ' <span class="bx-low">กลุ่มหรือประเภทไม่อยู่ในมาตรฐาน</span>'}`;
+    const gi = document.getElementById("bxl_group");
+    if (gi && (!gi.value || gi.value === BOM_GROUP_DEFAULT || Object.values(BOM_GROUP_BY_PREFIX).includes(gi.value) || /^\d{2} \|/.test(gi.value))) gi.value = p.groupLabel;
+    const src = document.getElementById("bxl_source");
+    if (src && p.type === "A" && !id) src.value = "ผลิตเอง";
+  };
+  document.getElementById("bxl_code").addEventListener("input", hint);
+  hint();
   document.getElementById("bxl_cancel").addEventListener("click", () => document.getElementById("bxLineBackdrop").classList.remove("open"));
   document.getElementById("bxl_save").addEventListener("click", bxSaveLine);
   document.getElementById("bxLineBackdrop").classList.add("open");

@@ -66,6 +66,8 @@ const BOM_GROUP_DEFAULT = "ทั่วไป";
 function bomNewLineId() { return "L" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
 function bomGroupForCode(code) {
+  const p = typeof pcParse === "function" ? pcParse(code) : null;
+  if (p) return p.groupLabel;
   return BOM_GROUP_BY_PREFIX[String(code || "").slice(0, 2).toUpperCase()] || BOM_GROUP_DEFAULT;
 }
 
