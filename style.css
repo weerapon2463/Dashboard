@@ -526,3 +526,15 @@ html, body {
 .bom-history-title { margin: 18px 0 6px; font-size: 13.5px; }
 .bom-history { margin: 0; padding-left: 18px; font-size: 13px; color: var(--text-secondary); line-height: 1.9; }
 @media (max-width: 720px) { .modal-grid { grid-template-columns: 1fr; } }
+
+/* Concept Demo link — top of the sidebar, under the brand */
+.demo-link {
+  display: block; margin: 0 4px 14px; padding: 9px 12px; border-radius: 8px;
+  font-size: 12.5px; font-weight: 600; text-decoration: none; line-height: 1.4;
+  color: #fff; background: color-mix(in srgb, var(--series-1) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--series-1) 60%, transparent);
+}
+.demo-link:hover { background: color-mix(in srgb, var(--series-1) 45%, transparent); }
+@media (max-width: 720px) {
+  .demo-link { margin: 0 8px; flex: none; white-space: nowrap; }
+}
