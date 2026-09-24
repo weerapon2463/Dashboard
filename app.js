@@ -318,6 +318,7 @@ function appStart() {
   const hadStoredDept = hasDept ? initDeptData() : false;
   if (hasDept) { initDeptInteractions(); initBomInteractions(); }
   if (hasDept && typeof initDocView === "function") initDocView();
+  if (typeof initEsign === "function") initEsign();
   if (typeof initPlans === "function") initPlans();
   if (typeof initP2P === "function") { initP2P(); renderP2P(); renderAlerts(); }
   if (typeof initAdmin === "function") initAdmin();

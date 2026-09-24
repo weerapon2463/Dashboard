@@ -147,6 +147,14 @@ function icRun() {
     if (grn.length && !grn.some((e) => e.stockKey) && bxKeyForItem(c.item)) add("warn", "จัดซื้อ", `${c.pr}: รับของแล้วแต่ยอดคงคลังไม่ได้เพิ่ม (${bxKeyForItem(c.item)})`, `p2p:${c.id}`);
   });
 
+  /* ---- signed documents changed afterwards ---- */
+  if (typeof esDocHash === "function") Object.keys(DEPT_DOCS).forEach((t) => docs(t).forEach((d) => {
+    Object.keys(d.signatures || {}).forEach((slot) => {
+      const s = d.signatures[slot];
+      if (s && s.hash && s.hash !== esDocHash(t, d)) add("warn", "ลายเซ็น", `${d.no}: เนื้อหาถูกแก้ไขหลัง ${s.name} ลงนาม (${esSlots()[slot]}) — ควรลงนามใหม่`, `doc:${d.no}`);
+    });
+  }));
+
   /* ---- document references ---- */
   Object.keys(DEPT_DOCS).forEach((t) => docs(t).forEach((d) => {
     Object.keys(d).forEach((k) => {

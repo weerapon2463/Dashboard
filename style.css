@@ -1106,3 +1106,14 @@ html[data-density="compact"] body { zoom: 0.9; }
 
 .pc-chip.pc-brand { background: color-mix(in srgb, var(--series-7) 14%, transparent); color: var(--series-7); }
 .pc-chip.pc-std { background: color-mix(in srgb, var(--series-3) 16%, transparent); color: var(--series-3); }
+
+/* ---- e-signature ---- */
+.es-canvas { width: 100%; max-width: 600px; aspect-ratio: 3 / 1; border: 1px dashed var(--border-hairline); border-radius: 10px; background: #fff; touch-action: none; cursor: crosshair; display: block; }
+.es-current img, .es-preview img { max-height: 60px; background: #fff; border-radius: 6px; padding: 4px; border: 1px solid var(--border-hairline); vertical-align: middle; }
+.es-preview { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.sig-img { max-height: 46px; max-width: 100%; }
+.sig-signed .sig-line { border-bottom-style: solid; min-height: 50px; }
+.sig-name { font-size: 12px; margin-top: 2px; }
+.sig-ok { font-size: 10.5px; color: #1b7f4b; }
+.sig-warn { font-size: 10.5px; color: #c0392b; font-weight: 700; }
+.sig-changed .sig-img { opacity: 0.45; }

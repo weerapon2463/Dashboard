@@ -346,13 +346,21 @@ function openDocView(type, index) {
     ${relatedHtml}
     <div class="paper-section-title">ไฟล์แนบ</div>
     <div id="docAttachments" class="paper-attach"><span class="paper-empty">${(doc.files || []).length ? "กำลังโหลด…" : "ไม่มีไฟล์แนบ"}</span></div>
-    ${paperSignatures([doc.owner || doc.requester || "", "", ""])}
+    ${typeof esPaperBoxes === "function" ? esPaperBoxes(type, doc) : paperSignatures([doc.owner || doc.requester || "", "", ""])}
     ${paperFooter(`FM-${def.prefix}-01 Rev.0`)}
     ${historyHtml}
   `;
 
   const role = currentRole();
   const actions = paperOutputActions();
+  if (hasAuth && typeof esSignable === "function") {
+    if (esSignable(type, doc).length) actions.push({ label: "✍ ลงนาม", primary: true, onClick: () => esStartSign(type, index) });
+    const me = authCurrentUser();
+    Object.keys(doc.signatures || {}).forEach((slot) => {
+      const s = doc.signatures[slot];
+      if (s && (s.uid === me.id || me.role === "admin")) actions.push({ label: `ถอนลายเซ็น (${esSlots()[slot]})`, onClick: () => esWithdraw(type, index, Number(slot)) });
+    });
+  }
   if (deptCanCreate(role, type)) actions.push({ label: "📎 แนบไฟล์ / ถ่ายรูป", onClick: () => document.getElementById("docAttachInput").click() });
   if (deptCanManage(role, type)) actions.push({ label: "แก้ไขข้อมูล", onClick: () => { closeDocView(); openDeptModal(type, index); } });
   actions.push({ label: "ปิด", onClick: () => closeDocView() });

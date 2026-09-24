@@ -438,9 +438,11 @@ function renderUserChip() {
   chip.innerHTML = `
     <span class="login-avatar small">${escapeHtml(AUTH_USER.name.slice(0, 1))}</span>
     <span class="user-chip-text"><strong>${escapeHtml(AUTH_USER.name)}</strong><span>${escapeHtml(authRoleLabel(AUTH_USER.role))}</span></span>
+    <button type="button" class="btn-chip" id="mySignBtn" title="ลายเซ็นสำหรับลงนามเอกสาร">✍ ลายเซ็น${AUTH_USER.signature ? "" : " (ยังไม่ตั้ง)"}</button>
     <button type="button" class="btn-chip" id="changePinBtn">เปลี่ยน PIN</button>
     <button type="button" class="btn-chip" id="logoutBtn">ออกจากระบบ</button>`;
   document.getElementById("logoutBtn").addEventListener("click", authSignOut);
+  document.getElementById("mySignBtn").addEventListener("click", () => { if (typeof esOpenPad === "function") esOpenPad(renderUserChip); });
   document.getElementById("changePinBtn").addEventListener("click", () => {
     const oldPin = prompt("PIN ปัจจุบัน");
     if (oldPin === null) return;
