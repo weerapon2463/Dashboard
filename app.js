@@ -5,6 +5,7 @@
 const VIEW_TITLES = {
   overview: "ภาพรวมการผลิต",
   pilot: "ผลการทดสอบนำร่อง (Pilot Test)",
+  dept: "งานตามแผนก / เอกสารที่เกี่ยวข้อง",
   mytasks: "งานของฉัน",
   priority: "Priority Matrix",
   capacity: "Capacity Planning",
@@ -23,10 +24,10 @@ const ROLES = [
 ];
 
 const MODULE_ACCESS = {
-  operator: ["overview", "mytasks", "workorder"],
-  depthead: ["overview", "pilot", "mytasks", "priority", "workorder", "resource"],
-  plant: ["overview", "pilot", "mytasks", "priority", "capacity", "schedule", "makeorbuy", "resource", "procurement", "workorder"],
-  group: ["overview", "pilot", "capacity", "schedule", "makeorbuy"],
+  operator: ["overview", "dept", "mytasks", "workorder"],
+  depthead: ["overview", "pilot", "dept", "mytasks", "priority", "workorder", "resource"],
+  plant: ["overview", "pilot", "dept", "mytasks", "priority", "capacity", "schedule", "makeorbuy", "resource", "procurement", "workorder"],
+  group: ["overview", "pilot", "dept", "capacity", "schedule", "makeorbuy"],
 };
 
 const ROLE_STORAGE_KEY = "y2j-role-v1";
@@ -62,6 +63,7 @@ function switchView(view) {
   // (canvas charts drawn while display:none report zero size)
   if (view === "overview") renderOverviewCharts();
   if (view === "pilot" && typeof renderPilot === "function") renderPilot();
+  if (view === "dept" && typeof renderDept === "function") renderDept();
   if (view === "mytasks") renderMyTasks();
   if (view === "priority") renderPriorityMatrix();
   if (view === "capacity") renderCapacityChart(document.getElementById("capacityLineFilter").value);
@@ -133,6 +135,7 @@ function initRoleSelect() {
     if (typeof renderPriorityMatrix === "function") renderPriorityMatrix();
     if (typeof renderResource === "function") renderResource();
     if (typeof renderPilot === "function") renderPilot();
+    if (typeof renderDept === "function") renderDept();
   });
 }
 
@@ -168,12 +171,15 @@ function refreshAllCharts() {
   renderOverviewCharts();
   renderAlerts();
   if (typeof renderPilot === "function") renderPilot();
+  if (typeof renderDept === "function") renderDept();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
   initNav();
   initRoleSelect();
   initThemeToggle();
+  const hasDept = typeof initDeptData === "function" && typeof initBomData === "function";
+  if (hasDept) initBomData();
   const hadStoredWorkOrders = initWorkOrderData();
   initWorkOrderInteractions();
   const hadStoredProcurement = initProcurementData();
@@ -186,6 +192,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const hasPilot = typeof initPilotData === "function";
   const hadStoredPilot = hasPilot ? initPilotData() : false;
   if (hasPilot) initPilotInteractions();
+  const hadStoredDept = hasDept ? initDeptData() : false;
+  if (hasDept) { initDeptInteractions(); initBomInteractions(); }
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();
@@ -202,10 +210,12 @@ document.addEventListener("DOMContentLoaded", () => {
   renderOverviewCharts();
   renderAlerts();
   if (hasPilot) renderPilot();
+  if (hasDept) renderDept();
   markWOInitialStatus(hadStoredWorkOrders);
   markProcInitialStatus(hadStoredProcurement);
   markMSInitialStatus(hadStoredSchedule);
   markPMInitialStatus(hadStoredPriority);
   markResInitialStatus(hadStoredResource);
   if (hasPilot) markPilotInitialStatus(hadStoredPilot);
+  if (hasDept) markDeptInitialStatus(hadStoredDept);
 });

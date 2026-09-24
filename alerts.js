@@ -30,6 +30,24 @@ function computeAlerts() {
     });
   });
 
+  // Department documents that need attention (open NCRs, unfinished repairs)
+  if (typeof DEPT_DOCS !== "undefined") {
+    (DEPT_DOCS.ncr || []).filter((d) => d.status !== "ปิดแล้ว").forEach((d) => {
+      alerts.push({
+        type: "คุณภาพ (NCR)",
+        detail: `${d.no} — ${d.title}${d.model ? ` (${d.model})` : ""} สถานะ: ${d.status}`,
+        severity: d.status === "เปิด" ? "critical" : "warning",
+      });
+    });
+    (DEPT_DOCS.mtr || []).filter((d) => d.status !== "ซ่อมเสร็จ").forEach((d) => {
+      alerts.push({
+        type: "แจ้งซ่อม",
+        detail: `${d.no} — ${d.machine || ""} ${d.title} (${d.status})`,
+        severity: d.status === "รออะไหล่" || String(d.priority || "").startsWith("ด่วนมาก") ? "critical" : "warning",
+      });
+    });
+  }
+
   MACHINE_STATUS.filter((m) => m.status !== "ใช้งานปกติ").forEach((m) => {
     alerts.push({
       type: "เครื่องจักร",

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Dashboard | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260924b">
+<link rel="stylesheet" href="style.css?v=20260924c">
 </head>
 <body>
   <div class="app-shell">
@@ -24,6 +24,9 @@
         </button>
         <button class="nav-item" data-view="pilot">
           <span class="nav-icon">◆</span> ผลทดสอบนำร่อง (Pilot)
+        </button>
+        <button class="nav-item" data-view="dept">
+          <span class="nav-icon">◆</span> งานตามแผนก / เอกสาร
         </button>
         <button class="nav-item" data-view="mytasks">
           <span class="nav-icon">◆</span> งานของฉัน
@@ -291,6 +294,111 @@
             <button id="pilotBackupBtn" class="btn-secondary" type="button">สำรองข้อมูล (.json)</button>
             <button id="pilotRestoreBtn" class="btn-secondary pilot-edit-only" type="button">นำเข้าไฟล์สำรอง</button>
             <input type="file" id="pilotRestoreInput" accept=".json,application/json" hidden>
+          </div>
+        </div>
+      </section>
+
+      <!-- Department workspaces: per-department documents & tools -->
+      <section class="view" id="view-dept">
+        <div class="stat-grid pilot-stat-grid">
+          <div class="stat-tile">
+            <div class="stat-label">เอกสารที่ยังเปิดอยู่ทุกแผนก</div>
+            <div class="stat-value" id="deptStatOpen">-</div>
+            <div class="stat-note">ยังไม่ปิด/ยังไม่เสร็จ</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">ECR / EO รออนุมัติ</div>
+            <div class="stat-value" id="deptStatChange">-</div>
+            <div class="stat-note">การเปลี่ยนแปลงทางวิศวกรรม</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">NCR ที่ยังเปิดอยู่</div>
+            <div class="stat-value" id="deptStatNcr">-</div>
+            <div class="stat-note">ปัญหาคุณภาพ</div>
+          </div>
+          <div class="stat-tile">
+            <div class="stat-label">ใบแจ้งซ่อมค้าง</div>
+            <div class="stat-value" id="deptStatRepair">-</div>
+            <div class="stat-note">ยังซ่อมไม่เสร็จ</div>
+          </div>
+        </div>
+
+        <div class="dept-tabs" id="deptTabs" role="group" aria-label="เลือกแผนก"></div>
+
+        <div class="card">
+          <div class="card-header" id="deptHeader"></div>
+          <div class="save-status dept-save" id="deptSaveStatus"></div>
+          <div class="card-body">
+            <div class="dept-doc-grid" id="deptDocGrid"></div>
+          </div>
+        </div>
+
+        <div class="card" id="deptRegister">
+          <div class="card-header card-header-actions">
+            <div>
+              <h3 id="deptRegTitle"></h3>
+              <p class="card-sub" id="deptRegSub"></p>
+            </div>
+            <button id="deptAddBtn" class="btn-primary" type="button">+ สร้างใหม่</button>
+          </div>
+          <div class="card-body table-scroll">
+            <div class="filter-row">
+              <label for="deptStatusFilter">สถานะ:</label>
+              <select id="deptStatusFilter"></select>
+              <label for="deptSearch">ค้นหา:</label>
+              <input type="text" id="deptSearch" class="wo-search" placeholder="เลขที่ / เรื่อง / รุ่น / ผู้รับผิดชอบ">
+              <button id="deptExportBtn" class="btn-secondary" type="button">ส่งออก CSV</button>
+            </div>
+            <table class="data-table" id="deptTable">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+            <p class="muted-note" id="deptEmptyNote" hidden></p>
+          </div>
+        </div>
+
+        <div class="card" id="bomEditor" hidden>
+          <div class="card-header card-header-actions">
+            <div>
+              <h3>BOM Manager — รายการวัสดุต่อรุ่น</h3>
+              <p class="card-sub">BOM ที่อนุมัติแล้วจะถูกล็อก การแก้ไขต้องออก Revision ใหม่พร้อมอ้างอิง ECR/EO — ข้อมูลเชื่อมกับหน้า "ใบสั่งผลิต &amp; BOM" ทันที</p>
+            </div>
+            <button id="bomNewBtn" class="btn-primary" type="button">+ สร้าง BOM รุ่นใหม่</button>
+          </div>
+          <div class="card-body">
+            <div class="filter-row">
+              <label for="bomEdModel">รุ่น:</label>
+              <select id="bomEdModel"></select>
+              <span id="bomEdBadge"></span>
+              <span class="muted-inline" id="bomEdStats"></span>
+            </div>
+            <div class="pilot-toolbar bom-actions">
+              <button id="bomAddLineBtn" class="btn-secondary" type="button">+ เพิ่มรายการ</button>
+              <button id="bomReleaseBtn" class="btn-primary" type="button">อนุมัติใช้งาน (Release)</button>
+              <button id="bomRevBtn" class="btn-secondary" type="button">ออก Revision ใหม่เพื่อแก้ไข</button>
+              <button id="bomExportBtn" class="btn-secondary" type="button">ส่งออก CSV</button>
+            </div>
+            <p class="muted-note" id="bomLockNote" hidden>🔒 BOM นี้อนุมัติใช้งานแล้ว — กด "ออก Revision ใหม่เพื่อแก้ไข" เพื่อเปิดแก้ไข ระบบจะบันทึกประวัติการเปลี่ยนแปลงให้</p>
+            <div class="table-scroll">
+              <table class="data-table" id="bomEdTable">
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>รหัสชิ้นส่วน</th>
+                    <th>ชื่อชิ้นส่วน</th>
+                    <th>จำนวน/คัน</th>
+                    <th>หน่วย</th>
+                    <th>ผลิตเอง/ซื้อ</th>
+                    <th>หมายเหตุ</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+            <p class="muted-note" id="bomEmptyNote" hidden>ยังไม่มีรายการใน BOM นี้</p>
+            <h4 class="bom-history-title">ประวัติ Revision</h4>
+            <ul class="bom-history" id="bomHistory"></ul>
           </div>
         </div>
       </section>
@@ -991,19 +1099,77 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="deptDocBackdrop">
+    <div class="modal modal-wide">
+      <h3 id="deptDocTitle"></h3>
+      <p class="card-sub" id="deptDocSub"></p>
+      <div id="deptDocFields" class="modal-grid"></div>
+      <div class="form-field">
+        <label for="deptDocStatus">สถานะ</label>
+        <select id="deptDocStatus"></select>
+      </div>
+      <div class="modal-actions">
+        <button id="deptDocDeleteBtn" class="btn-secondary" type="button" hidden>ลบเอกสารนี้</button>
+        <button id="deptDocCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
+        <button id="deptDocSaveBtn" class="btn-primary" type="button">บันทึก</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="bomNewBackdrop">
+    <div class="modal">
+      <h3>สร้าง BOM รุ่นใหม่</h3>
+      <div class="form-field">
+        <label for="bomNewModel">ชื่อรุ่น</label>
+        <input type="text" id="bomNewModel" placeholder="เช่น YT8000">
+      </div>
+      <div class="form-field">
+        <label for="bomNewCopy">เริ่มต้นจาก</label>
+        <select id="bomNewCopy"></select>
+      </div>
+      <p class="muted-note">BOM ใหม่จะอยู่ในสถานะ "ร่าง" แก้ไขรายการได้จนกว่าจะกดอนุมัติใช้งาน</p>
+      <div class="modal-actions">
+        <button class="btn-secondary" type="button" data-close>ยกเลิก</button>
+        <button id="bomNewSaveBtn" class="btn-primary" type="button">สร้าง</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="bomRevBackdrop">
+    <div class="modal">
+      <h3>ออก Revision ใหม่</h3>
+      <p class="card-sub" id="bomRevLabel"></p>
+      <div class="form-field">
+        <label for="bomRevRef">อ้างอิง EO / ECR</label>
+        <select id="bomRevRef"></select>
+      </div>
+      <div class="form-field">
+        <label for="bomRevNote">เหตุผล / สิ่งที่เปลี่ยน *</label>
+        <input type="text" id="bomRevNote" placeholder="เช่น เปลี่ยนใบมีดเป็น SK5 ตาม EO-2026-001">
+      </div>
+      <div class="modal-actions">
+        <button class="btn-secondary" type="button" data-close>ยกเลิก</button>
+        <button id="bomRevSaveBtn" class="btn-primary" type="button">เปิด Revision ใหม่</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="data.js?v=20260924b"></script>
-  <script src="priority-matrix.js?v=20260924b"></script>
-  <script src="capacity-planning.js?v=20260924b"></script>
-  <script src="master-schedule.js?v=20260924b"></script>
-  <script src="make-or-buy.js?v=20260924b"></script>
-  <script src="resource.js?v=20260924b"></script>
-  <script src="procurement.js?v=20260924b"></script>
-  <script src="workorder.js?v=20260924b"></script>
-  <script src="alerts.js?v=20260924b"></script>
-  <script src="overview-charts.js?v=20260924b"></script>
-  <script src="pilot.js?v=20260924b"></script>
-  <script src="app.js?v=20260924b"></script>
+  <script src="data.js?v=20260924c"></script>
+  <script src="priority-matrix.js?v=20260924c"></script>
+  <script src="capacity-planning.js?v=20260924c"></script>
+  <script src="master-schedule.js?v=20260924c"></script>
+  <script src="make-or-buy.js?v=20260924c"></script>
+  <script src="resource.js?v=20260924c"></script>
+  <script src="procurement.js?v=20260924c"></script>
+  <script src="workorder.js?v=20260924c"></script>
+  <script src="alerts.js?v=20260924c"></script>
+  <script src="overview-charts.js?v=20260924c"></script>
+  <script src="pilot.js?v=20260924c"></script>
+  <script src="dept-data.js?v=20260924c"></script>
+  <script src="dept.js?v=20260924c"></script>
+  <script src="bom.js?v=20260924c"></script>
+  <script src="app.js?v=20260924c"></script>
 </body>
 </html>

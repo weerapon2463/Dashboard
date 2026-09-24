@@ -271,9 +271,9 @@ function renderBOMTable(model) {
   list.forEach((row) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
-      <td>${row.part}</td>
-      <td>${row.qty}</td>
-      <td>${row.unit}</td>
+      <td>${escapeHtml(row.part)}</td>
+      <td>${escapeHtml(String(row.qty))}</td>
+      <td>${escapeHtml(row.unit)}</td>
     `;
     tbody.appendChild(tr);
   });
