@@ -86,8 +86,15 @@ async function storeFiles(fileList) {
   for (const f of fileList) {
     if (f.size > ATTACH_MAX_BYTES) { showToast(`${f.name} ใหญ่เกิน 15 MB — ข้าม`, "warn"); continue; }
     const id = newFileId();
+    let stored = false;
+    try { await Y2JFiles.put(id, f); stored = true; } catch (e) { /* no local storage — Drive may still work */ }
     try {
-      await Y2JFiles.put(id, f);
+      if (typeof Y2JStore !== "undefined" && Y2JStore.isRemote()) {
+        showToast(`กำลังอัปโหลด ${f.name} ไป Google Drive…`);
+        await Y2JStore.uploadFile(id, f, f.name);
+        stored = true;
+      }
+      if (!stored) throw new Error("no storage");
       saved.push({ id, name: f.name, type: f.type || "", size: f.size });
     } catch (e) {
       showToast("เบราว์เซอร์นี้เก็บไฟล์ไม่ได้ (เช่นโหมดส่วนตัว) — ใช้ช่องลิงก์ไฟล์แทน", "warn");
@@ -362,7 +369,12 @@ async function renderDocAttachments(type, doc) {
   for (const f of files) {
     let url = null;
     try {
-      const blob = await Y2JFiles.get(f.id);
+      let blob = null;
+      try { blob = await Y2JFiles.get(f.id); } catch (e) { /* not on this device */ }
+      if (!blob && typeof Y2JStore !== "undefined" && Y2JStore.isRemote()) {
+        blob = await Y2JStore.fetchFile(f.id);
+        if (blob) { try { await Y2JFiles.put(f.id, blob); } catch (e) { /* cache is optional */ } }
+      }
       if (blob) { url = URL.createObjectURL(blob); docViewUrls.push(url); }
     } catch (e) { /* file unavailable on this device */ }
     const isImg = (f.type || "").startsWith("image/");

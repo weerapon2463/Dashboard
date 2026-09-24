@@ -1,0 +1,278 @@
+/**
+ * Y2J Production Dashboard — Google Sheets backend (Google Apps Script)
+ *
+ * Setup (once):
+ *   1. Open the Google Sheet → Extensions → Apps Script → paste this file as Code.gs → Save.
+ *   2. Select the function "setup" → Run → allow the permissions it asks for.
+ *      It creates the "_ตั้งค่า" tab with your secret key (and the Drive folder for attachments).
+ *   3. Deploy → New deployment → type "Web app":
+ *        Execute as: Me   ·   Who has access: Anyone
+ *      → Deploy → copy the Web app URL (ends with /exec).
+ *   4. In the dashboard: Admin → ที่เก็บข้อมูล → paste the URL and the secret key → ทดสอบ → เชื่อมต่อ.
+ *
+ * Data model: the dashboard stores each dataset (documents, purchasing, users, audit log …) as one
+ * JSON value per key in the hidden "_store" tab (split across cells, a cell holds max 50,000 chars).
+ * Human-readable report tabs (เอกสาร, จัดซื้อ, ผู้ใช้, ประวัติ, …) are rebuilt on every save —
+ * they are for reading/reporting; edits there are overwritten, make changes in the dashboard.
+ */
+
+const STORE_SHEET = "_store";
+const CONFIG_SHEET = "_ตั้งค่า";
+const CHUNK = 45000;
+// Every stored chunk starts with "~" so Sheets never turns a piece of JSON that happens to begin
+// with "=", "+", "-" or digits into a formula or a number. Stripped again when reading.
+const CHUNK_MARK = "~";
+const FILE_FOLDER = "Y2J Dashboard — ไฟล์แนบ";
+
+/* ------------------------------------------------------------------ setup */
+
+function setup() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const props = PropertiesService.getScriptProperties();
+  let token = props.getProperty("TOKEN");
+  if (!token) {
+    token = Utilities.getUuid().replace(/-/g, "").slice(0, 24);
+    props.setProperty("TOKEN", token);
+  }
+  props.setProperty("SHEET_ID", ss.getId());
+  storeSheet_();
+  const cfg = ss.getSheetByName(CONFIG_SHEET) || ss.insertSheet(CONFIG_SHEET);
+  cfg.clear();
+  cfg.getRange(1, 1, 6, 2).setValues([
+    ["รหัสลับ (Secret key) — ใส่ในหน้า Admin ของ Dashboard", token],
+    ["โฟลเดอร์ไฟล์แนบใน Google Drive", folder_().getUrl()],
+    ["ขั้นต่อไป", "Deploy → New deployment → Web app · Execute as: Me · Who has access: Anyone → คัดลอก URL"],
+    ["หมายเหตุ", "อย่าแชร์รหัสลับนี้กับคนนอก — ใครมีทั้ง URL และรหัสลับจะอ่าน/เขียนข้อมูลได้"],
+    ["ตั้งค่าเมื่อ", new Date()],
+    ["Sheet ID", ss.getId()],
+  ]);
+  cfg.setColumnWidth(1, 380);
+  cfg.setColumnWidth(2, 520);
+  cfg.getRange("A1:A6").setFontWeight("bold");
+  cfg.getRange("B1").setFontWeight("bold").setBackground("#fff3c4");
+  Logger.log("Secret key: " + token);
+  return token;
+}
+
+/* ------------------------------------------------------------------ http */
+
+function doGet(e) {
+  return handle_(e.parameter || {});
+}
+
+function doPost(e) {
+  let body = {};
+  try { body = JSON.parse(e.postData.contents || "{}"); } catch (err) { return json_({ ok: false, error: "bad json" }); }
+  return handle_(body);
+}
+
+function handle_(p) {
+  try {
+    const token = PropertiesService.getScriptProperties().getProperty("TOKEN");
+    if (!token) return json_({ ok: false, error: "ยังไม่ได้รัน setup() ใน Apps Script" });
+    if (p.token !== token) return json_({ ok: false, error: "รหัสลับไม่ถูกต้อง" });
+    switch (p.action) {
+      case "ping": return json_({ ok: true, name: sheet_().getName(), keys: Object.keys(readAll_(false)).length });
+      case "versions": return json_({ ok: true, versions: versions_() });
+      case "pull": return json_({ ok: true, data: readAll_(true, p.keys ? String(p.keys).split(",") : null) });
+      case "push": return json_(push_(p));
+      case "upload": return json_(upload_(p));
+      case "file": return json_(file_(p.id));
+      default: return json_({ ok: false, error: "unknown action" });
+    }
+  } catch (err) {
+    return json_({ ok: false, error: String(err && err.message || err) });
+  }
+}
+
+function json_(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+}
+
+/* ------------------------------------------------------------------ store */
+
+function sheet_() {
+  const id = PropertiesService.getScriptProperties().getProperty("SHEET_ID");
+  return id ? SpreadsheetApp.openById(id) : SpreadsheetApp.getActiveSpreadsheet();
+}
+
+function storeSheet_() {
+  const ss = sheet_();
+  let sh = ss.getSheetByName(STORE_SHEET);
+  if (!sh) {
+    sh = ss.insertSheet(STORE_SHEET);
+    sh.getRange(1, 1, 1, 6).setValues([["key", "version", "updatedAt", "updatedBy", "chunks", "data…"]]).setFontWeight("bold");
+    sh.setFrozenRows(1);
+    sh.hideSheet();
+  }
+  return sh;
+}
+
+// row objects: { row, key, version, updatedAt, updatedBy, value? }
+function readRows_(withValues) {
+  const sh = storeSheet_();
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  const width = Math.max(5, sh.getLastColumn());
+  const vals = sh.getRange(2, 1, last - 1, width).getValues();
+  return vals.map((r, i) => {
+    const o = { row: i + 2, key: String(r[0]), version: Number(r[1]) || 0, updatedAt: r[2] ? new Date(r[2]).toISOString() : "", updatedBy: String(r[3] || "") };
+    if (withValues) o.value = r.slice(5, 5 + (Number(r[4]) || 0)).map((c) => { const t = String(c); return t.charAt(0) === CHUNK_MARK ? t.slice(1) : t; }).join("");
+    return o;
+  }).filter((o) => o.key);
+}
+
+function readAll_(withValues, onlyKeys) {
+  const out = {};
+  readRows_(withValues).forEach((o) => {
+    if (onlyKeys && onlyKeys.indexOf(o.key) < 0) return;
+    out[o.key] = withValues ? { value: o.value, version: o.version, updatedAt: o.updatedAt, updatedBy: o.updatedBy } : { version: o.version };
+  });
+  return out;
+}
+
+function versions_() {
+  const out = {};
+  readRows_(false).forEach((o) => { out[o.key] = { version: o.version, updatedBy: o.updatedBy, updatedAt: o.updatedAt }; });
+  return out;
+}
+
+function push_(p) {
+  const key = String(p.key || "");
+  if (!/^y2j-[a-z0-9-]+$/.test(key)) return { ok: false, error: "bad key" };
+  const value = String(p.value == null ? "" : p.value);
+  const lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    const sh = storeSheet_();
+    const rows = readRows_(false);
+    const cur = rows.filter((r) => r.key === key)[0];
+    const curVersion = cur ? cur.version : 0;
+    // optimistic concurrency: the client must have seen the latest version (or force)
+    if (!p.force && Number(p.baseVersion || 0) !== curVersion) {
+      const now = readAll_(true, [key])[key];
+      return { ok: false, conflict: true, current: now || { value: "", version: 0 } };
+    }
+    const chunks = [];
+    for (let i = 0; i < value.length; i += CHUNK) chunks.push(CHUNK_MARK + value.slice(i, i + CHUNK));
+    if (!chunks.length) chunks.push(CHUNK_MARK);
+    const version = curVersion + 1;
+    const rowIdx = cur ? cur.row : sh.getLastRow() + 1;
+    const width = Math.max(sh.getLastColumn(), 5 + chunks.length);
+    const line = [key, version, new Date(), String(p.by || ""), chunks.length].concat(chunks);
+    while (line.length < width) line.push("");
+    if (sh.getMaxColumns() < width) sh.insertColumnsAfter(sh.getMaxColumns(), width - sh.getMaxColumns());
+    sh.getRange(rowIdx, 1, 1, width).setNumberFormat("@").setValues([line]);
+    SpreadsheetApp.flush();
+    try { mirror_(key, value); } catch (err) { /* report tabs are best-effort */ }
+    return { ok: true, version: version };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/* ------------------------------------------------------------------ files (Google Drive) */
+
+function folder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty("FOLDER_ID");
+  if (id) { try { return DriveApp.getFolderById(id); } catch (err) { /* recreate */ } }
+  const f = DriveApp.createFolder(FILE_FOLDER);
+  props.setProperty("FOLDER_ID", f.getId());
+  return f;
+}
+
+function upload_(p) {
+  if (!p.id || !p.data) return { ok: false, error: "missing file" };
+  const bytes = Utilities.base64Decode(p.data);
+  const blob = Utilities.newBlob(bytes, p.type || "application/octet-stream", p.id + "__" + (p.name || "file"));
+  const file = folder_().createFile(blob);
+  return { ok: true, fileId: file.getId(), url: file.getUrl() };
+}
+
+function file_(id) {
+  const it = folder_().searchFiles("title contains '" + String(id).replace(/'/g, "") + "__'");
+  if (!it.hasNext()) return { ok: false, error: "not found" };
+  const f = it.next();
+  const blob = f.getBlob();
+  return { ok: true, name: f.getName().split("__").slice(1).join("__"), type: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
+}
+
+/* ------------------------------------------------------------------ readable report tabs */
+
+function writeTab_(name, header, rows) {
+  const ss = sheet_();
+  const sh = ss.getSheetByName(name) || ss.insertSheet(name);
+  sh.clearContents();
+  // text typed by users must never run as a formula in the report tabs
+  const safe = (v) => (typeof v === "string" && /^[=+\-@]/.test(v) ? "'" + v : v);
+  const data = [header].concat(rows.length ? rows.map((r) => r.map(safe)) : [header.map(() => "")]);
+  sh.getRange(1, 1, data.length, header.length).setValues(data);
+  sh.getRange(1, 1, 1, header.length).setFontWeight("bold").setBackground("#e8eef7");
+  sh.setFrozenRows(1);
+  const note = "สร้างอัตโนมัติจาก Dashboard — แก้ข้อมูลที่ Dashboard (แก้ในแท็บนี้จะถูกเขียนทับ)";
+  sh.getRange(1, 1).setNote(note);
+}
+
+function userNames_() {
+  const map = {};
+  try {
+    const auth = JSON.parse(readAll_(true, ["y2j-auth-v1"])["y2j-auth-v1"].value);
+    (auth.users || []).forEach((u) => { map[u.id] = u.name; });
+  } catch (err) { /* no users yet */ }
+  return map;
+}
+
+const VIS_ = { all: "ทั่วไป", dept: "เฉพาะแผนก", custom: "ลับ (เฉพาะที่เลือก)", private: "ส่วนตัว" };
+const STAGE_ = { pr: "เปิด PR", approve: "อนุมัติ PR", rfq: "ขอราคา", po: "ออก PO", ack: "ผู้ขายยืนยัน", ship: "จัดส่ง", grn: "รับของ", iqc: "ตรวจรับ", issue: "จ่ายให้ไลน์", pay: "จ่ายเงิน" };
+
+function mirror_(key, value) {
+  let d;
+  try { d = JSON.parse(value); } catch (err) { return; }
+  const names = key === "y2j-auth-v1" ? {} : userNames_();
+  const who = (id) => names[id] || id || "";
+  if (key === "y2j-dept-docs-v1") {
+    const rows = [];
+    Object.keys(d).forEach((t) => (d[t] || []).forEach((doc) => rows.push([
+      t.toUpperCase(), doc.no || "", doc.title || "", doc.status || "", doc.model || "", doc.owner || "", doc.date || doc.due || "",
+      VIS_[(doc.visibility && doc.visibility.mode) || "all"] || "", who(doc.createdBy), doc.createdAt || "", who(doc.updatedBy), doc.updatedAt || "", (doc.files || []).length,
+    ])));
+    writeTab_("เอกสาร", ["ชนิด", "เลขที่", "เรื่อง", "สถานะ", "รุ่น", "ผู้รับผิดชอบ", "วันที่", "การมองเห็น", "สร้างโดย", "สร้างเมื่อ", "แก้ล่าสุดโดย", "แก้เมื่อ", "ไฟล์แนบ"], rows);
+  }
+  if (key === "y2j-p2p-v1") {
+    writeTab_("จัดซื้อ", ["PR", "รายการ", "จำนวน", "หน่วย", "ผู้ขอ", "ผู้ขาย", "PO", "มูลค่า", "วันที่ต้องใช้", "นัดส่ง", "ขั้นล่าสุด", "เมื่อ", "โดย", "สถานะ", "ประเด็นค้าง"],
+      (d || []).map((c) => {
+        const ev = (c.events || []).filter((e) => !e.superseded);
+        const last = ev[ev.length - 1] || {};
+        return [c.pr, c.item, c.qty, c.unit, c.requester, c.supplier || "", c.po || "", c.value || "", c.needBy || "", c.promised || "",
+          STAGE_[last.stage] || last.stage || "", last.at || "", last.by || "", c.status === "cancelled" ? "ยกเลิก" : "",
+          (c.issues || []).filter((i) => !i.resolved).map((i) => i.type + ": " + i.note).join(" | ")];
+      }));
+  }
+  if (key === "y2j-audit-v1") {
+    writeTab_("ประวัติ", ["วันเวลา", "ผู้ใช้", "การกระทำ", "เป้าหมาย", "รายละเอียด"],
+      (d || []).slice().reverse().map((e) => [e.ts, e.userName, e.action, e.target, e.detail]));
+  }
+  if (key === "y2j-auth-v1") {
+    const teams = {};
+    (d.teams || []).forEach((t) => { teams[t.id] = t.name; });
+    writeTab_("ผู้ใช้", ["ชื่อ", "ชื่อผู้ใช้", "ตำแหน่ง", "บทบาท", "แผนก", "ทีม", "ใช้งาน", "เข้าระบบล่าสุด"],
+      (d.users || []).map((u) => [u.name, u.username, u.position || "", u.role, u.dept || "ส่วนกลาง", (u.teams || []).map((t) => teams[t] || t).join(", "), u.active ? "ใช่" : "ไม่", u.lastLogin || ""]));
+  }
+  if (key === "y2j-plans-v1") {
+    writeTab_("แผนงาน", ["แผน", "เจ้าของ", "สถานะ", "เริ่ม", "กำหนดเสร็จ", "ความคืบหน้า", "การมองเห็น"],
+      (d || []).map((p) => {
+        const items = p.items || [];
+        const pct = p.status === "เสร็จแล้ว" ? 100 : items.length ? Math.round(items.filter((i) => i.done).length / items.length * 100) : 0;
+        return [p.title, who(p.owner), p.status, p.start || "", p.due || "", pct + "%", VIS_[(p.visibility && p.visibility.mode) || "all"] || ""];
+      }));
+  }
+  if (key === "y2j-pilot-v1") {
+    writeTab_("Pilot", ["ตัวชี้วัด", "หน่วย", "ทิศทางที่ดี", "ก่อนใช้", "หลังใช้", "ครั้ง/เดือน", "จำนวนคน"],
+      (d.kpis || []).map((k) => [k.name, k.unit, k.direction === "higher" ? "มากขึ้น" : "น้อยลง", k.before == null ? "" : k.before, k.after == null ? "" : k.after, k.timesPerMonth == null ? "" : k.timesPerMonth, k.people == null ? "" : k.people]));
+  }
+  if (key === "y2j-workorders-v1") {
+    writeTab_("ใบสั่งผลิต", ["เลขที่", "PO", "รุ่น", "ไลน์", "จำนวน", "สถานะ", "เบิกวัสดุ %", "กำหนดส่ง", "ผู้รับผิดชอบ"],
+      (d || []).map((w) => [w.wo, w.po, w.model, w.department, w.qty, w.status, w.issuedPct, w.dueDate, w.assignee || w.claimedBy || ""]));
+  }
+}

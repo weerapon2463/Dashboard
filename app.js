@@ -182,7 +182,14 @@ function refreshAllCharts() {
   if (typeof renderDept === "function") renderDept();
 }
 
+// Start only after the storage layer has pulled shared data (Google Sheets mode) — modules
+// read localStorage during init, so it must already hold the latest copy.
 document.addEventListener("DOMContentLoaded", () => {
+  const ready = typeof Y2JStore !== "undefined" ? Y2JStore.ready() : Promise.resolve();
+  ready.then(appStart, appStart);
+});
+
+function appStart() {
   // Login gate: nothing else starts until a user signs in (the page reloads after sign-in)
   if (typeof authInit === "function") {
     if (!authInit()) {
@@ -241,4 +248,12 @@ document.addEventListener("DOMContentLoaded", () => {
   markResInitialStatus(hadStoredResource);
   if (hasPilot) markPilotInitialStatus(hadStoredPilot);
   if (hasDept) markDeptInitialStatus(hadStoredDept);
-});
+
+  // After a sync reload, return to the page the user was on
+  try {
+    const back = sessionStorage.getItem("y2j-return-view");
+    sessionStorage.removeItem("y2j-return-view");
+    const btn = back && document.querySelector(`.nav-item[data-view="${back}"]`);
+    if (btn && !btn.hidden) switchView(back);
+  } catch (e) { /* ignore */ }
+}

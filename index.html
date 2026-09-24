@@ -5,9 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Dashboard | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260924i">
+<link rel="stylesheet" href="style.css?v=20260925a">
 </head>
 <body>
+  <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
+  <div class="sync-banner" id="syncBanner" hidden><span></span><button type="button" class="btn-primary">โหลดข้อมูลใหม่</button></div>
   <div class="login-screen" id="loginScreen" hidden>
     <div class="login-card">
       <div class="login-brand">
@@ -101,6 +103,7 @@
           <label class="role-picker" for="roleSelect">มุมมอง:
             <select id="roleSelect" autocomplete="off"></select>
           </label>
+          <span class="sync-chip" id="syncChip" hidden></span>
           <div class="user-chip" id="userChip" hidden></div>
           <button class="theme-toggle" id="themeToggle" title="สลับโหมดสี">🌓</button>
         </div>
@@ -478,6 +481,7 @@
               <button type="button" class="dept-tab admin-tab" data-tab="users">ผู้ใช้งาน &amp; สิทธิ์</button>
               <button type="button" class="dept-tab admin-tab" data-tab="teams">ทีม</button>
               <button type="button" class="dept-tab admin-tab" data-tab="audit">ประวัติการใช้งาน (Audit Log)</button>
+              <button type="button" class="dept-tab admin-tab" data-tab="storage">☁ ที่เก็บข้อมูล</button>
             </div>
             <p class="admin-note">ระบบต้นแบบ: ผู้ใช้ สิทธิ์ และประวัติ เก็บในเบราว์เซอร์ของเครื่องนี้ ยังไม่ใช่ระบบความปลอดภัยจริงและยังไม่ซิงก์ข้ามเครื่อง — ขั้นต่อไปคือย้ายไปฐานข้อมูลกลาง</p>
 
@@ -496,6 +500,39 @@
               <div class="team-grid" id="adminTeamList"></div>
             </div>
 
+            <div class="admin-panel" data-panel="storage" hidden>
+              <div class="storage-status" id="storageStatus"></div>
+              <div class="modal-grid storage-form">
+                <div class="form-field modal-grid-wide"><label for="stUrl">Web app URL (ลงท้ายด้วย /exec)</label><input id="stUrl" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></div>
+                <div class="form-field"><label for="stToken">รหัสลับ (Secret key จากแท็บ _ตั้งค่า)</label><input id="stToken" autocomplete="off"></div>
+                <div class="form-field"><label>&nbsp;</label>
+                  <div class="pilot-toolbar">
+                    <button id="stTestBtn" class="btn-secondary" type="button">ทดสอบการเชื่อมต่อ</button>
+                    <button id="stConnectBtn" class="btn-primary" type="button">เชื่อมต่อ Google Sheets</button>
+                  </div>
+                </div>
+              </div>
+              <p class="muted-note" id="stTestResult"></p>
+              <div class="pilot-toolbar storage-actions" id="stConnectedActions" hidden>
+                <button id="stLinkBtn" class="btn-secondary" type="button">🔗 คัดลอกลิงก์ตั้งค่าสำหรับเครื่องอื่น</button>
+                <button id="stForceBtn" class="btn-secondary" type="button">⬆ อัปโหลดข้อมูลเครื่องนี้ทับใน Sheets</button>
+                <button id="stSyncBtn" class="btn-secondary" type="button">↻ ซิงก์ตอนนี้</button>
+                <button id="stLocalBtn" class="btn-secondary" type="button">กลับไปเก็บในเบราว์เซอร์นี้</button>
+              </div>
+
+              <div class="ue-section-title">วิธีตั้งค่าครั้งแรก (ประมาณ 10 นาที)</div>
+              <ol class="storage-steps">
+                <li>เปิด Google Sheet ของคุณ → เมนู <strong>ส่วนขยาย (Extensions) → Apps Script</strong></li>
+                <li>ลบโค้ดเดิมในไฟล์ Code.gs แล้ววางสคริปต์นี้ → กดบันทึก 💾
+                  <div class="pilot-toolbar"><button id="stCopyScriptBtn" class="btn-secondary" type="button">📋 คัดลอกสคริปต์</button><a class="btn-secondary" href="./apps-script/Code.gs" target="_blank" rel="noopener">เปิดดูสคริปต์</a></div>
+                </li>
+                <li>ด้านบนเลือกฟังก์ชัน <strong>setup</strong> → กด <strong>เรียกใช้ (Run)</strong> → อนุญาตสิทธิ์ (กด Advanced → Go to project หากมีคำเตือน) — ระบบสร้างแท็บ <strong>_ตั้งค่า</strong> ที่มีรหัสลับ</li>
+                <li><strong>การทำให้ใช้งานได้ (Deploy) → การทำให้ใช้งานได้รายการใหม่</strong> → ประเภท <strong>เว็บแอป</strong> · เรียกใช้ในฐานะ: <strong>ฉัน</strong> · ผู้มีสิทธิ์เข้าถึง: <strong>ทุกคน</strong> → Deploy → คัดลอก URL</li>
+                <li>วาง URL และรหัสลับด้านบน → ทดสอบ → เชื่อมต่อ (ครั้งแรกระบบอัปโหลดข้อมูลในเครื่องนี้ขึ้น Sheets ให้อัตโนมัติ)</li>
+                <li>ส่ง <strong>ลิงก์ตั้งค่าสำหรับเครื่องอื่น</strong> ให้ทีม (เช่นทาง LINE) — เปิดครั้งเดียวเครื่องนั้นก็เชื่อมต่อ Sheets เดียวกัน</li>
+              </ol>
+              <p class="admin-note">ใน Sheets จะมีแท็บอ่านง่ายให้ดูและทำรายงาน: เอกสาร · จัดซื้อ · ผู้ใช้ · ประวัติ · แผนงาน · Pilot · ใบสั่งผลิต (สร้างใหม่ทุกครั้งที่บันทึก — แก้ข้อมูลที่ Dashboard) · ไฟล์แนบเก็บในโฟลเดอร์ Google Drive · ข้อมูลเครื่องนี้ยังเก็บสำเนาไว้เผื่อเน็ตหลุด</p>
+            </div>
             <div class="admin-panel" data-panel="audit" hidden>
               <div class="filter-row">
                 <label for="auditUser">ผู้ใช้:</label><select id="auditUser"></select>
@@ -1521,27 +1558,28 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="data.js?v=20260924i"></script>
-  <script src="priority-matrix.js?v=20260924i"></script>
-  <script src="capacity-planning.js?v=20260924i"></script>
-  <script src="master-schedule.js?v=20260924i"></script>
-  <script src="make-or-buy.js?v=20260924i"></script>
-  <script src="resource.js?v=20260924i"></script>
-  <script src="procurement.js?v=20260924i"></script>
-  <script src="workorder.js?v=20260924i"></script>
-  <script src="alerts.js?v=20260924i"></script>
-  <script src="overview-charts.js?v=20260924i"></script>
-  <script src="pilot.js?v=20260924i"></script>
-  <script src="dept-data.js?v=20260924i"></script>
-  <script src="dept-samples.js?v=20260924i"></script>
-  <script src="dept.js?v=20260924i"></script>
-  <script src="bom.js?v=20260924i"></script>
-  <script src="docview.js?v=20260924i"></script>
-  <script src="p2p-data.js?v=20260924i"></script>
-  <script src="p2p.js?v=20260924i"></script>
-  <script src="auth.js?v=20260924i"></script>
-  <script src="admin.js?v=20260924i"></script>
-  <script src="plans.js?v=20260924i"></script>
-  <script src="app.js?v=20260924i"></script>
+  <script src="storage.js?v=20260925a"></script>
+  <script src="data.js?v=20260925a"></script>
+  <script src="priority-matrix.js?v=20260925a"></script>
+  <script src="capacity-planning.js?v=20260925a"></script>
+  <script src="master-schedule.js?v=20260925a"></script>
+  <script src="make-or-buy.js?v=20260925a"></script>
+  <script src="resource.js?v=20260925a"></script>
+  <script src="procurement.js?v=20260925a"></script>
+  <script src="workorder.js?v=20260925a"></script>
+  <script src="alerts.js?v=20260925a"></script>
+  <script src="overview-charts.js?v=20260925a"></script>
+  <script src="pilot.js?v=20260925a"></script>
+  <script src="dept-data.js?v=20260925a"></script>
+  <script src="dept-samples.js?v=20260925a"></script>
+  <script src="dept.js?v=20260925a"></script>
+  <script src="bom.js?v=20260925a"></script>
+  <script src="docview.js?v=20260925a"></script>
+  <script src="p2p-data.js?v=20260925a"></script>
+  <script src="p2p.js?v=20260925a"></script>
+  <script src="auth.js?v=20260925a"></script>
+  <script src="admin.js?v=20260925a"></script>
+  <script src="plans.js?v=20260925a"></script>
+  <script src="app.js?v=20260925a"></script>
 </body>
 </html>

@@ -26,6 +26,41 @@ function renderAdmin() {
   if (adminTab === "users") renderAdminUsers();
   if (adminTab === "teams") renderAdminTeams();
   if (adminTab === "audit") renderAdminAudit();
+  if (adminTab === "storage") renderAdminStorage();
+}
+
+/* ---- storage location ------------------------------------------------------ */
+
+function renderAdminStorage() {
+  if (typeof Y2JStore === "undefined") return;
+  const c = Y2JStore.config();
+  const st = Y2JStore.status();
+  const remote = Y2JStore.isRemote();
+  document.getElementById("stUrl").value = c.url || "";
+  document.getElementById("stToken").value = c.token || "";
+  document.getElementById("stConnectedActions").hidden = !remote;
+  document.getElementById("stConnectBtn").textContent = remote ? "บันทึกการตั้งค่าใหม่" : "เชื่อมต่อ Google Sheets";
+  document.getElementById("storageStatus").innerHTML = remote
+    ? `<div class="storage-mode storage-sheets">☁ ตอนนี้เก็บข้อมูลที่ <strong>Google Sheets</strong> — ทุกเครื่องที่เชื่อมต่อเห็นข้อมูลชุดเดียวกัน</div>
+       <div class="muted-inline">สถานะ: ${st.state === "synced" ? "ซิงก์แล้ว" : st.state === "saving" ? "กำลังบันทึก" : "ออฟไลน์ — จะส่งเมื่อเน็ตกลับมา"}${st.pending.length ? ` · รอส่ง ${st.pending.length} ชุดข้อมูล` : ""}${st.error ? ` · ${escapeHtml(st.error)}` : ""}</div>`
+    : `<div class="storage-mode storage-local">💻 ตอนนี้เก็บข้อมูลใน <strong>เบราว์เซอร์เครื่องนี้</strong> เท่านั้น — เครื่องอื่นจะไม่เห็นข้อมูลเดียวกัน</div>`;
+}
+
+async function adminStorageTest() {
+  const url = document.getElementById("stUrl").value.trim();
+  const token = document.getElementById("stToken").value.trim();
+  const out = document.getElementById("stTestResult");
+  if (!/^https:\/\/script\.google\.com\/.+\/exec$/.test(url)) { out.textContent = "URL ต้องขึ้นต้นด้วย https://script.google.com/ และลงท้ายด้วย /exec"; return null; }
+  if (!token) { out.textContent = "กรุณาใส่รหัสลับจากแท็บ _ตั้งค่า"; return null; }
+  out.textContent = "กำลังทดสอบ…";
+  try {
+    const r = await Y2JStore.test(url, token);
+    out.textContent = `✔ เชื่อมต่อได้ — ไฟล์ "${r.name}" (มีข้อมูล ${r.keys} ชุด)`;
+    return r;
+  } catch (e) {
+    out.textContent = `✖ เชื่อมต่อไม่ได้: ${e.message === "Failed to fetch" ? "ตรวจ URL / ตั้งค่า Deploy เป็น 'ทุกคน' / อินเทอร์เน็ต" : e.message}`;
+    return null;
+  }
 }
 
 /* ---- users ------------------------------------------------------------------ */
@@ -270,6 +305,40 @@ function initAdmin() {
   document.getElementById("adminAddUserBtn").addEventListener("click", () => openUserEditor(""));
   document.getElementById("adminAddTeamBtn").addEventListener("click", () => openTeamEditor(""));
   document.getElementById("auditExportBtn").addEventListener("click", exportAuditCsv);
+  document.getElementById("stTestBtn").addEventListener("click", adminStorageTest);
+  document.getElementById("stConnectBtn").addEventListener("click", async () => {
+    const r = await adminStorageTest();
+    if (!r) return;
+    const msg = r.keys ? `Sheets นี้มีข้อมูลอยู่แล้ว ${r.keys} ชุด — เครื่องนี้จะโหลดข้อมูลจาก Sheets (ข้อมูลที่ Sheets ยังไม่มีจะอัปโหลดขึ้นไป) ดำเนินการต่อ?` : "Sheets ยังว่าง — จะอัปโหลดข้อมูลในเครื่องนี้ขึ้นไปเป็นข้อมูลตั้งต้น ดำเนินการต่อ?";
+    if (!confirm(msg)) return;
+    auditLog("เปลี่ยนที่เก็บข้อมูล", "Google Sheets", r.name);
+    Y2JStore.connect(document.getElementById("stUrl").value.trim(), document.getElementById("stToken").value.trim());
+  });
+  document.getElementById("stLocalBtn").addEventListener("click", () => {
+    if (!confirm("กลับไปเก็บข้อมูลในเบราว์เซอร์นี้? เครื่องนี้จะหยุดซิงก์กับ Sheets (ข้อมูลใน Sheets ยังอยู่)")) return;
+    auditLog("เปลี่ยนที่เก็บข้อมูล", "เบราว์เซอร์นี้", "");
+    Y2JStore.disconnect();
+  });
+  document.getElementById("stSyncBtn").addEventListener("click", async () => { await Y2JStore.flush(); renderAdminStorage(); showToast("ซิงก์แล้ว", "good"); });
+  document.getElementById("stForceBtn").addEventListener("click", async () => {
+    if (!confirm("เขียนทับข้อมูลทั้งหมดใน Sheets ด้วยข้อมูลของเครื่องนี้? (ใช้เมื่อย้ายข้อมูลครั้งแรก หรือกู้คืน)")) return;
+    try { const n = await Y2JStore.forceUpload(); auditLog("อัปโหลดข้อมูลทับ Sheets", "Google Sheets", `${n} ชุดข้อมูล`); showToast(`อัปโหลด ${n} ชุดข้อมูลแล้ว`, "good"); }
+    catch (e) { showToast(`อัปโหลดไม่สำเร็จ: ${e.message}`, "warn"); }
+    renderAdminStorage();
+  });
+  document.getElementById("stLinkBtn").addEventListener("click", () => {
+    const link = Y2JStore.setupLink();
+    const done = () => showToast("คัดลอกลิงก์แล้ว — ส่งให้ทีมเฉพาะคนในบริษัท (มีรหัสลับอยู่ในลิงก์)", "good");
+    if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, () => prompt("คัดลอกลิงก์นี้", link));
+    else prompt("คัดลอกลิงก์นี้", link);
+  });
+  document.getElementById("stCopyScriptBtn").addEventListener("click", async () => {
+    try {
+      const code = await (await fetch("./apps-script/Code.gs", { cache: "no-store" })).text();
+      await navigator.clipboard.writeText(code);
+      showToast("คัดลอกสคริปต์แล้ว — ไปวางใน Apps Script", "good");
+    } catch (e) { window.open("./apps-script/Code.gs", "_blank"); }
+  });
   ["auditUser", "auditAction"].forEach((id) => document.getElementById(id).addEventListener("change", renderAdminAudit));
   document.getElementById("auditSearch").addEventListener("input", renderAdminAudit);
 
