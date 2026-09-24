@@ -36,12 +36,31 @@ function initBomData() {
       hadStored = true;
     }
   } catch (e) { /* keep built-in sample BOMs */ }
+  if (!hadStored) bomApplySamples();
   MACHINE_MODELS.forEach((m) => {
     if (!MASTER_BOM[m]) MASTER_BOM[m] = [];
     if (!BOM_META[m]) BOM_META[m] = bomDefaultMeta(m);
   });
   bomModel = MACHINE_MODELS[0] || null;
   return hadStored;
+}
+
+function bomApplySamples() {
+  const mobByName = {};
+  MOB_SAMPLE_PARTS.forEach((p) => { mobByName[p.name] = computeMakeOrBuy(p).recommendation === "make" ? "ผลิตเอง" : "ซื้อ"; });
+  Object.keys(MASTER_BOM).forEach((m) => {
+    MASTER_BOM[m].forEach((l) => {
+      if (!l.code) l.code = BOM_PART_CODES[l.part] || "";
+      if (!l.source) l.source = mobByName[l.part] || "ซื้อ";
+      if (l.note === undefined) l.note = "";
+    });
+  });
+  // YT6500 Rev.B carries the SK5 blade from EO-2026-001
+  const blade = (MASTER_BOM.YT6500 || []).find((l) => l.code === "BL-1001");
+  if (blade) { blade.code = "BL-1001B"; blade.note = "SK5 ชุบแข็ง ตาม EO-2026-001"; }
+  Object.keys(BOM_SAMPLE_META).forEach((m) => {
+    if (MASTER_BOM[m]) BOM_META[m] = JSON.parse(JSON.stringify(BOM_SAMPLE_META[m]));
+  });
 }
 
 function saveBom() {

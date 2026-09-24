@@ -2,7 +2,7 @@
    Department workspaces — which documents each department owns, and the
    register definition (fields, status workflow, sample rows) for each one.
    dept.js renders every register from these definitions; BOM is handled by
-   its own editor in bom.js.
+   its own editor in bom.js. Sample documents are in dept-samples.js.
    ========================================================================== */
 
 const PROD_LINES = ["ไลน์ประกอบ 1", "ไลน์ประกอบ 2", "ไลน์ประกอบ 3", "ไลน์เชื่อม", "ไลน์พ่นสี", "ไลน์ทดสอบ"];
@@ -95,10 +95,6 @@ const DOC_TYPES = {
     statuses: [["ร่าง", "neutral"], ["รอพิจารณา", "warning"], ["อนุมัติ", "good"], ["ไม่อนุมัติ", "critical"], ["ปิดแล้ว", "neutral"]],
     flow: ["ร่าง", "รอพิจารณา", "อนุมัติ", "ปิดแล้ว"],
     closed: ["ไม่อนุมัติ", "ปิดแล้ว"],
-    samples: [
-      { no: "ECR-2026-001", status: "อนุมัติ", title: "เปลี่ยนวัสดุใบมีดตัดอ้อยเป็นเหล็ก SK5 ชุบแข็ง", model: "YT6500", reason: "ปัญหาคุณภาพ", owner: "ฝ่ายวิศวกรรม", date: "2026-09-02", detail: "ใบมีดเดิมสึกเร็วกว่ากำหนด ลูกค้าแจ้ง 3 ราย — ต้นทุน +180 บาท/ชิ้น" },
-      { no: "ECR-2026-002", status: "รอพิจารณา", title: "ย้ายตำแหน่งจุดยึดสายไฮดรอลิกหลบโซ่ลำเลียง", model: "YT7500", reason: "ปรับปรุงการผลิต", owner: "ไลน์ประกอบ 2", date: "2026-09-15", detail: "ประกอบยาก สายเสียดสีโซ่" },
-    ],
   },
   eo: {
     name: "EO / ECN — ใบสั่งเปลี่ยนแปลงทางวิศวกรรม",
@@ -118,9 +114,6 @@ const DOC_TYPES = {
     statuses: [["ร่าง", "neutral"], ["รออนุมัติ", "warning"], ["อนุมัติแล้ว", "info"], ["แจ้งหน้างานแล้ว", "info"], ["มีผลใช้งาน", "good"], ["ยกเลิก", "critical"]],
     flow: ["ร่าง", "รออนุมัติ", "อนุมัติแล้ว", "แจ้งหน้างานแล้ว", "มีผลใช้งาน"],
     closed: ["มีผลใช้งาน", "ยกเลิก"],
-    samples: [
-      { no: "EO-2026-001", status: "แจ้งหน้างานแล้ว", title: "ใช้ใบมีด SK5 ชุบแข็งแทนรุ่นเดิม", model: "YT6500", ref: "ECR-2026-001", effective: "ล็อต 2 เป็นต้นไป", parts: "BOM YT6500 Rev.B, WI-2026-001", owner: "ฝ่ายวิศวกรรม", date: "2026-09-08" },
-    ],
   },
   wi: {
     name: "WI — วิธีการปฏิบัติงาน (Work Instruction)",
@@ -141,10 +134,6 @@ const DOC_TYPES = {
     statuses: [["ร่าง", "neutral"], ["รอทบทวน", "warning"], ["อนุมัติใช้งาน", "good"], ["ยกเลิกใช้", "critical"]],
     flow: ["ร่าง", "รอทบทวน", "อนุมัติใช้งาน"],
     closed: ["ยกเลิกใช้"],
-    samples: [
-      { no: "WI-2026-001", status: "รอทบทวน", title: "การติดตั้งใบมีดตัดอ้อยและขันแรงบิด", model: "YT6500", line: "ไลน์ประกอบ 1", rev: "C", ref: "EO-2026-001", owner: "ฝ่ายวิศวกรรม", date: "2026-09-20", link: "" },
-      { no: "WI-2026-002", status: "อนุมัติใช้งาน", title: "ขั้นตอนทดสอบแรงดันระบบไฮดรอลิก", model: "", line: "ไลน์ทดสอบ", rev: "A", ref: "", owner: "ไลน์ทดสอบ", date: "2026-06-01", link: "" },
-    ],
   },
   dwg: {
     name: "ทะเบียนแบบ (Drawing Register)",
@@ -163,9 +152,6 @@ const DOC_TYPES = {
     statuses: [["กำลังออกแบบ", "info"], ["รอตรวจแบบ", "warning"], ["อนุมัติ (Released)", "good"], ["ยกเลิก", "critical"]],
     flow: ["กำลังออกแบบ", "รอตรวจแบบ", "อนุมัติ (Released)"],
     closed: ["ยกเลิก"],
-    samples: [
-      { no: "DWG-2026-001", status: "อนุมัติ (Released)", title: "ใบมีดตัดอ้อย SK5", model: "YT6500", rev: "B", owner: "ฝ่ายวิศวกรรม", date: "2026-09-05", link: "" },
-    ],
   },
   bom: {
     name: "BOM — รายการวัสดุต่อรุ่น",
@@ -192,9 +178,6 @@ const DOC_TYPES = {
     statuses: [["ร่าง", "neutral"], ["อนุมัติแผน", "info"], ["กำลังดำเนินการ", "warning"], ["เสร็จตามแผน", "good"], ["ไม่เป็นไปตามแผน", "critical"]],
     flow: ["ร่าง", "อนุมัติแผน", "กำลังดำเนินการ", "เสร็จตามแผน"],
     closed: ["เสร็จตามแผน", "ไม่เป็นไปตามแผน"],
-    samples: [
-      { no: "PLN-2026-001", status: "กำลังดำเนินการ", title: "สัปดาห์ที่ 39", model: "YT6500", qty: 3, line: "ไลน์ประกอบ 1", owner: "ฝ่ายวางแผน", date: "2026-09-21" },
-    ],
   },
   mrq: {
     name: "ใบแจ้งความต้องการวัสดุ (Material Requirement)",
@@ -213,9 +196,6 @@ const DOC_TYPES = {
     statuses: [["ร่าง", "neutral"], ["ส่งจัดซื้อแล้ว", "info"], ["ของครบแล้ว", "good"], ["ล่าช้า", "critical"]],
     flow: ["ร่าง", "ส่งจัดซื้อแล้ว", "ของครบแล้ว"],
     closed: ["ของครบแล้ว"],
-    samples: [
-      { no: "MRQ-2026-001", status: "ส่งจัดซื้อแล้ว", title: "โซ่ลำเลียงอ้อย (Conveyor Chain)", model: "YT6500", qty: 3, need: "2026-10-05", owner: "ฝ่ายวางแผน", date: "2026-09-18" },
-    ],
   },
 
   /* ---------------- Production ---------------- */
@@ -237,9 +217,6 @@ const DOC_TYPES = {
     statuses: [["ส่งแล้ว", "info"], ["รับทราบแล้ว", "good"]],
     flow: ["ส่งแล้ว", "รับทราบแล้ว"],
     closed: ["รับทราบแล้ว"],
-    samples: [
-      { no: "DPR-2026-001", status: "รับทราบแล้ว", title: "ประกอบโครงฐาน YT6500 เครื่องที่ 2", line: "ไลน์ประกอบ 1", date: "2026-09-23", output: 1, manpower: 11, owner: "หัวหน้าไลน์ประกอบ 1", detail: "รอโซ่ลำเลียง 2 ชม." },
-    ],
   },
   mreq: {
     name: "ใบเบิกวัสดุ (Material Requisition)",
@@ -258,9 +235,6 @@ const DOC_TYPES = {
     statuses: [["รออนุมัติ", "warning"], ["อนุมัติ", "info"], ["จ่ายของแล้ว", "good"], ["ปฏิเสธ", "critical"]],
     flow: ["รออนุมัติ", "อนุมัติ", "จ่ายของแล้ว"],
     closed: ["จ่ายของแล้ว", "ปฏิเสธ"],
-    samples: [
-      { no: "MR-2026-001", status: "รออนุมัติ", title: "ปลอกสายไฮดรอลิก 10 ชิ้น", wo: "WO-2026-0412", qty: 10, line: "ไลน์ประกอบ 1", owner: "ช่างประกอบ", date: "2026-09-23" },
-    ],
   },
   saf: {
     name: "รายงานเหตุการณ์ความปลอดภัย / Near Miss",
@@ -279,7 +253,6 @@ const DOC_TYPES = {
     statuses: [["เปิด", "warning"], ["กำลังแก้ไข", "info"], ["ปิดแล้ว", "good"]],
     flow: ["เปิด", "กำลังแก้ไข", "ปิดแล้ว"],
     closed: ["ปิดแล้ว"],
-    samples: [],
   },
 
   /* ---------------- QC ---------------- */
@@ -302,10 +275,6 @@ const DOC_TYPES = {
     statuses: [["เปิด", "critical"], ["วิเคราะห์สาเหตุ", "warning"], ["กำลังแก้ไข", "info"], ["ปิดแล้ว", "good"]],
     flow: ["เปิด", "วิเคราะห์สาเหตุ", "กำลังแก้ไข", "ปิดแล้ว"],
     closed: ["ปิดแล้ว"],
-    samples: [
-      { no: "NCR-2026-001", status: "กำลังแก้ไข", title: "รอยเชื่อมโครงฐานไม่เต็มแนว", model: "YT6500", found: "ระหว่างผลิต", disposition: "แก้ไข (Rework)", wo: "WO-2026-0412", owner: "ไลน์เชื่อม", date: "2026-09-19", detail: "กระแสเชื่อมต่ำกว่ากำหนด" },
-      { no: "NCR-2026-002", status: "เปิด", title: "เฟืองขับขนาดไม่ตรงแบบ", model: "YT7500", found: "ตรวจรับวัตถุดิบ", disposition: "คืนผู้ขาย", wo: "PO-2026-0318", owner: "QC", date: "2026-09-22", detail: "" },
-    ],
   },
   capa: {
     name: "CAPA — การแก้ไขและป้องกัน",
@@ -323,9 +292,6 @@ const DOC_TYPES = {
     statuses: [["เปิด", "warning"], ["กำลังดำเนินการ", "info"], ["ติดตามผล", "info"], ["ปิดแล้ว", "good"]],
     flow: ["เปิด", "กำลังดำเนินการ", "ติดตามผล", "ปิดแล้ว"],
     closed: ["ปิดแล้ว"],
-    samples: [
-      { no: "CAPA-2026-001", status: "กำลังดำเนินการ", title: "ตั้งค่ากระแสเชื่อมมาตรฐานและตรวจทุกต้นกะ", ref: "NCR-2026-001", owner: "หัวหน้าไลน์เชื่อม", due: "2026-10-03", detail: "" },
-    ],
   },
   iqc: {
     name: "ตรวจรับวัตถุดิบ (Incoming Inspection)",
@@ -344,9 +310,6 @@ const DOC_TYPES = {
     statuses: [["รอตรวจ", "warning"], ["ผ่าน", "good"], ["ผ่านแบบมีเงื่อนไข", "info"], ["ไม่ผ่าน", "critical"]],
     flow: ["รอตรวจ", "ผ่าน"],
     closed: ["ผ่าน", "ผ่านแบบมีเงื่อนไข", "ไม่ผ่าน"],
-    samples: [
-      { no: "IQC-2026-001", status: "ไม่ผ่าน", title: "ชุดเฟืองขับ (Drive Gear Set)", po: "PO-2026-0318", supplier: "ซัพพลายเออร์เฟือง", qty: 6, owner: "QC", date: "2026-09-22" },
-    ],
   },
   fi: {
     name: "ตรวจสอบก่อนส่งมอบ (Final Inspection / PDI)",
@@ -365,7 +328,6 @@ const DOC_TYPES = {
     statuses: [["รอตรวจ", "warning"], ["ผ่าน", "good"], ["ไม่ผ่าน-ส่งแก้ไข", "critical"]],
     flow: ["รอตรวจ", "ผ่าน"],
     closed: ["ผ่าน"],
-    samples: [],
   },
 
   /* ---------------- Purchasing ---------------- */
@@ -387,9 +349,6 @@ const DOC_TYPES = {
     statuses: [["ขอราคา", "info"], ["เปรียบเทียบ", "warning"], ["เลือกผู้ขายแล้ว", "good"], ["ยกเลิก", "critical"]],
     flow: ["ขอราคา", "เปรียบเทียบ", "เลือกผู้ขายแล้ว"],
     closed: ["เลือกผู้ขายแล้ว", "ยกเลิก"],
-    samples: [
-      { no: "RFQ-2026-001", status: "เปรียบเทียบ", title: "Servo Motor หุ่นยนต์เชื่อม", pr: "PR-2026-0144", suppliers: "3 ราย", selected: "", amount: 85000, owner: "ฝ่ายจัดซื้อ", date: "2026-09-16" },
-    ],
   },
   sev: {
     name: "ประเมินผู้ขาย (Supplier Evaluation)",
@@ -409,7 +368,6 @@ const DOC_TYPES = {
     statuses: [["ร่าง", "neutral"], ["ประเมินแล้ว", "good"]],
     flow: ["ร่าง", "ประเมินแล้ว"],
     closed: ["ประเมินแล้ว"],
-    samples: [],
   },
 
   /* ---------------- Warehouse ---------------- */
@@ -430,9 +388,6 @@ const DOC_TYPES = {
     statuses: [["รอ QC ตรวจ", "warning"], ["รับเข้าคลังแล้ว", "good"], ["ส่งคืนผู้ขาย", "critical"]],
     flow: ["รอ QC ตรวจ", "รับเข้าคลังแล้ว"],
     closed: ["รับเข้าคลังแล้ว", "ส่งคืนผู้ขาย"],
-    samples: [
-      { no: "GRN-2026-001", status: "รอ QC ตรวจ", title: "ชุดเฟืองขับ (Drive Gear Set)", po: "PO-2026-0318", supplier: "ซัพพลายเออร์เฟือง", qty: 6, owner: "คลังสินค้า", date: "2026-09-22" },
-    ],
   },
   stk: {
     name: "ตรวจนับสต็อก (Stock Count)",
@@ -450,7 +405,6 @@ const DOC_TYPES = {
     statuses: [["วางแผน", "neutral"], ["กำลังนับ", "info"], ["ปรับยอดแล้ว", "good"]],
     flow: ["วางแผน", "กำลังนับ", "ปรับยอดแล้ว"],
     closed: ["ปรับยอดแล้ว"],
-    samples: [],
   },
 
   /* ---------------- Maintenance ---------------- */
@@ -471,9 +425,6 @@ const DOC_TYPES = {
     statuses: [["แจ้งซ่อม", "warning"], ["กำลังซ่อม", "info"], ["รออะไหล่", "critical"], ["ซ่อมเสร็จ", "good"]],
     flow: ["แจ้งซ่อม", "กำลังซ่อม", "ซ่อมเสร็จ"],
     closed: ["ซ่อมเสร็จ"],
-    samples: [
-      { no: "MT-2026-001", status: "รออะไหล่", title: "หุ่นยนต์เชื่อมแกน 3 ไม่เคลื่อนที่", machine: "หุ่นยนต์เชื่อม #2", line: "ไลน์เชื่อม", priority: "ด่วน", owner: "ไลน์เชื่อม", date: "2026-09-15" },
-    ],
   },
   pm: {
     name: "แผนบำรุงรักษาเชิงป้องกัน (PM)",
@@ -491,9 +442,6 @@ const DOC_TYPES = {
     statuses: [["ตามแผน", "info"], ["เลยกำหนด", "critical"], ["ทำแล้ว", "good"]],
     flow: ["ตามแผน", "ทำแล้ว"],
     closed: ["ทำแล้ว"],
-    samples: [
-      { no: "PM-2026-001", status: "ตามแผน", title: "เปลี่ยนน้ำมันไฮดรอลิกเครื่องพับ", machine: "เครื่องพับเหล็ก CNC", freq: "ราย 6 เดือน", due: "2026-10-10", owner: "ฝ่ายซ่อมบำรุง" },
-    ],
   },
 
   /* ---------------- Sales ---------------- */
@@ -514,9 +462,6 @@ const DOC_TYPES = {
     statuses: [["เสนอราคา", "neutral"], ["ยืนยันคำสั่งซื้อ", "info"], ["กำลังผลิต", "warning"], ["ส่งมอบแล้ว", "good"], ["ยกเลิก", "critical"]],
     flow: ["เสนอราคา", "ยืนยันคำสั่งซื้อ", "กำลังผลิต", "ส่งมอบแล้ว"],
     closed: ["ส่งมอบแล้ว", "ยกเลิก"],
-    samples: [
-      { no: "SO-2026-001", status: "กำลังผลิต", title: "บริษัท น้ำตาลพิษณุโลก จำกัด", model: "YT6500", qty: 3, due: "2026-11-15", owner: "ฝ่ายขาย", date: "2026-08-20" },
-    ],
   },
   cc: {
     name: "ข้อร้องเรียนลูกค้า (Customer Complaint)",
@@ -535,8 +480,5 @@ const DOC_TYPES = {
     statuses: [["รับเรื่อง", "warning"], ["กำลังแก้ไข", "info"], ["ปิดเรื่อง", "good"]],
     flow: ["รับเรื่อง", "กำลังแก้ไข", "ปิดเรื่อง"],
     closed: ["ปิดเรื่อง"],
-    samples: [
-      { no: "CC-2026-001", status: "ปิดเรื่อง", title: "ใบมีดสึกเร็วผิดปกติ", customer: "ลูกค้าไร่อ้อย จ.กำแพงเพชร", model: "YT6500", owner: "ฝ่ายขาย", date: "2026-08-28", detail: "ส่งต่อวิศวกรรม → ECR-2026-001" },
-    ],
   },
 };

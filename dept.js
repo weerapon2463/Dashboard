@@ -24,7 +24,7 @@ function deptSampleDocs() {
   const out = {};
   Object.keys(DOC_TYPES).forEach((t) => {
     if (DOC_TYPES[t].special) return;
-    out[t] = (DOC_TYPES[t].samples || []).map((d) => Object.assign({}, d));
+    out[t] = (DOC_SAMPLES[t] || []).map((d) => Object.assign({}, d));
   });
   return out;
 }
@@ -230,6 +230,7 @@ function renderDeptRegister() {
   const addBtn = document.getElementById("deptAddBtn");
   addBtn.hidden = !deptCanCreate(role);
   addBtn.textContent = `+ สร้าง ${def.abbr} ใหม่`;
+  document.getElementById("deptSampleBtn").hidden = !deptCanManage(role);
 
   // status filter options follow the selected document type
   const statusSel = document.getElementById("deptStatusFilter");
@@ -298,8 +299,14 @@ function renderDeptRegister() {
 
 /* ---- modal ------------------------------------------------------------- */
 
-function deptFieldInput(field, value, disabled) {
+function deptFieldExample(type, key) {
+  const hit = (DOC_SAMPLES[type] || []).find((d) => d[key] !== undefined && d[key] !== "");
+  return hit ? `เช่น ${hit[key]}` : "";
+}
+
+function deptFieldInput(field, value, disabled, example) {
   const id = `deptField_${field.key}`;
+  const ph = example ? ` placeholder="${escapeHtml(example)}"` : "";
   const dis = disabled ? " disabled" : "";
   const v = value === undefined || value === null ? "" : String(value);
   const opts = (list, withEmpty) => (withEmpty ? `<option value="">—</option>` : "")
@@ -311,10 +318,10 @@ function deptFieldInput(field, value, disabled) {
   let input;
   switch (field.type) {
     case "textarea":
-      input = `<textarea id="${id}" rows="3"${dis}>${escapeHtml(v)}</textarea>`;
+      input = `<textarea id="${id}" rows="3"${ph}${dis}>${escapeHtml(v)}</textarea>`;
       break;
     case "number":
-      input = `<input type="number" step="any" id="${id}" value="${escapeHtml(v)}"${dis}>`;
+      input = `<input type="number" step="any" id="${id}" value="${escapeHtml(v)}"${ph}${dis}>`;
       break;
     case "date":
       input = `<input type="date" id="${id}" value="${escapeHtml(v)}"${dis}>`;
@@ -335,7 +342,7 @@ function deptFieldInput(field, value, disabled) {
       break;
     }
     default:
-      input = `<input type="text" id="${id}" value="${escapeHtml(v)}"${dis}>`;
+      input = `<input type="text" id="${id}" value="${escapeHtml(v)}"${ph}${dis}>`;
   }
   return `<div class="form-field"><label for="${id}">${escapeHtml(field.label)}${field.required ? " *" : ""}</label>${input}</div>`;
 }
@@ -350,7 +357,7 @@ function openDeptModal(type, index) {
 
   document.getElementById("deptDocTitle").textContent = isEdit ? `${doc.no}` : `สร้าง ${def.abbr} ใหม่`;
   document.getElementById("deptDocSub").textContent = isEdit ? def.name : `เลขที่เอกสาร: ${doc.no} (ออกให้อัตโนมัติ)`;
-  document.getElementById("deptDocFields").innerHTML = def.fields.map((f) => deptFieldInput(f, doc[f.key], readOnly)).join("");
+  document.getElementById("deptDocFields").innerHTML = def.fields.map((f) => deptFieldInput(f, doc[f.key], readOnly, deptFieldExample(type, f.key))).join("");
 
   const statusSel = document.getElementById("deptDocStatus");
   statusSel.innerHTML = def.statuses.map((s) => `<option value="${escapeHtml(s[0])}"${s[0] === doc.status ? " selected" : ""}>${escapeHtml(s[0])}</option>`).join("");
@@ -410,6 +417,20 @@ function deleteDeptDoc() {
   showToast(`ลบ ${doc.no} แล้ว`, "warn");
 }
 
+function fillDeptSamples() {
+  const def = DOC_TYPES[deptDocType];
+  const samples = DOC_SAMPLES[deptDocType] || [];
+  const list = DEPT_DOCS[deptDocType] = DEPT_DOCS[deptDocType] || [];
+  const missing = samples.filter((sd) => !list.some((d) => d.no === sd.no));
+  if (!missing.length) { showToast(`ตัวอย่าง ${def.abbr} มีครบแล้ว`, "good"); return; }
+  missing.forEach((sd) => list.push(Object.assign({}, sd)));
+  list.sort((a, b) => String(a.no).localeCompare(String(b.no)));
+  document.getElementById("deptStatusFilter").value = "__all__";
+  saveDeptDocs();
+  renderDept();
+  showToast(`เพิ่มตัวอย่าง ${def.abbr} ${missing.length} รายการ`, "good");
+}
+
 /* ---- export ------------------------------------------------------------ */
 
 function exportDeptCsv() {
@@ -438,6 +459,7 @@ function exportDeptCsv() {
 function initDeptInteractions() {
   document.getElementById("deptAddBtn").addEventListener("click", () => openDeptModal(deptDocType, null));
   document.getElementById("deptExportBtn").addEventListener("click", exportDeptCsv);
+  document.getElementById("deptSampleBtn").addEventListener("click", fillDeptSamples);
   document.getElementById("deptSearch").addEventListener("input", renderDeptRegister);
   document.getElementById("deptStatusFilter").addEventListener("change", renderDeptRegister);
   document.getElementById("deptDocCancelBtn").addEventListener("click", closeDeptModal);
