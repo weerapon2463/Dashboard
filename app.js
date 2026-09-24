@@ -281,6 +281,18 @@ function appStart() {
     const btn = back && document.querySelector(`.nav-item[data-view="${back}"]`);
     if (btn && !btn.hidden) switchView(back);
   } catch (e) { /* ignore */ }
+  // Link straight to a page (?view=bomx&tab=mrp) — used by the concept page and shared links
+  try {
+    const q = new URLSearchParams(location.search);
+    const v = q.get("view");
+    const nav = v && document.querySelector(`.nav-item[data-view="${v}"]`);
+    if (nav && !nav.hidden) {
+      const tab = q.get("tab");
+      if (tab && v === "bomx" && typeof bxTab !== "undefined") bxTab = tab;
+      if (tab && v === "service" && typeof svTab !== "undefined") svTab = tab;
+      switchView(v);
+    }
+  } catch (e) { /* ignore */ }
   const activeNav = document.querySelector(".nav-item.active");
   updateDataBadge(activeNav ? activeNav.dataset.view : "overview");
   // Shared link to one BOM item (?bom=<model>&item=<part code>)

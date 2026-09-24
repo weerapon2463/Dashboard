@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Command Center Concept — Y2J Dashboard</title>
-<meta name="description" content="เดโม่แนวคิด (concept mockup) ระบบ Production Dashboard เวอร์ชันใช้งานจริงตามแผนสถาปัตยกรรม Power Platform">
+<title>ระบบใช้งานจริง — Y2J Production Dashboard</title>
+<meta name="description" content="ภาพรวมระบบ Production Dashboard ที่ใช้งานจริง: ขั้นตอนงานตั้งแต่คำสั่งซื้อถึงบริการหลังการขาย การเชื่อมโยงข้อมูล กลุ่มผู้ใช้ การตรวจความสอดคล้อง และแผนขยายผล">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
 <style>
@@ -152,11 +152,144 @@
     .controls label{ flex:1 1 30%; }
     select, input{ min-width:0; width:100%; }
   }
+
+  /* ---- the working system (top of page) ---- */
+  .cx-hero{ display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,1fr); gap:22px; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:26px; box-shadow:var(--shadow); margin-bottom:16px; }
+  .cx-eyebrow{ font-size:12px; font-weight:700; color:var(--accent); letter-spacing:.02em; }
+  .cx-hero h1{ font-size:clamp(20px,2.6vw,28px); line-height:1.3; margin:6px 0 10px; }
+  .cx-hero p{ color:var(--muted); line-height:1.7; margin:0 0 14px; }
+  .cx-hero-actions{ display:flex; flex-wrap:wrap; gap:10px; }
+  .cx-btn{ text-decoration:none; display:inline-flex; align-items:center; }
+  .cx-live-title{ font-size:12.5px; font-weight:700; color:var(--muted); margin-bottom:8px; }
+  .cx-live-grid{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .cx-live-tile{ background:var(--surface-2); border-radius:12px; padding:12px; }
+  .cx-live-n{ font-size:24px; font-weight:700; }
+  .cx-live-l{ font-size:13px; font-weight:600; }
+  .cx-live-s{ font-size:11.5px; color:var(--muted); }
+  .cx-live-empty{ background:var(--surface-2); border-radius:12px; padding:16px; color:var(--muted); line-height:1.6; }
+  .cx-live-empty a{ color:var(--accent); }
+  .cx-flow{ display:flex; align-items:stretch; gap:4px; overflow-x:auto; padding:4px 2px 10px; }
+  .cx-step{ font:inherit; flex:1 1 0; min-width:112px; display:flex; flex-direction:column; gap:3px; align-items:flex-start; text-align:left; padding:10px 12px; border-radius:12px; border:1px solid var(--border); background:var(--surface-2); color:var(--text); cursor:pointer; }
+  .cx-step:hover{ border-color:var(--accent); }
+  .cx-step.active{ background:var(--accent-strong); border-color:var(--accent-strong); color:#fff; }
+  .cx-step-no{ font-family:"IBM Plex Mono",monospace; font-size:11px; opacity:.8; }
+  .cx-step-name{ font-weight:700; font-size:14px; }
+  .cx-step-count{ font-size:11px; opacity:.85; }
+  .cx-arrow{ align-self:center; color:var(--muted); font-size:20px; }
+  .cx-detail{ display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:18px; margin-top:10px; padding:16px; border-radius:12px; background:var(--surface-2); }
+  .cx-detail h3{ margin:0 0 6px; font-size:17px; }
+  .cx-who{ font-size:12.5px; font-weight:500; color:var(--muted); margin-left:6px; }
+  .cx-detail p{ margin:0 0 10px; line-height:1.7; }
+  .cx-docs{ display:flex; flex-wrap:wrap; gap:6px; }
+  .cx-doc{ display:inline-block; font-size:12px; font-weight:600; padding:3px 9px; border-radius:999px; background:var(--surface); border:1px solid var(--border); }
+  .cx-detail-side{ display:flex; flex-direction:column; gap:8px; font-size:13.5px; line-height:1.6; }
+  .cx-side-label{ font-size:12px; font-weight:700; color:var(--good); }
+  .cx-chains{ display:flex; flex-direction:column; gap:18px; }
+  .cx-chain-title{ font-weight:700; font-size:13.5px; margin-bottom:8px; }
+  .cx-chain-row{ display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+  .cx-node{ display:flex; flex-direction:column; padding:8px 12px; border-radius:10px; border:1px solid var(--border); background:var(--surface-2); min-width:96px; }
+  .cx-node b{ font-family:"IBM Plex Mono",monospace; font-size:13px; color:var(--accent-strong); }
+  .cx-node span{ font-size:11.5px; color:var(--muted); }
+  .cx-node-loop{ border-color:var(--good); }
+  .cx-link-arrow{ color:var(--muted); font-size:18px; }
+  .cx-two{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+  .cx-two .panel{ margin-bottom:16px; }
+  .cx-checks{ margin:0; padding-left:18px; line-height:1.8; font-size:13.5px; }
+  .cx-score{ margin-top:12px; }
+  .cx-arch{ display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); gap:14px; align-items:center; }
+  .cx-arch-col{ display:flex; flex-direction:column; gap:8px; }
+  .cx-arch-tag{ font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; align-self:flex-start; }
+  .cx-now{ background:var(--good-bg); color:var(--good); }
+  .cx-next{ background:var(--warn-bg); color:var(--warn); }
+  .cx-arch-box{ padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--surface-2); font-size:13px; line-height:1.6; }
+  .cx-arch-arrow{ font-size:26px; color:var(--muted); }
+  .cx-section-title{ font-size:18px; margin:28px 0 12px; }
+  @media (max-width:860px){
+    .cx-hero, .cx-detail, .cx-two{ grid-template-columns:1fr; }
+    .cx-arch{ grid-template-columns:1fr; }
+    .cx-arch-arrow{ transform:rotate(90deg); justify-self:center; }
+  }
 </style>
 </head>
 <body>
 <div class="app">
   <a class="backlink" href="./index.html">← กลับไปหน้า Production Dashboard จริง</a>
+  <section class="cx-hero">
+    <div>
+      <div class="cx-eyebrow">ระบบที่ใช้งานได้จริงวันนี้</div>
+      <h1>จากคำสั่งซื้อ ถึงบริการหลังการขาย — ในระบบเดียว ทุกฝ่ายเห็นข้อมูลชุดเดียวกัน</h1>
+      <p>ทุกเอกสาร ทุกการเบิก ทุกขั้นจัดซื้อ และทุกงานบริการ อ้างอิงกันได้ด้วยเลขที่เดียว ระบบบันทึกว่าใครทำอะไรเมื่อไร และตรวจความสอดคล้องของข้อมูลข้ามฝ่ายให้อัตโนมัติ</p>
+      <div class="cx-hero-actions">
+        <a class="btn-primary cx-btn" href="./index.html">เปิด Production Dashboard</a>
+        <a class="btn-secondary cx-btn" href="#cxFlow">ดูว่าระบบทำงานอย่างไร ↓</a>
+      </div>
+    </div>
+    <div class="cx-live" id="cxLive"></div>
+  </section>
+
+  <section class="panel" id="cxFlow">
+    <div class="panel-head"><h2>ระบบทำงานอย่างไร — กดแต่ละขั้นเพื่อดูรายละเอียด</h2></div>
+    <div class="cx-flow" id="cxFlowSteps" role="tablist" aria-label="ขั้นตอนการทำงาน"></div>
+    <div class="cx-detail" id="cxFlowDetail" role="tabpanel"></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h2>ข้อมูลเชื่อมกันอย่างไร — ตามรอยได้ทั้งสองทาง</h2></div>
+    <div class="cx-chains">
+      <div class="cx-chain">
+        <div class="cx-chain-title">สายผลิต: ของมาจากไหน ไปลงงานไหน</div>
+        <div class="cx-chain-row" id="cxChainProd"></div>
+      </div>
+      <div class="cx-chain">
+        <div class="cx-chain-title">สายบริการ: ปัญหาจากลูกค้ากลับไปแก้ที่ต้นเหตุ</div>
+        <div class="cx-chain-row" id="cxChainSvc"></div>
+      </div>
+    </div>
+    <p class="note">ทุกกล่องคือเอกสารจริงในระบบ มีเลขที่ สถานะ ผู้บันทึก และประวัติการแก้ไข · ชิ้นส่วนทุกตัวใน BOM มีเลขข้ออ้างอิง (เช่น BOM-YT3000 Rev.B ข้อ 1.1.2) ส่งลิงก์ให้ฝ่ายอื่นเปิดดูได้ทันที</p>
+  </section>
+
+  <div class="cx-two">
+    <section class="panel">
+      <div class="panel-head"><h2>ใครทำอะไรได้ — กลุ่มผู้ใช้</h2></div>
+      <div class="table-wrap"><table class="data-table"><thead><tr><th>กลุ่ม</th><th>ทำอะไรได้</th><th>สิทธิ์พิเศษ</th></tr></thead><tbody id="cxGroups"></tbody></table></div>
+      <p class="note">ผู้ดูแลระบบสร้าง/แก้กลุ่มได้เองที่ Admin › กลุ่มผู้ใช้ — คนหนึ่งอยู่ได้หลายกลุ่ม สิทธิ์รวมกันอัตโนมัติ</p>
+    </section>
+    <section class="panel">
+      <div class="panel-head"><h2>ระบบตรวจให้เองทุกวัน</h2></div>
+      <ul class="cx-checks">
+        <li><b>ใบเบิก ↔ งาน ↔ BOM</b> เบิกเกิน BOM, เบิกให้งานที่ไม่มีอยู่, ชิ้นส่วนที่ไม่อยู่ใน BOM ปัจจุบัน</li>
+        <li><b>คงคลัง</b> ยอดติดลบ, ของไม่พอจ่ายแต่ยังไม่มี PR, ชิ้นผลิตเองที่ต้องสั่งผลิตเพิ่ม</li>
+        <li><b>ใบสั่งผลิต</b> % เบิกวัสดุไม่ตรงใบเบิกจริง, ปิดงานทั้งที่ใบเบิกค้าง, BOM ยังเป็นร่าง</li>
+        <li><b>จัดซื้อ</b> รับของแล้วแต่คงคลังไม่เพิ่ม, รับไม่ครบ, ค้างเกินเป้าหมายแต่ละขั้น</li>
+        <li><b>บริการ & เคลม</b> งานที่ไม่มีเครื่องในทะเบียน, เคลมนอกประกัน, สาเหตุภายในที่ยังไม่มี NCR/ECR</li>
+        <li><b>เอกสาร & ผู้ใช้</b> เลขที่อ้างถึงแต่ไม่มีอยู่ (ลิงก์เสีย), ผู้ใช้ในกลุ่ม/ทีม/แผนกที่ถูกลบ</li>
+      </ul>
+      <div class="cx-score" id="cxScore"></div>
+    </section>
+  </div>
+
+  <section class="panel">
+    <div class="panel-head"><h2>สถาปัตยกรรม — วันนี้ และขั้นต่อไป</h2></div>
+    <div class="cx-arch">
+      <div class="cx-arch-col">
+        <div class="cx-arch-tag cx-now">ใช้งานอยู่ตอนนี้ · ค่าใช้จ่าย 0 บาท</div>
+        <div class="cx-arch-box"><b>หน้าจอ</b> เว็บแอป (GitHub Pages) ใช้ได้ทั้งคอมพิวเตอร์ iPad มือถือ · โหมดมืด/สว่าง</div>
+        <div class="cx-arch-box"><b>ฐานข้อมูลกลาง</b> Google Sheets + Apps Script ซิงก์ทุกเครื่อง รวมข้อมูลเมื่อแก้พร้อมกัน</div>
+        <div class="cx-arch-box"><b>รายงานใน Sheets</b> แท็บเอกสาร ใบเบิก คงคลัง จัดซื้อ งานบริการ ผู้ขาย · BOM แยกไฟล์ต่อรุ่น</div>
+        <div class="cx-arch-box"><b>ไฟล์แนบ</b> รูปถ่าย/แบบ เก็บใน Google Drive ของบริษัท</div>
+      </div>
+      <div class="cx-arch-arrow" aria-hidden="true">→</div>
+      <div class="cx-arch-col">
+        <div class="cx-arch-tag cx-next">ขยายผลหลังนำร่อง</div>
+        <div class="cx-arch-box"><b>เข้าสู่ระบบด้วยบัญชี Google ของบริษัท</b> แทน PIN — ความปลอดภัยระดับองค์กร</div>
+        <div class="cx-arch-box"><b>ขยายไปทุกบริษัทในกลุ่ม</b> รองรับหลายบริษัทแล้ว ข้อมูลแยก โลโก้แยก ผู้บริหารกลุ่มสลับดูได้</div>
+        <div class="cx-arch-box"><b>เชื่อมระบบบัญชี/ERP</b> ส่ง PO รับของ ต้นทุนวัสดุต่องาน</div>
+        <div class="cx-arch-box"><b>Power Platform / Dataverse</b> ทางเลือกเมื่อผู้ใช้และข้อมูลโตเกินขีดจำกัดของ Sheets</div>
+      </div>
+    </div>
+  </section>
+
+  <h2 class="cx-section-title">แนวคิดขยายสู่ระดับกลุ่มบริษัท (ข้อมูลสมมติ)</h2>
 
   <header class="topbar">
     <div class="brand">
@@ -181,7 +314,7 @@
   </header>
 
   <div class="banner">
-    นี่คือ <strong>เดโม่แนวคิด (concept mockup)</strong> จำลองการทำงานของระบบใช้งานจริงตามแผนสถาปัตยกรรมข้อมูล — ข้อมูลทั้งหมดเป็นข้อมูลสมมติเพื่อการสื่อสารและทดลองปรับแต่งมุมมอง ไม่ใช่ระบบที่เชื่อมกับฐานข้อมูลจริง และไม่ได้บันทึกข้อมูลถาวร ไม่ใช่ dashboard ที่ใช้ส่งประกวด
+    ส่วนนี้เป็น <strong>เดโม่แนวคิด (concept mockup)</strong> ของการขยายระบบสู่ระดับกลุ่มบริษัท — ตัวเลขและรายการด้านล่างเป็นข้อมูลสมมติเพื่อสื่อสารแนวคิดการสรุปยอดข้ามบริษัทและมุมมองตามบทบาท ไม่ได้เชื่อมกับข้อมูลจริงของระบบด้านบน
   </div>
 
   <main>
@@ -759,5 +892,100 @@
   renderAll();
 })();
 </script>
+<script>
+/* Concept page: live figures read from the dashboard data already cached in this browser (same site). */
+(function () {
+  "use strict";
+  function read(key) { try { return JSON.parse(localStorage.getItem(key) || "null"); } catch (e) { return null; } }
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); }
+  var docs = read("y2j-dept-docs-v1") || {};
+  var wos = read("y2j-workorders-v1") || [];
+  var p2p = read("y2j-p2p-v1") || [];
+  var stock = (read("y2j-stock-v1") || {}).items || {};
+  var auth = read("y2j-auth-v1") || {};
+  var bom = read("y2j-bom-v1") || {};
+  var audit = read("y2j-audit-v1") || [];
+  var has = Object.keys(docs).length || wos.length || p2p.length;
+  var n = function (t) { return (docs[t] || []).length; };
+  var open = function (t, closed) { return (docs[t] || []).filter(function (d) { return closed.indexOf(d.status) < 0; }).length; };
+  var mreqItems = (docs.mreq || []).filter(function (d) { return d.items && d.items.length; });
+  var bomLines = 0; Object.keys(bom.bom || {}).forEach(function (m) { bomLines += (bom.bom[m] || []).length; });
+  var docTotal = 0; Object.keys(docs).forEach(function (t) { docTotal += (docs[t] || []).length; });
+
+  var live = document.getElementById("cxLive");
+  if (!has) {
+    live.innerHTML = '<div class="cx-live-empty">เปิด <a href="./index.html">Production Dashboard</a> ในเบราว์เซอร์นี้ก่อน หน้านี้จะแสดงตัวเลขจริงจากระบบ</div>';
+  } else {
+    var tiles = [
+      [docTotal, "เอกสารในระบบ", "ทุกแผนก มีเลขที่และประวัติ"],
+      [(bom.models || []).length + " รุ่น", "BOM หลายระดับ", bomLines + " รายการ อ้างอิงเลขข้อได้"],
+      [mreqItems.length, "ใบเบิกตามรายการ BOM", "ค้าง " + mreqItems.filter(function (d) { return ["รออนุมัติ", "อนุมัติ", "จ่ายบางส่วน"].indexOf(d.status) >= 0; }).length + " ใบ"],
+      [p2p.length, "คำขอซื้อ PR → PO", "ติดตามครบ 10 ขั้น"],
+      [n("mc"), "เครื่องลูกค้าในทะเบียน", "งานบริการ " + n("svc") + " ใบ"],
+      [(auth.users || []).filter(function (u) { return u.active; }).length, "ผู้ใช้งาน", (auth.groups || []).length + " กลุ่มสิทธิ์ · " + audit.length + " บันทึกการใช้งาน"],
+    ];
+    live.innerHTML = '<div class="cx-live-title">ตัวเลขจริงจากระบบ ณ ตอนนี้</div><div class="cx-live-grid">' + tiles.map(function (t) {
+      return '<div class="cx-live-tile"><div class="cx-live-n">' + esc(t[0]) + '</div><div class="cx-live-l">' + esc(t[1]) + '</div><div class="cx-live-s">' + esc(t[2]) + "</div></div>";
+    }).join("") + "</div>";
+  }
+
+  var STEPS = [
+    { id: "sales", name: "ขาย", who: "ฝ่ายขาย", docs: ["SO คำสั่งซื้อ", "CC ข้อร้องเรียน"], does: "รับคำสั่งซื้อ ยืนยันวันส่ง แล้วส่งต่อฝ่ายวางแผน — ข้อร้องเรียนส่งต่อ QC/วิศวกรรมจนปิดเรื่อง", check: "ใบสั่งผลิตต้องอ้างคำสั่งซื้อที่มีอยู่จริง", view: "dept", count: function () { return open("so", ["ส่งมอบแล้ว", "ยกเลิก"]) + " คำสั่งซื้อที่กำลังดำเนินการ"; } },
+    { id: "plan", name: "วางแผน", who: "ฝ่ายวางแผนการผลิต", docs: ["ใบสั่งผลิต (WO)", "PLN แผนสัปดาห์", "MRQ ความต้องการวัสดุ"], does: "เปิดใบสั่งผลิตจากคำสั่งซื้อ แล้วคำนวณวัสดุ (MRP) = BOM × จำนวนคัน − ที่เบิกแล้ว − คงคลัง − ของที่สั่งซื้ออยู่ → ออก MRQ หรือเปิด PR ได้ทันที", check: "BOM ของรุ่นที่จะผลิตต้องอนุมัติแล้ว", view: "bomx", tab: "mrp", count: function () { return wos.filter(function (w) { return w.status !== "เสร็จสมบูรณ์"; }).length + " ใบสั่งผลิตที่ยังไม่เสร็จ"; } },
+    { id: "rnd", name: "R&D / BOM", who: "วิศวกรรม", docs: ["BOM หลายระดับ", "ECR / EO", "DWG แบบ", "WI วิธีทำงาน"], does: "BOM จัดเป็นกลุ่มงาน › ชุดประกอบ › ชิ้นย่อย ทุกบรรทัดมีเลขข้อ ระบุ \"ใช้ที่\" ไลน์/สถานีที่รับไปใช้ต่อ · แก้ได้เฉพาะการออก Revision ใหม่พร้อมอ้างอิง ECR/EO", check: "โครงสร้างวน ชุดแม่หาย รหัสซ้ำ จำนวนผิด", view: "bomx", tab: "tree", count: function () { return bomLines + " รายการใน BOM"; } },
+    { id: "store", name: "เบิก & คลัง", who: "ช่าง · หัวหน้างาน · คลังสินค้า", docs: ["MR ใบเบิก", "STK ตรวจนับ", "คงคลัง"], does: "ช่างเลือกเบิกตามรายการ BOM ของงาน (หัวหน้าสั่งเบิกแทนและมอบหมายช่างรับของได้) → หัวหน้าอนุมัติ → คลังจ่าย (จ่ายบางส่วนได้) → เห็นค้างเบิก/ค้างจ่ายและของไม่พอทันที", check: "เบิกเกิน BOM, คงคลังติดลบ, ของไม่พอแต่ไม่มี PR", view: "bomx", tab: "track", count: function () { return Object.keys(stock).length + " รายการในคลัง"; } },
+    { id: "pur", name: "จัดซื้อ", who: "จัดซื้อ · ผู้อนุมัติ", docs: ["PR → PO 10 ขั้น", "RFQ", "ผู้ขาย", "SE ประเมินผู้ขาย"], does: "ทุกขั้นมีเป้าเวลา รู้ว่างานค้างอยู่ที่ใครกี่วัน · รับของแล้วยอดเข้าคลังอัตโนมัติ ตรวจรับไม่ผ่านหักคืน · ผลงานผู้ขายคำนวณจากการส่งจริง", check: "รับของแล้วคงคลังไม่เพิ่ม, รับไม่ครบ", view: "p2p", count: function () { return p2p.length + " คำขอซื้อ"; } },
+    { id: "prod", name: "ผลิต", who: "หัวหน้าไลน์ · ช่าง", docs: ["ใบสั่งผลิต", "DPR รายงานประจำวัน", "SAF ความปลอดภัย", "MT แจ้งซ่อม"], does: "รับงาน อัปเดตสถานะ · % เบิกวัสดุคำนวณจากใบเบิกจริง ไม่ต้องกรอกเอง · ปิดงานแล้วระบบเตือนถ้ายังมีใบเบิกค้าง", check: "% เบิกวัสดุไม่ตรงกับใบเบิก", view: "workorder", count: function () { return wos.filter(function (w) { return w.status === "ล่าช้า"; }).length + " ใบสั่งผลิตล่าช้า"; } },
+    { id: "qc", name: "คุณภาพ", who: "QC", docs: ["IQC ตรวจรับ", "FI ก่อนส่งมอบ", "NCR", "CAPA"], does: "ตรวจรับวัตถุดิบ ตรวจก่อนส่งมอบรายเครื่อง · NCR ผูกกับชิ้นส่วน ใบสั่งผลิต และงานเคลม", check: "เคลมจากสาเหตุภายในที่ยังไม่มี NCR/CAPA/ECR", view: "dept", count: function () { return open("ncr", ["ปิดแล้ว"]) + " NCR ที่ยังเปิด"; } },
+    { id: "svc", name: "ส่งมอบ & บริการ", who: "ฝ่ายขาย · ช่างบริการ", docs: ["MC ทะเบียนเครื่อง", "SV งานบริการ", "เคลม"], does: "ทะเบียนเครื่องจำ BOM Rev. ที่ส่งมอบและวันหมดประกัน · ช่างเบิกอะไหล่ตาม BOM ของเครื่อง · เคลมต่อกับผู้ขาย · อะไหล่ที่เปลี่ยนบ่อยส่งกลับเป็น ECR", check: "งานบริการที่ไม่มีเครื่องในทะเบียน, เคลมนอกประกัน", view: "service", count: function () { return n("svc") + " งานบริการ · " + (docs.svc || []).filter(function (d) { return d.kind === "เคลมประกัน" || d.claimCause; }).length + " เคลม"; } },
+  ];
+  var stepsEl = document.getElementById("cxFlowSteps");
+  var detailEl = document.getElementById("cxFlowDetail");
+  var current = 0;
+  function renderSteps() {
+    stepsEl.innerHTML = STEPS.map(function (s, i) {
+      return (i ? '<span class="cx-arrow" aria-hidden="true">›</span>' : "") + '<button type="button" role="tab" class="cx-step' + (i === current ? " active" : "") + '" aria-selected="' + (i === current) + '" data-i="' + i + '"><span class="cx-step-no">' + (i + 1) + '</span><span class="cx-step-name">' + esc(s.name) + "</span>" + (has ? '<span class="cx-step-count">' + esc(s.count()) + "</span>" : "") + "</button>";
+    }).join("");
+    var s = STEPS[current];
+    detailEl.innerHTML = '<div class="cx-detail-main"><h3>' + (current + 1) + ". " + esc(s.name) + ' <span class="cx-who">' + esc(s.who) + "</span></h3><p>" + esc(s.does) + '</p><div class="cx-docs">' + s.docs.map(function (d) { return '<span class="cx-doc">' + esc(d) + "</span>"; }).join("") + '</div></div><div class="cx-detail-side"><div class="cx-side-label">ระบบตรวจให้</div><div>' + esc(s.check) + '</div><a class="btn-primary cx-btn" href="./index.html?view=' + s.view + (s.tab ? "&tab=" + s.tab : "") + '">เปิดหน้านี้ในระบบ →</a></div>';
+    stepsEl.querySelectorAll("[data-i]").forEach(function (b) { b.addEventListener("click", function () { current = Number(b.dataset.i); renderSteps(); }); });
+  }
+  renderSteps();
+
+  function chain(el, items) {
+    el.innerHTML = items.map(function (it, i) {
+      return (i ? '<span class="cx-link-arrow" aria-hidden="true">' + (it.back ? "←" : "→") + "</span>" : "") + '<div class="cx-node' + (it.loop ? " cx-node-loop" : "") + '"><b>' + esc(it.a) + "</b><span>" + esc(it.b) + "</span></div>";
+    }).join("");
+  }
+  chain(document.getElementById("cxChainProd"), [
+    { a: "SO", b: "คำสั่งซื้อลูกค้า" }, { a: "WO", b: "ใบสั่งผลิต" }, { a: "BOM × คัน", b: "ชิ้นย่อยที่ต้องใช้" }, { a: "MR", b: "ใบเบิกตามรายการ" },
+    { a: "คงคลัง", b: "จ่าย/คืน ตัดยอดอัตโนมัติ" }, { a: "GRN", b: "รับของเข้าคลัง", back: true }, { a: "PO", b: "ผู้ขายยืนยันส่ง", back: true }, { a: "PR / MRQ", b: "เมื่อของไม่พอ", back: true },
+  ]);
+  chain(document.getElementById("cxChainSvc"), [
+    { a: "MC", b: "เครื่องลูกค้า + BOM Rev." }, { a: "SV", b: "งานบริการ / เคลม" }, { a: "MR อะไหล่", b: "เบิกตาม BOM ของเครื่อง" }, { a: "NCR", b: "หาสาเหตุ" },
+    { a: "ECR → EO", b: "แก้แบบ/วัสดุ" }, { a: "BOM Rev. ใหม่", b: "ล็อตถัดไปไม่เกิดซ้ำ", loop: true },
+  ]);
+
+  var groups = (auth.groups && auth.groups.length) ? auth.groups : [
+    { name: "ช่างประกอบ / ช่างเทคนิค", desc: "เบิกวัสดุตาม BOM ดูใบสั่งผลิตและงานของตัวเอง", abilities: ["request"] },
+    { name: "หัวหน้างาน / ผู้อนุมัติเบิก", desc: "อนุมัติใบเบิก สั่งเบิกแทนและมอบหมายช่างรับของ", abilities: ["request", "approve"] },
+    { name: "คลังสินค้า", desc: "จ่ายของตามใบเบิก รับของเข้าคลัง ปรับยอดคงคลัง", abilities: ["issue", "stock"] },
+    { name: "ช่างบริการหลังการขาย", desc: "เปิด/อัปเดตงานบริการ เบิกอะไหล่ตาม BOM ของเครื่องลูกค้า", abilities: ["request"] },
+    { name: "จัดซื้อ", desc: "PR → PO → ผู้ขาย และของที่ต้องสั่งเพิ่ม", abilities: [] },
+    { name: "ผู้บริหาร / ผู้ดูรายงาน", desc: "ดูภาพรวม รายงาน และกิจกรรมทั้งระบบ", abilities: ["reports"] },
+  ];
+  var ABL = { request: "สั่งเบิก", approve: "อนุมัติเบิก", issue: "จ่ายของ", stock: "ปรับคงคลัง", reports: "รายงานกิจกรรม" };
+  document.getElementById("cxGroups").innerHTML = groups.map(function (g) {
+    return "<tr><td><b>" + esc(g.name) + "</b></td><td>" + esc(g.desc || "") + "</td><td>" + ((g.abilities || []).map(function (a) { return '<span class="cx-doc">' + esc(ABL[a] || a) + "</span>"; }).join(" ") || "—") + "</td></tr>";
+  }).join("");
+
+  document.getElementById("cxScore").innerHTML = has
+    ? '<a class="btn-secondary cx-btn" href="./index.html?view=admin">ดูผลตรวจล่าสุดในระบบ (ผู้ดูแล) →</a>'
+    : "";
+
+  // the older group-rollup concept below is illustrative only
+})();
+</script>
+
 </body>
 </html>
