@@ -118,9 +118,26 @@ function bxGroupRank(g) {
 }
 
 // Ordered rows: group headers, then each line with its item number, depth and quantity per machine
+// The tree is rebuilt only when the BOM changes (saveBom bumps the version) — large BOMs have 1,000+ lines
+let BX_TREE_V = 0;
+const BX_TREE_CACHE = new Map();
+function bxTreeInvalidate() { BX_TREE_V++; BX_TREE_CACHE.clear(); }
+
 function bxTree(model) {
   const lines = MASTER_BOM[model] || [];
+  const cacheable = !String(model).startsWith("__");
+  const sig = `${BX_TREE_V}|${lines.length}`;
+  const hit = cacheable && BX_TREE_CACHE.get(model);
+  if (hit && hit.sig === sig && hit.lines === lines) return hit.rows;
+  const rows = bxTreeBuild(lines);
+  if (cacheable) BX_TREE_CACHE.set(model, { sig, lines, rows });
+  return rows;
+}
+
+function bxTreeBuild(lines) {
   const ids = new Set(lines.map((l) => l.id));
+  const kidsOf = new Map();
+  lines.forEach((l) => { if (l.parent && ids.has(l.parent)) { if (!kidsOf.has(l.parent)) kidsOf.set(l.parent, []); kidsOf.get(l.parent).push(l); } });
   const tops = lines.filter((l) => !l.parent || !ids.has(l.parent));
   const groups = [];
   tops.forEach((l) => { const g = l.group || BOM_GROUP_DEFAULT; if (!groups.includes(g)) groups.push(g); });
@@ -134,8 +151,8 @@ function bxTree(model) {
       seen.add(l.id);
       const no = `${prefix}.${i + 1}`;
       const per = bxNum(l.qty) * mult;
-      const kids = lines.filter((c) => c.parent === l.id);
-      rows.push({ line: l, no, depth, per, hasKids: kids.length > 0, group: g, path });
+      const kids = kidsOf.get(l.id) || [];
+      rows.push({ line: l, no, depth, per, hasKids: kids.length > 0, kidCount: kids.length, group: g, path });
       walk(kids, no, depth + 1, per, path.concat([l]));
     });
     walk(tops.filter((l) => (l.group || BOM_GROUP_DEFAULT) === g), String(gi + 1), 1, 1, []);
@@ -485,7 +502,7 @@ function bxTreeRowHtml(r, editable) {
     <td class="mono-cell">${bxEsc(l.code || "—")}${typeof pcChips === "function" && (pcParse(l.code) || pcParseStd(l.code)) ? `<div>${pcChips(l.code)}</div>` : ""}</td>
     <td><span class="bx-indent" style="padding-left:${(r.depth - 1) * 20}px">${r.hasKids
       ? `<button type="button" class="bx-tog" data-tog="${bxEsc(l.id)}" aria-expanded="${bxIsOpen(bxModel, l.id)}" aria-label="${bxIsOpen(bxModel, l.id) ? "ย่อ" : "ขยาย"} ${bxEsc(l.part)}">${bxIsOpen(bxModel, l.id) ? "▾" : "▸"}</button>`
-      : `<span class="bx-tog-space">${r.depth > 1 ? "└" : ""}</span>`}<button type="button" class="bx-link" data-detail="${bxEsc(key)}">${bxEsc(l.part || "(ไม่มีชื่อ)")}</button>${r.hasKids ? ` <span class="pill pill-schedule">ชุดประกอบ · ${(MASTER_BOM[bxModel] || []).filter((c) => c.parent === l.id).length} รายการ</span>` : ""}</span></td>
+      : `<span class="bx-tog-space">${r.depth > 1 ? "└" : ""}</span>`}<button type="button" class="bx-link" data-detail="${bxEsc(key)}">${bxEsc(l.part || "(ไม่มีชื่อ)")}</button>${r.hasKids ? ` <span class="pill pill-schedule">ชุดประกอบ · ${r.kidCount} รายการ</span>` : ""}</span></td>
     <td class="num">${bxFmt(l.qty)}</td>
     <td class="num"><strong>${bxFmt(r.per)}</strong></td>
     <td>${bxEsc(l.unit || "")}</td>

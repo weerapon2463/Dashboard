@@ -140,6 +140,7 @@ function bomApplySamples() {
 }
 
 function saveBom() {
+  if (typeof bxTreeInvalidate === "function") bxTreeInvalidate();
   try {
     localStorage.setItem(BOM_STORAGE_KEY, JSON.stringify({ models: MACHINE_MODELS, bom: MASTER_BOM, meta: BOM_META }));
     const el = document.getElementById("deptSaveStatus");
