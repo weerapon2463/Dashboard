@@ -1215,3 +1215,6 @@ html[data-density="compact"] body { zoom: 0.9; }
 .login-conn-row { display: flex; gap: 6px; }
 .login-conn-row input { flex: 1; min-width: 0; }
 .login-conn-err { color: var(--status-critical); }
+
+.login-conn-demo { border: 1px solid var(--series-1); background: rgba(42,120,214,.10); }
+.login-conn-demo span { color: var(--text-secondary); }

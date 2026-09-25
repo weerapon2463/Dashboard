@@ -401,6 +401,15 @@ function authUserName(id) {
 function renderLoginConn() {
   const box = document.getElementById("loginConn");
   if (!box || typeof Y2JStore === "undefined") return;
+  if (Y2JStore.isRemote() && Y2JStore.config().demo) {
+    box.className = "login-conn login-conn-demo";
+    box.innerHTML = `<strong>🧪 ระบบทดลอง (ข้อมูลจำลองทั้งหมด)</strong>
+      <span>ทดลองใช้ได้ทันที — เลือกผู้ใช้ด้านล่าง PIN 1234 · พนักงาน Y2J ที่จะใช้ข้อมูลจริง: วาง "ลิงก์ตั้งค่า" จากผู้ดูแลระบบที่นี่</span>
+      <div class="login-conn-row"><input id="loginSetupLink" type="url" placeholder="วางลิงก์ตั้งค่า https://…?sheet=…&key=…" aria-label="ลิงก์ตั้งค่า"><button type="button" class="btn-secondary" id="loginSetupBtn">ใช้ข้อมูลจริงของบริษัท</button></div>
+      <span class="login-conn-err" id="loginSetupErr" hidden></span>`;
+    loginSetupWire();
+    return;
+  }
   if (Y2JStore.isRemote()) {
     const st = Y2JStore.status();
     box.className = "login-conn login-conn-ok";
@@ -412,6 +421,10 @@ function renderLoginConn() {
     <span>รายชื่อด้านล่างเป็นข้อมูลตัวอย่างในเครื่องนี้เท่านั้น จึงไม่ตรงกับเครื่องอื่น — ขอ "ลิงก์ตั้งค่า" จากผู้ดูแลระบบ (เมนู ผู้ดูแลระบบ › ที่เก็บข้อมูล) แล้วเปิดลิงก์บนเครื่องนี้ หรือวางลิงก์ที่นี่</span>
     <div class="login-conn-row"><input id="loginSetupLink" type="url" placeholder="วางลิงก์ตั้งค่า https://…?sheet=…&key=…" aria-label="ลิงก์ตั้งค่า"><button type="button" class="btn-primary" id="loginSetupBtn">เชื่อมต่อ</button></div>
     <span class="login-conn-err" id="loginSetupErr" hidden></span>`;
+  loginSetupWire();
+}
+
+function loginSetupWire() {
   const err = document.getElementById("loginSetupErr");
   document.getElementById("loginSetupBtn").addEventListener("click", async () => {
     err.hidden = true;

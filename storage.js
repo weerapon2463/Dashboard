@@ -31,6 +31,20 @@ const Y2JStore = (() => {
   const readJson = (k, dflt) => { try { return JSON.parse(rawGet(k) || "null") || dflt; } catch (e) { return dflt; } };
 
   let cfg = readJson(CONFIG_KEY, { mode: "local", url: "", token: "" });
+  // A device that was never set up joins the public DEMO: a separate Google Sheet that holds only the
+  // simulated company (sample data, demo-* users). Its key is public on purpose and opens nothing else.
+  // Company data lives in another Sheet whose key only travels in the admin's setup link.
+  const DEMO_CFG = { mode: "sheets", demo: true,
+    url: "https://script.google.com/macros/s/AKfycbwbMJvGEudXfHvw0YeKNaLhA6vyIzb1qsyLNBhCy7GlgFx_3TRK7fC1McqJnu4deGXIdw/exec",
+    token: "demo52d4f92df756fddcd9a5" };
+  try {
+    if (!rawGet(CONFIG_KEY) && !new URLSearchParams(location.search).get("sheet")) {
+      cfg = Object.assign({}, DEMO_CFG);
+      rawSet(CONFIG_KEY, JSON.stringify(cfg));
+      rawSet(META_KEY, JSON.stringify({ keys: {}, pending: [] }));   // this device's sample edits never go up
+      rawSet(COMPANY_KEY, "demo");
+    }
+  } catch (e) { /* stay local */ }
   let company = rawGet(COMPANY_KEY) || DEFAULT_COMPANY;
   if (!/^[a-z0-9]{2,12}$/.test(company)) company = DEFAULT_COMPANY;
   // The original company keeps the plain keys, so data saved before companies existed stays put
@@ -48,8 +62,17 @@ const Y2JStore = (() => {
   try {
     const q = new URLSearchParams(location.search);
     if (q.get("sheet") && q.get("key")) {
+      const wasDemo = !!cfg.demo;
       cfg = { mode: "sheets", url: q.get("sheet"), token: q.get("key") };
       rawSet(CONFIG_KEY, JSON.stringify(cfg));
+      if (wasDemo || company === "demo") {
+        // leaving the demo: start this device fresh against the company data
+        meta = { keys: {}, pending: [] };
+        dirty.clear();
+        rawSet(META_KEY, JSON.stringify(meta));
+        company = DEFAULT_COMPANY;
+        rawSet(COMPANY_KEY, DEFAULT_COMPANY);
+      }
       history.replaceState(null, "", location.pathname + location.hash);
     }
   } catch (e) { /* ignore */ }
@@ -354,6 +377,7 @@ const Y2JStore = (() => {
 
   function connect(url, token) {
     cfg = { mode: "sheets", url, token };
+    if (company === "demo" && url !== DEMO_CFG.url) { company = DEFAULT_COMPANY; rawSet(COMPANY_KEY, DEFAULT_COMPANY); } // leaving the demo
     rawSet(CONFIG_KEY, JSON.stringify(cfg));
     meta = { keys: {}, pending: [] };
     dirty.clear();
