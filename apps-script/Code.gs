@@ -85,6 +85,8 @@ function handle_(p) {
       case "bomfiles": return json_(bomFiles_(p.company === "y2j" ? "" : p.company));
       case "bomread": return json_(bomRead_(p.company === "y2j" ? "" : p.company, String(p.model || "")));
       case "rebuild": return json_(rebuildTabs_());
+      case "organize": return json_(organize_(String(p.folder || "")));
+      case "store": return json_(store_(p));
       default: return json_({ ok: false, error: "unknown action" });
     }
   } catch (err) {
@@ -505,6 +507,53 @@ function rebuildTabs_() {
     try { mirror_(k, all[k].value); done.push(k); } catch (err) { done.push(k + " ✗ " + err.message); }
   });
   return { ok: true, rebuilt: done };
+}
+
+/* ------------------------------------------------------------------ one Drive folder for everything */
+
+// Sub-folders of the organisation's root folder (ROOT_FOLDER_ID). The BOM and attachment folders keep
+// their ids when moved, so files the dashboard creates later still land in the right place.
+const ROOT_SUBS_ = {
+  db: "01 ฐานข้อมูลหลัก (Google Sheet)",
+  bom: "02 BOM แยกรุ่น",
+  files: "03 ไฟล์แนบเอกสาร",
+  award: "04 เอกสารส่งประกวด",
+  backup: "05 สำรองข้อมูล",
+};
+
+function rootSub_(root, name) {
+  const it = root.getFoldersByName(name);
+  return it.hasNext() ? it.next() : root.createFolder(name);
+}
+
+function organize_(folderId) {
+  const props = PropertiesService.getScriptProperties();
+  const id = folderId || props.getProperty("ROOT_FOLDER_ID");
+  if (!id) return { ok: false, error: "ไม่ได้ระบุโฟลเดอร์" };
+  const root = DriveApp.getFolderById(id);
+  props.setProperty("ROOT_FOLDER_ID", id);
+  const done = [];
+  const step = (label, fn) => { try { fn(); done.push("✓ " + label); } catch (err) { done.push("✗ " + label + ": " + err.message); } };
+  const db = rootSub_(root, ROOT_SUBS_.db);
+  step("ย้าย Google Sheet หลัก", () => DriveApp.getFileById(sheet_().getId()).moveTo(db));
+  step("ย้ายโฟลเดอร์ BOM", () => { const f = bomFolder_(); f.moveTo(root); f.setName(ROOT_SUBS_.bom); });
+  step("ย้ายโฟลเดอร์ไฟล์แนบ", () => { const f = folder_(); f.moveTo(root); f.setName(ROOT_SUBS_.files); });
+  step("สร้างโฟลเดอร์เอกสารส่งประกวด", () => rootSub_(root, ROOT_SUBS_.award));
+  step("สร้างโฟลเดอร์สำรองข้อมูล", () => rootSub_(root, ROOT_SUBS_.backup));
+  return { ok: true, root: root.getName(), done: done, url: root.getUrl() };
+}
+
+// Save one file (base64) into a sub-folder of the root folder, replacing a file with the same name
+function store_(p) {
+  const id = PropertiesService.getScriptProperties().getProperty("ROOT_FOLDER_ID");
+  if (!id) return { ok: false, error: "ยังไม่ได้ตั้งโฟลเดอร์หลัก (organize)" };
+  const sub = rootSub_(DriveApp.getFolderById(id), ROOT_SUBS_[p.sub] || ROOT_SUBS_.backup);
+  const name = String(p.name || "file");
+  const old = sub.getFilesByName(name);
+  while (old.hasNext()) old.next().setTrashed(true);
+  const blob = Utilities.newBlob(Utilities.base64Decode(p.data), p.type || "application/octet-stream", name);
+  const f = sub.createFile(blob);
+  return { ok: true, name: name, url: f.getUrl() };
 }
 
 function userNames_() {
