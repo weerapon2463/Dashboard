@@ -408,6 +408,24 @@ const Y2JStore = (() => {
     return api("ping", {}, false, url, token);
   }
 
+  // The company connection, encrypted with the company code (AES-GCM, key = PBKDF2-SHA256 of the code).
+  // Staff type the code once per device; without it this blob opens nothing.
+  const COMPANY_LOCK = {"salt": "gJBUyXTghwoXDQQO5L0Xiw==", "iv": "b+vfaOqPdMrM4XuN", "iter": 600000, "data": "qZLR9Ge2ZU54rERsjED2LqmxNKzJR9AeQ4xm4oK1XZz8+4T0KQvOR4w4nAp+9pmMXYMgwxhR8GT3WTFqjcTOsIU07B+9TfFJ/lAGlcBVwapRGe0lBMZroMR6IQgw7vzW7egJfOaX6z+eLBO0BB420O4o3N0sNGi1cSUx5Z6hqBlG4RnNcP/J2uio6b+lBLt8cY4pdhIhSvwJlBHXXomQcG1oQZ32FSVk95bqLDuqYlo="};
+  const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  async function unlockCompany(code) {
+    const norm = String(code || "").toUpperCase().replace(/\s+/g, "");
+    const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(norm), "PBKDF2", false, ["deriveKey"]);
+    const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(COMPANY_LOCK.salt), iterations: COMPANY_LOCK.iter, hash: "SHA-256" },
+      base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+    let conn;
+    try {
+      const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(COMPANY_LOCK.iv) }, key, b64(COMPANY_LOCK.data));
+      conn = JSON.parse(new TextDecoder().decode(plain));
+    } catch (e) { throw new Error("รหัสบริษัทไม่ถูกต้อง"); }
+    try { ls.removeItem("y2j-session-v1"); } catch (e) { /* ignore */ }
+    connect(conn.url, conn.token);
+  }
+
   function connect(url, token) {
     cfg = { mode: "sheets", url, token };
     if (company === "demo" && url !== DEMO_CFG.url) { // leaving the demo
@@ -461,6 +479,7 @@ const Y2JStore = (() => {
     ready, test, connect, disconnect, forceUpload, setupLink, uploadFile, fetchFile, flush,
     company: () => company, setCompany,
     bomFiles: () => api("bomfiles", { company }),
+    unlockCompany,
     bomRead: (model) => api("bomread", { company, model }, true),
     isRemote, config: () => Object.assign({}, cfg), status: () => Object.assign({ pending: [...dirty] }, status),
     sharedKeys: SHARED, merge3,

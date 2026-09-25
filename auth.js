@@ -410,7 +410,21 @@ function renderLoginConn() {
   }
   if (Y2JStore.isRemote() && Y2JStore.config().demo) {
     box.className = "login-conn login-conn-demo";
-    box.innerHTML = "🧪 ระบบทดลอง (ข้อมูลจำลอง) — เลือกผู้ใช้ด้านล่าง PIN 1234";
+    box.innerHTML = `<span>🧪 ระบบทดลอง (ข้อมูลจำลอง) — เลือกผู้ใช้ด้านล่าง PIN 1234</span>
+      <button type="button" class="btn-chip login-code-toggle" id="loginCodeToggle">พนักงาน Y2J: ใส่รหัสบริษัท</button>
+      <div class="login-conn-row" id="loginCodeRow" hidden><input id="loginCode" type="password" autocomplete="off" autocapitalize="characters" placeholder="รหัสบริษัท เช่น Y2J-XXXX-XXXX" aria-label="รหัสบริษัท"><button type="button" class="btn-primary" id="loginCodeBtn">เข้าข้อมูลบริษัท</button></div>
+      <span class="login-conn-err" id="loginCodeErr" hidden></span>`;
+    const row = document.getElementById("loginCodeRow");
+    document.getElementById("loginCodeToggle").addEventListener("click", () => { row.hidden = !row.hidden; if (!row.hidden) document.getElementById("loginCode").focus(); });
+    const go = async () => {
+      const err = document.getElementById("loginCodeErr");
+      const btn = document.getElementById("loginCodeBtn");
+      err.hidden = true; btn.disabled = true; btn.textContent = "กำลังตรวจ…";
+      try { await Y2JStore.unlockCompany(document.getElementById("loginCode").value); }
+      catch (e) { err.textContent = e.message; err.hidden = false; btn.disabled = false; btn.textContent = "เข้าข้อมูลบริษัท"; }
+    };
+    document.getElementById("loginCodeBtn").addEventListener("click", go);
+    document.getElementById("loginCode").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
     return;
   }
   if (Y2JStore.isRemote()) {

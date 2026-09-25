@@ -1221,3 +1221,4 @@ html[data-density="compact"] body { zoom: 0.9; }
 
 .login-build { margin-top: 10px; font-size: 11px; color: var(--text-muted); text-align: center; }
 .login-build a { color: inherit; }
+.login-code-toggle { align-self: flex-start; }
