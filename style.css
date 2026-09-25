@@ -1134,3 +1134,24 @@ html[data-density="compact"] body { zoom: 0.9; }
 .bs-lists h4 { margin: 8px 0 0; font-size: 13px; }
 .bs-lists code { font-size: 12px; }
 .bom-sheet-edited { border-color: var(--status-warning); }
+
+/* Overview: ranked decisions for today */
+.ov-decide-sum { margin: 0 0 10px; color: var(--text-secondary); }
+.ov-decide-sum strong { font-size: 1.25em; color: var(--text-primary); }
+.ov-decide-crit { color: var(--status-critical); font-weight: 600; }
+.ov-decide { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ov-decide-item { display: grid; grid-template-columns: 32px 1fr auto; align-items: center; gap: 12px; padding: 10px 12px;
+  border: 1px solid var(--border-hairline); border-left: 4px solid var(--status-warning); border-radius: 10px; background: var(--surface-1); }
+.ov-decide-critical { border-left-color: var(--status-critical); }
+.ov-decide-no { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font-weight: 700;
+  background: var(--status-warning); color: #1b1b1b; }
+.ov-decide-critical .ov-decide-no { background: var(--status-critical); color: #fff; }
+.ov-decide-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ov-decide-text strong { font-size: 15px; }
+.ov-decide-text span { color: var(--text-secondary); font-size: 13px; }
+.ov-decide-go { white-space: nowrap; }
+.ov-decide-ok { padding: 14px; border-radius: 10px; border: 1px solid var(--status-good); color: var(--status-good); font-weight: 600; }
+@media (max-width: 720px) {
+  .ov-decide-item { grid-template-columns: 28px 1fr; }
+  .ov-decide-go { grid-column: 2; justify-self: start; }
+}

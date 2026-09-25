@@ -10,6 +10,7 @@ const OV_STORAGE_PREFIX = "y2j-overview-v1-";
 
 const OV_WIDGETS = {
   hero: { title: "ตัวเลขสำคัญตอนนี้", sub: "กดตัวเลขเพื่อไปยังหน้าที่เกี่ยวข้อง", size: "full" },
+  decide: { title: "สิ่งที่ต้องตัดสินใจวันนี้", sub: "ระบบจัดลำดับจากข้อมูลจริงทุกโมดูล — เรื่องที่กระทบการส่งมอบมากที่สุดอยู่บนสุด", size: "full" },
   flow: { title: "เส้นทางงาน: คำสั่งซื้อ → ผลิต → ส่งมอบ → บริการ", sub: "จำนวนงานที่อยู่ในแต่ละช่วงตอนนี้ · กรอบแดง = คอขวด (ค้าง/เกินกำหนดมากที่สุด)", size: "full" },
   woProgress: { title: "ความคืบหน้าใบสั่งผลิต", sub: "แถบ = % เบิกวัสดุจริงจากใบเบิก · เรียงตามกำหนดส่ง", size: "half" },
   health: { title: "คะแนนความสอดคล้องของข้อมูล", sub: "ตรวจข้ามทุกโมดูลอัตโนมัติ — 100 = ไม่พบปัญหา", size: "half" },
@@ -30,9 +31,9 @@ const OV_WIDGETS = {
 };
 
 const OV_PRESETS = [
-  { id: "exec", name: "ผู้บริหาร", widgets: ["hero", "flow", "rndProjects", "woProgress", "health", "p2pPipeline", "service", "activity", "pilot", "docsLoad", "alerts"] },
-  { id: "prod", name: "ฝ่ายผลิต / วางแผน", widgets: ["hero", "woProgress", "reqAging", "stockHealth", "capacity", "woStatus", "legacyStats", "alerts"] },
-  { id: "store", name: "คลัง & จัดซื้อ", widgets: ["hero", "reqAging", "stockHealth", "p2pPipeline", "flow", "activity"] },
+  { id: "exec", name: "ผู้บริหาร", widgets: ["decide", "hero", "flow", "rndProjects", "woProgress", "health", "p2pPipeline", "service", "activity", "pilot", "docsLoad", "alerts"] },
+  { id: "prod", name: "ฝ่ายผลิต / วางแผน", widgets: ["decide", "hero", "flow", "woProgress", "reqAging", "capacity", "woStatus", "stockHealth", "health", "legacyStats", "alerts"] },
+  { id: "store", name: "คลัง & จัดซื้อ", widgets: ["decide", "hero", "reqAging", "stockHealth", "p2pPipeline", "flow", "activity"] },
   { id: "rnd", name: "R&D / วิศวกรรม", widgets: ["rndProjects", "rndChanges", "woProgress", "health", "activity", "docsLoad"] },
   { id: "svc", name: "บริการหลังการขาย", widgets: ["hero", "service", "flow", "stockHealth", "activity"] },
 ];
@@ -52,12 +53,18 @@ function ovDefaultPreset() {
 }
 function ovFromPreset(id) {
   const p = OV_PRESETS.find((x) => x.id === id) || OV_PRESETS[0];
-  return { preset: p.id, items: p.widgets.map((w) => ({ id: w, size: OV_WIDGETS[w].size })) };
+  return { preset: p.id, v2: true, items: p.widgets.map((w) => ({ id: w, size: OV_WIDGETS[w].size })) };
 }
 function ovLoad() {
   try {
     const p = JSON.parse(localStorage.getItem(OV_STORAGE_PREFIX + ovUserId()) || "null");
-    if (p && Array.isArray(p.items)) { p.items = p.items.filter((i) => OV_WIDGETS[i.id]); return p; }
+    if (p && Array.isArray(p.items)) {
+      p.items = p.items.filter((i) => OV_WIDGETS[i.id]);
+      // one-time: layouts saved before "decide" existed get it on top
+      if (!p.v2 && !p.items.some((i) => i.id === "decide")) p.items.unshift({ id: "decide", size: "full" });
+      p.v2 = true;
+      return p;
+    }
   } catch (e) { /* use preset */ }
   return ovFromPreset(ovDefaultPreset());
 }
@@ -75,11 +82,68 @@ function ovTile(label, value, note, view, tone, extra) {
     ? `<button type="button" class="stat-tile ov-tile${tone ? ` bx-tile-${tone}` : ""}" data-go="${view}"${extra ? ` data-extra="${ovEsc(extra)}"` : ""}>${inner}</button>`
     : `<div class="stat-tile ov-tile${tone ? ` bx-tile-${tone}` : ""}">${inner}</div>`;
 }
+// "15 ต.ค. 2569" → "2026-10-15" (work orders keep Thai display dates)
+function ovDue(s) {
+  const m = /(\d{1,2})\s+(\S+)\s+(\d{4})/.exec(s || "");
+  if (!m) return "9999";
+  const mi = TH_MONTHS.indexOf(m[2]);
+  return `${Number(m[3]) - 543}-${String(mi + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
+}
 function ovEmpty(text) { return `<p class="muted-note ov-empty">${text}</p>`; }
 
 /* ---- widgets ----------------------------------------------------------------- */
 
 const OV_RENDER = {
+  // Ranked decisions: each item says what is wrong, why it matters, and opens the page to act on it
+  decide() {
+    const items = [];
+    const add = (score, tone, title, why, view, label, extra) => items.push({ score, tone, title, why, view, label, extra });
+    WORK_ORDERS.filter((w) => w.status !== "เสร็จสมบูรณ์").forEach((w) => {
+      const due = ovDue(w.dueDate);
+      const left = due !== "9999" ? bxDaysBetween(bxToday(), due) : null;
+      const pct = Number(w.issuedPct) || 0;
+      if (w.status === "ล่าช้า" || (left !== null && left < 0))
+        add(100 + Math.abs(left || 0), "critical", `${w.wo} ${w.model} × ${w.qty} ล่าช้า${left !== null && left < 0 ? ` ${Math.abs(left)} วัน` : ""}`, `เบิกวัสดุแล้ว ${pct}% · ${w.department} — เร่งงานหรือแจ้งลูกค้าเลื่อนส่ง`, "workorder", "ดูใบสั่งผลิต");
+      else if (left !== null && left <= 7 && pct < 80)
+        add(80 - left, "warning", `${w.wo} ${w.model} ต้องส่งใน ${left} วัน แต่เบิกวัสดุได้ ${pct}%`, "เสี่ยงส่งไม่ทัน — ตรวจของขาดและเร่งเบิก", "workorder", "ดูใบสั่งผลิต");
+    });
+    if (typeof CAPACITY_LINES !== "undefined") {
+      const over = CAPACITY_LINES.map((line) => {
+        const wk = CAPACITY_DATA[line]; const last = wk && wk[wk.length - 1];
+        return last && last.capacity ? { line, pct: Math.round((last.demand / last.capacity) * 100) } : null;
+      }).filter((x) => x && x.pct > 100).sort((a, b) => b.pct - a.pct);
+      const free = CAPACITY_LINES.map((line) => { const wk = CAPACITY_DATA[line]; const last = wk && wk[wk.length - 1]; return last && last.capacity ? { line, pct: Math.round((last.demand / last.capacity) * 100) } : null; })
+        .filter((x) => x && x.pct < 95).sort((a, b) => a.pct - b.pct)[0];
+      if (over.length) add(60 + (over[0].pct - 100), over[0].pct >= 110 ? "critical" : "warning",
+        over.length === 1 ? `${over[0].line} ใช้กำลังผลิต ${over[0].pct}%` : `${over.length} ไลน์ใช้กำลังผลิตเกิน 100% — สูงสุด ${over[0].line} ${over[0].pct}%`,
+        `${over.map((x) => `${x.line} ${x.pct}%`).join(" · ")} — ${free ? `ย้ายงานไป${free.line} (ใช้ ${free.pct}%) ` : ""}เพิ่ม OT หรือเลื่อนงานที่ไม่ด่วน`, "capacity", "ดูกำลังการผลิต");
+    }
+    const reqs = bxReqs().filter(bxReqVisible).filter((d) => BX_OPEN_REQ.includes(d.status));
+    const stuck = reqs.map((d) => ({ d, age: bxDaysBetween(d.date, bxToday()), holder: bxReqHolder(d) })).filter((r) => r.age >= 2).sort((a, b) => b.age - a.age);
+    if (stuck.length) add(50 + stuck[0].age * 3, /ไม่พอ/.test(stuck[0].holder) ? "critical" : "warning", `ใบเบิกค้าง ${stuck.length} ใบ — นานสุด ${stuck[0].d.no} รอ ${stuck[0].age} วัน`, `ค้างที่: ${stuck[0].holder} · หน้างานรอของ`, "bomx", "ติดตามใบเบิก", "track");
+    const short = bxMrpRows().filter((r) => r.net > 0);
+    if (short.length) add(45, "warning", `วัสดุต้องสั่ง/ผลิตเพิ่ม ${ovNum(short.length)} รายการ`, "จากแผนความต้องการวัสดุ (MRP) ของใบสั่งผลิตที่เปิดอยู่ — เปิดใบขอซื้อจากหน้า MRP ได้ทันที", "bomx", "เปิด MRP", "mrp");
+    if (typeof P2P_CASES !== "undefined") {
+      const late = P2P_CASES.filter((c) => c.status !== "cancelled" && p2pCurrent(c) && p2pState(c) === "late");
+      if (late.length) add(55 + late.length, "critical", `คำขอซื้อเกินกำหนด ${late.length} รายการ`, "ของอาจไม่ทันใบสั่งผลิต — ดูว่าค้างที่ขั้นไหนและใครถืออยู่", "p2p", "ดูงานจัดซื้อ");
+    }
+    const claims = (DEPT_DOCS.svc || []).filter((d) => svIsClaim(d) && svClaimOpen(d));
+    if (claims.length) add(40 + claims.length, "warning", `เคลมจากลูกค้ายังไม่จบ ${claims.length} เรื่อง`, "กระทบความพอใจลูกค้า — ตรวจว่ามี NCR/ECR แก้ต้นเหตุแล้วหรือยัง", "service", "ดูงานเคลม");
+    const ic = typeof icRun === "function" ? icSummary(icRun()) : null;
+    if (ic && ic.error) add(70, "critical", `ข้อมูลขัดแย้งกัน ${ic.error} จุด`, "ตัวเลขบางหน้าอาจไม่ถูกต้องจนกว่าจะแก้", ovCan("admin") ? "admin" : "reports", "ดูรายการ", "integrity");
+    items.sort((a, b) => b.score - a.score);
+    if (!items.length) return `<div class="ov-decide-ok">✓ ไม่มีเรื่องเร่งด่วน — งานทุกส่วนเป็นไปตามแผน</div>`;
+    const top = items.slice(0, 5);
+    const crit = items.filter((x) => x.tone === "critical").length;
+    return `<p class="ov-decide-sum"><strong>${items.length}</strong> เรื่องต้องดู · <span class="ov-decide-crit">${crit} เรื่องเร่งด่วน</span>${items.length > top.length ? ` · แสดง ${top.length} อันดับแรก` : ""}</p>
+      <ol class="ov-decide">${top.map((x, i) => `
+      <li class="ov-decide-item ov-decide-${x.tone}">
+        <span class="ov-decide-no">${i + 1}</span>
+        <div class="ov-decide-text"><strong>${ovEsc(x.title)}</strong><span>${ovEsc(x.why)}</span></div>
+        ${ovCan(x.view) ? `<button type="button" class="btn-secondary ov-decide-go" data-go="${x.view}"${x.extra ? ` data-extra="${ovEsc(x.extra)}"` : ""}>${x.label} →</button>` : ""}
+      </li>`).join("")}</ol>`;
+  },
+
   hero() {
     const open = WORK_ORDERS.filter((w) => w.status !== "เสร็จสมบูรณ์");
     const late = WORK_ORDERS.filter((w) => w.status === "ล่าช้า").length;
@@ -98,10 +162,10 @@ const OV_RENDER = {
       ${ovTile("ใบสั่งผลิตที่ยังไม่เสร็จ", open.length, late ? `ล่าช้า ${late} ใบ` : "ไม่มีงานล่าช้า", "workorder", late ? "bad" : "")}
       ${ovTile("เบิกวัสดุเฉลี่ย", `${avg}%`, "ของใบสั่งผลิตที่ยังไม่เสร็จ", "bomx", "", "track")}
       ${ovTile("ใบเบิกที่ยังไม่ปิด", reqs.length, `รออนุมัติ ${reqs.filter((d) => d.status === "รออนุมัติ").length} · รอคลัง ${reqs.filter((d) => d.status !== "รออนุมัติ").length}`, "bomx", reqs.length ? "warn" : "", "track")}
-      ${ovTile("วัสดุที่ต้องสั่ง/ผลิตเพิ่ม", shortBuy, "จากแผนความต้องการวัสดุ (MRP)", "bomx", shortBuy ? "warn" : "", "mrp")}
+      ${ovTile("วัสดุที่ต้องสั่ง/ผลิตเพิ่ม", ovNum(shortBuy), "จากแผนความต้องการวัสดุ (MRP)", "bomx", shortBuy ? "warn" : "", "mrp")}
       ${ovTile("คำขอซื้อ PR→PO ค้าง", cases.length, p2pLate ? `เกินกำหนด ${p2pLate}` : "ตามกำหนดทั้งหมด", "p2p", p2pLate ? "bad" : "")}
       ${ovTile("งานบริการเปิดอยู่", svc.length, `เคลมยังไม่จบ ${claims.length}`, "service", svc.some((d) => d.status === "รออะไหล่") ? "warn" : "")}
-      ${ovTile("เอกสารค้างทุกแผนก", openDocs, "ยังไม่ปิด/อนุมัติ", "dept")}
+      ${ovTile("เอกสารค้างทุกแผนก", ovNum(openDocs), "ยังไม่ปิด/อนุมัติ", "dept")}
       ${score === null ? "" : ovTile("ความสอดคล้องของข้อมูล", `${score}`, ic.error ? `ผิดพลาด ${ic.error} รายการ` : ic.warn ? `ควรตรวจ ${ic.warn} รายการ` : "ไม่พบปัญหา", ovCan("admin") ? "admin" : "reports", ic.error ? "bad" : ic.warn ? "warn" : "", "integrity")}
     </div>`;
   },
@@ -139,12 +203,7 @@ const OV_RENDER = {
   },
 
   woProgress() {
-    const parseThai = (s) => {
-      const m = /(\d{1,2})\s+(\S+)\s+(\d{4})/.exec(s || "");
-      if (!m) return "9999";
-      const mi = TH_MONTHS.indexOf(m[2]);
-      return `${Number(m[3]) - 543}-${String(mi + 1).padStart(2, "0")}-${m[1].padStart(2, "0")}`;
-    };
+    const parseThai = ovDue;
     const list = WORK_ORDERS.slice().sort((a, b) => (a.status === "เสร็จสมบูรณ์") - (b.status === "เสร็จสมบูรณ์") || parseThai(a.dueDate).localeCompare(parseThai(b.dueDate))).slice(0, 8);
     if (!list.length) return ovEmpty("ยังไม่มีใบสั่งผลิต — ฝ่ายวางแผนเปิดได้ที่หน้า \"ใบสั่งผลิต & BOM\"");
     return `<div class="ov-rows">${list.map((w) => {
@@ -194,7 +253,12 @@ const OV_RENDER = {
     }).sort((a, b) => a.ratio - b.ratio).slice(0, 8);
     if (!rows.length) return ovEmpty("ยังไม่มียอดคงคลัง — คลังสินค้าตั้งยอดได้ที่หน้า BOM & เบิกวัสดุ › คงคลัง");
     const max = Math.max(...rows.map((r) => Math.max(r.qty, r.min, r.dem))) * 1.1 || 1;
-    const name = (k) => { let n = k; MACHINE_MODELS.some((m) => { const r = bxRowFor(m, k); if (r) { n = r.line.part; return true; } return false; }); return n; };
+    const name = (k) => {
+      let n = "";
+      MACHINE_MODELS.some((m) => { const r = bxRowFor(m, k); if (r) { n = r.line.part; return true; } return false; });
+      if (!n) n = (BX_STOCK[k] || {}).name || (typeof RD !== "undefined" && RD.parts && RD.parts[k] ? RD.parts[k].name : "") || "";
+      return n && n !== k ? n : "";
+    };
     return `<div class="ov-rows">${rows.map((r) => {
       const tone = r.qty < r.dem ? "critical" : r.min && r.qty <= r.min ? "warning" : "good";
       const label = tone === "critical" ? "ไม่พอจ่าย" : tone === "warning" ? "ถึงจุดสั่งซื้อ" : "ปกติ";

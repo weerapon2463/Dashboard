@@ -42,7 +42,7 @@ function renderWOStatusChart() {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
-        x: { beginAtZero: true, ticks: { color: cssVar("--text-muted"), stepSize: 1, precision: 0 }, grid: { color: cssVar("--gridline") } },
+        x: { beginAtZero: true, grace: "18%", ticks: { color: cssVar("--text-muted"), stepSize: 1, precision: 0 }, grid: { color: cssVar("--gridline") } },
         y: { ticks: { color: cssVar("--text-secondary") }, grid: { display: false } },
       },
       plugins: {
@@ -99,7 +99,7 @@ function renderCapacitySnapshotChart() {
       responsive: true,
       maintainAspectRatio: false,
       scales: {
-        x: { beginAtZero: true, ticks: { color: cssVar("--text-muted"), callback: (v) => v + "%" }, grid: { color: cssVar("--gridline") } },
+        x: { beginAtZero: true, grace: "12%", ticks: { color: cssVar("--text-muted"), callback: (v) => v + "%" }, grid: { color: cssVar("--gridline") } },
         y: { ticks: { color: cssVar("--text-secondary"), font: { size: 11 } }, grid: { display: false } },
       },
       plugins: {
