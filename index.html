@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Y2J ONE | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260926y">
+<link rel="stylesheet" href="style.css?v=20260926z">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -55,7 +55,7 @@
           <span class="nav-icon">◆</span> งานตามแผนก / เอกสาร
         </button>
         <button class="nav-item" data-view="plans">
-          <span class="nav-icon">◆</span> แผนงานของฉัน
+          <span class="nav-icon">◆</span> แผนงาน &amp; Schedule
         </button>
         <button class="nav-item" data-view="mytasks">
           <span class="nav-icon">◆</span> งานของฉัน
@@ -120,6 +120,10 @@
             <select id="companySelect"></select>
           </label>
           <span class="sync-chip" id="syncChip" hidden></span>
+          <div class="notify-wrap">
+            <button type="button" class="theme-toggle notify-btn" id="notifyBtn" aria-haspopup="true" aria-expanded="false" aria-label="การแจ้งเตือน" hidden>🔔<span class="notify-count" id="notifyCount" hidden>0</span></button>
+            <div class="notify-panel" id="notifyPanel" hidden></div>
+          </div>
           <div class="user-chip" id="userChip" hidden></div>
           <button class="theme-toggle density-toggle" id="densityBtn" type="button" title="ขนาดการแสดงผลของเครื่องนี้">Aa</button>
           <button class="theme-toggle" id="themeToggle" title="สลับโหมดสี">🌓</button>
@@ -353,6 +357,17 @@
               <span id="bomEdBadge"></span>
               <span class="muted-inline" id="bomEdStats"></span>
             </div>
+            <div class="bom-tree-bar">
+              <label for="bomLevelSel">แสดงถึงระดับ:</label>
+              <select id="bomLevelSel">
+                <option value="1">หัวข้อหลัก (ชุดประกอบหลัก)</option>
+                <option value="2">+ ชุดประกอบย่อย</option>
+                <option value="3">+ ชิ้นส่วนระดับ 3</option>
+                <option value="99">ทั้งหมด</option>
+              </select>
+              <span class="muted-inline" id="bomTreeInfo"></span>
+              <span class="muted-inline">· กด ▸ เพื่อดูรายการย่อยของแต่ละชุด</span>
+            </div>
             <div class="pilot-toolbar bom-actions">
               <button id="bomSheetBtn" class="btn-primary" type="button">📄 ดูเอกสาร BOM / คำนวณจำนวน</button>
               <button id="bomAddLineBtn" class="btn-secondary" type="button">+ เพิ่มรายการ</button>
@@ -393,17 +408,31 @@
         <div class="card">
           <div class="card-header card-header-actions">
             <div>
-              <h3>แผนงานของฉัน</h3>
-              <p class="card-sub">แต่ละคนทำแผนของตัวเองได้ และเลือกได้ว่าให้ใครเห็น — เฉพาะตัวเอง แผนก ทีม บุคคลที่เลือก หรือทุกคน</p>
+              <h3>แผนงาน &amp; Schedule</h3>
+              <p class="card-sub">สร้างงานของตัวเอง หรือสร้างแล้วมอบหมายให้คนอื่น · กำหนดวันและเวลา · เลือกผู้ร่วมแก้ไขและผู้ที่มองเห็น · แท็กงาน · ผู้เกี่ยวข้องได้รับแจ้งเตือน 🔔 · แต่ละคนเห็นเฉพาะงานที่ตนมีสิทธิ์</p>
             </div>
-            <button id="planAddBtn" class="btn-primary" type="button">+ สร้างแผน</button>
+            <button id="planAddBtn" class="btn-primary" type="button">+ สร้างงาน / นัดหมาย</button>
           </div>
           <div class="card-body">
             <div class="dept-tabs">
-              <button type="button" class="dept-tab plan-tab" data-tab="mine">แผนของฉัน <span class="dept-tab-count" id="planCountMine">0</span></button>
+              <button type="button" class="dept-tab plan-tab" data-tab="mine">ของฉัน <span class="dept-tab-count" id="planCountMine">0</span></button>
+              <button type="button" class="dept-tab plan-tab" data-tab="assigned">มอบหมายให้ฉัน <span class="dept-tab-count" id="planCountAssigned">0</span></button>
               <button type="button" class="dept-tab plan-tab" data-tab="shared">แชร์กับฉัน <span class="dept-tab-count" id="planCountShared">0</span></button>
               <button type="button" class="dept-tab plan-tab" data-tab="all" id="planTabAll" hidden>ทั้งหมด (Admin)</button>
             </div>
+            <div class="plan-toolbar">
+              <div class="plan-modes" role="group" aria-label="รูปแบบการแสดง">
+                <button type="button" class="btn-chip plan-mode" data-mode="week">🗓 ปฏิทินสัปดาห์</button>
+                <button type="button" class="btn-chip plan-mode" data-mode="list">☰ รายการ</button>
+              </div>
+              <div class="plan-weekbar" id="planWeekBar">
+                <button type="button" class="btn-chip" id="planPrevWeek" aria-label="สัปดาห์ก่อน">‹</button>
+                <strong id="planWeekLabel"></strong>
+                <button type="button" class="btn-chip" id="planNextWeek" aria-label="สัปดาห์ถัดไป">›</button>
+                <button type="button" class="btn-chip" id="planThisWeek">สัปดาห์นี้</button>
+              </div>
+            </div>
+            <div class="plan-tagbar" id="planTagBar"></div>
             <div class="plan-grid" id="planList"></div>
             <p class="muted-note" id="planEmpty" hidden></p>
           </div>
@@ -1151,19 +1180,30 @@
         <div class="card">
           <div class="card-header">
             <h3>Master BOM ตามรุ่นเครื่องจักร</h3>
-            <p class="card-sub">รายการชิ้นส่วนหลักต่อเครื่อง 1 คัน อ้างอิงชิ้นส่วนชุดเดียวกับโมดูล Make-or-Buy</p>
+            <p class="card-sub">จัดกลุ่มตามหมวดงาน › ชุดประกอบหลัก › ชุดประกอบย่อย › ชิ้นส่วน · เปิดมาเห็นหัวข้อหลัก กด ▸ เพื่อดูหัวข้อย่อย</p>
           </div>
           <div class="card-body">
             <div class="filter-row">
               <label for="bomModelFilter">รุ่นเครื่องจักร:</label>
               <select id="bomModelFilter"></select>
+              <label for="bomLevelFilter">แสดงถึงระดับ:</label>
+              <select id="bomLevelFilter">
+                <option value="1">หัวข้อหลัก</option>
+                <option value="2">+ ชุดประกอบย่อย</option>
+                <option value="3">+ ระดับ 3</option>
+                <option value="99">ทั้งหมด</option>
+              </select>
+              <span class="muted-inline" id="bomTableInfo"></span>
             </div>
             <div class="table-scroll">
               <table class="data-table" id="bomTable">
                 <thead>
                   <tr>
+                    <th>ข้อ</th>
+                    <th>รหัส</th>
                     <th>ชิ้นส่วน</th>
-                    <th>จำนวน/คัน</th>
+                    <th class="num">ต่อชุดแม่</th>
+                    <th class="num">รวม/คัน</th>
                     <th>หน่วย</th>
                   </tr>
                 </thead>
@@ -1474,15 +1514,24 @@
   <div class="modal-backdrop" id="planEdBackdrop">
     <div class="modal modal-wide">
       <h3 id="planEdTitle">แผน</h3>
-      <div class="form-field"><label for="pl_title">ชื่อแผน / เป้าหมาย *</label><input id="pl_title" placeholder="เช่น ลดเวลาประกอบโครงฐานลง 20%"></div>
+      <p class="card-sub" id="pl_owner"></p>
+      <div class="form-field"><label for="pl_title">ชื่องาน / นัดหมาย *</label><input id="pl_title" placeholder="เช่น ประชุมทบทวน BOM YT6500 / ตรวจรับเหล็กล็อตใหม่"></div>
       <div class="form-field"><label for="pl_detail">รายละเอียด</label><textarea id="pl_detail" rows="2"></textarea></div>
-      <div class="modal-grid">
-        <div class="form-field"><label for="pl_start">เริ่ม</label><input type="date" id="pl_start"></div>
-        <div class="form-field"><label for="pl_due">กำหนดเสร็จ</label><input type="date" id="pl_due"></div>
-        <div class="form-field"><label for="pl_status">สถานะ</label><select id="pl_status"></select></div>
+      <div class="modal-grid plan-when">
+        <div class="form-field"><label for="pl_start">วันที่เริ่ม *</label><input type="date" id="pl_start"></div>
+        <div class="form-field"><label for="pl_startTime">เวลาเริ่ม</label><input type="time" id="pl_startTime"></div>
+        <div class="form-field"><label for="pl_due">วันที่สิ้นสุด</label><input type="date" id="pl_due"></div>
+        <div class="form-field"><label for="pl_endTime">เวลาสิ้นสุด</label><input type="time" id="pl_endTime"></div>
       </div>
+      <div class="modal-grid">
+        <div class="form-field"><label for="pl_status">สถานะ</label><select id="pl_status"></select></div>
+        <div class="form-field"><label for="pl_tags">แท็ก (คั่นด้วย ,)</label><input id="pl_tags" list="pl_tagSuggest" placeholder="เช่น ประชุม, เร่งด่วน, YT6500"><datalist id="pl_tagSuggest"></datalist></div>
+      </div>
+      <div class="vis-group"><div class="vis-group-title">👤 ผู้รับผิดชอบ (มอบหมายงาน) *</div><div class="plan-people-pick" id="pl_assignees"></div></div>
+      <div class="vis-group"><div class="vis-group-title">✍ ผู้ร่วมแก้ไข (แก้รายละเอียดงานได้)</div><div class="plan-people-pick" id="pl_editors"></div></div>
       <div class="form-field"><label for="pl_items">ขั้นตอน / รายการที่ต้องทำ (บรรทัดละ 1 ข้อ — ขึ้นต้น [x] = เสร็จแล้ว)</label><textarea id="pl_items" rows="4" placeholder="ศึกษาปัญหา&#10;ทดลองวิธีใหม่&#10;สรุปผล"></textarea></div>
       <div id="planVisBox"></div>
+      <div id="pl_activity"></div>
       <div class="modal-actions">
         <button id="planDeleteBtn" class="btn-secondary" type="button" hidden>ลบแผน</button>
         <button id="planCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
@@ -1678,40 +1727,40 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260926y"></script>
-  <script src="data.js?v=20260926y"></script>
-  <script src="partcode.js?v=20260926y"></script>
-  <script src="priority-matrix.js?v=20260926y"></script>
-  <script src="capacity-planning.js?v=20260926y"></script>
-  <script src="master-schedule.js?v=20260926y"></script>
-  <script src="make-or-buy.js?v=20260926y"></script>
-  <script src="resource.js?v=20260926y"></script>
-  <script src="procurement.js?v=20260926y"></script>
-  <script src="workorder.js?v=20260926y"></script>
-  <script src="alerts.js?v=20260926y"></script>
-  <script src="overview-charts.js?v=20260926y"></script>
-  <script src="pilot.js?v=20260926y"></script>
-  <script src="pilot-measure.js?v=20260926y"></script>
-  <script src="dept-data.js?v=20260926y"></script>
-  <script src="dept-samples.js?v=20260926y"></script>
-  <script src="org.js?v=20260926y"></script>
-  <script src="dept.js?v=20260926y"></script>
-  <script src="bom.js?v=20260926y"></script>
-  <script src="bomx.js?v=20260926y"></script>
-  <script src="bomsheet.js?v=20260926y"></script>
-  <script src="service.js?v=20260926y"></script>
-  <script src="reports.js?v=20260926y"></script>
-  <script src="integrity.js?v=20260926y"></script>
-  <script src="overview.js?v=20260926y"></script>
-  <script src="rnd.js?v=20260926y"></script>
-  <script src="docview.js?v=20260926y"></script>
-  <script src="esign.js?v=20260926y"></script>
-  <script src="p2p-data.js?v=20260926y"></script>
-  <script src="p2p.js?v=20260926y"></script>
-  <script src="suppliers.js?v=20260926y"></script>
-  <script src="auth.js?v=20260926y"></script>
-  <script src="admin.js?v=20260926y"></script>
-  <script src="plans.js?v=20260926y"></script>
-  <script src="app.js?v=20260926y"></script>
+  <script src="storage.js?v=20260926z"></script>
+  <script src="data.js?v=20260926z"></script>
+  <script src="partcode.js?v=20260926z"></script>
+  <script src="priority-matrix.js?v=20260926z"></script>
+  <script src="capacity-planning.js?v=20260926z"></script>
+  <script src="master-schedule.js?v=20260926z"></script>
+  <script src="make-or-buy.js?v=20260926z"></script>
+  <script src="resource.js?v=20260926z"></script>
+  <script src="procurement.js?v=20260926z"></script>
+  <script src="workorder.js?v=20260926z"></script>
+  <script src="alerts.js?v=20260926z"></script>
+  <script src="overview-charts.js?v=20260926z"></script>
+  <script src="pilot.js?v=20260926z"></script>
+  <script src="pilot-measure.js?v=20260926z"></script>
+  <script src="dept-data.js?v=20260926z"></script>
+  <script src="dept-samples.js?v=20260926z"></script>
+  <script src="org.js?v=20260926z"></script>
+  <script src="dept.js?v=20260926z"></script>
+  <script src="bom.js?v=20260926z"></script>
+  <script src="bomx.js?v=20260926z"></script>
+  <script src="bomsheet.js?v=20260926z"></script>
+  <script src="service.js?v=20260926z"></script>
+  <script src="reports.js?v=20260926z"></script>
+  <script src="integrity.js?v=20260926z"></script>
+  <script src="overview.js?v=20260926z"></script>
+  <script src="rnd.js?v=20260926z"></script>
+  <script src="docview.js?v=20260926z"></script>
+  <script src="esign.js?v=20260926z"></script>
+  <script src="p2p-data.js?v=20260926z"></script>
+  <script src="p2p.js?v=20260926z"></script>
+  <script src="suppliers.js?v=20260926z"></script>
+  <script src="auth.js?v=20260926z"></script>
+  <script src="admin.js?v=20260926z"></script>
+  <script src="plans.js?v=20260926z"></script>
+  <script src="app.js?v=20260926z"></script>
 </body>
 </html>

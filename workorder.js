@@ -187,6 +187,8 @@ function populateBOMFilter() {
     select.appendChild(opt);
   });
   select.addEventListener("change", () => renderBOMTable(select.value));
+  const lv = document.getElementById("bomLevelFilter");
+  if (lv) lv.addEventListener("change", () => woBomLevel(Number(lv.value)));
 }
 
 function populateWOLineFilter() {
@@ -264,20 +266,62 @@ function renderWOTable(lineFilter) {
   });
 }
 
+// Master BOM as a tree: group (01 CHASSIS …) › main assembly › sub-assembly › part.
+// Opens on the main items; ▸ opens one assembly, the level picker opens every assembly down to a level.
+let woBomModel = null;
 function renderBOMTable(model) {
   const tbody = document.querySelector("#bomTable tbody");
   if (!tbody) return;
+  if (model) woBomModel = model;
+  model = woBomModel;
   tbody.innerHTML = "";
   const list = MASTER_BOM[model] || [];
-  list.forEach((row) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(row.part)}</td>
-      <td>${escapeHtml(String(row.qty))}</td>
-      <td>${escapeHtml(row.unit)}</td>
-    `;
-    tbody.appendChild(tr);
+  if (typeof bxTree !== "function") return;
+  const tree = bxTree(model);
+  const ids = new Set(list.map((l) => l.id));
+  const hidden = new Set();
+  const visible = tree.filter((r) => {
+    if (r.isGroup) return true;
+    const p = r.line.parent;
+    if (p && ids.has(p) && (hidden.has(p) || !bxIsOpen(model, p))) { hidden.add(r.line.id); return false; }
+    return true;
   });
+  const size = {};
+  tree.forEach((r) => { if (r.line) size[r.group] = (size[r.group] || 0) + 1; });
+  const info = document.getElementById("bomTableInfo");
+  if (info) info.textContent = `${model} · ${list.length.toLocaleString("th-TH")} รายการ · แสดง ${visible.filter((r) => r.line).length}`;
+  tbody.innerHTML = visible.map((r) => {
+    if (r.isGroup) return `<tr class="bom-group-row"><td colspan="6"><strong>${escapeHtml(r.no)} · ${escapeHtml(r.group)}</strong> <span class="muted-inline">${size[r.group] || 0} รายการ</span></td></tr>`;
+    const l = r.line;
+    const open = r.hasKids && bxIsOpen(model, l.id);
+    const tog = r.hasKids
+      ? `<button type="button" class="bx-tog" data-wtog="${escapeHtml(l.id)}" aria-expanded="${open}" aria-label="${open ? "ย่อ" : "ขยาย"} ${escapeHtml(l.part || "")}">${open ? "▾" : "▸"}</button>`
+      : `<span class="bx-tog-space">${r.depth > 1 ? "└" : ""}</span>`;
+    return `<tr${r.hasKids ? ' class="bom-assy-row"' : ""}>
+      <td><span class="bx-itemno">${escapeHtml(r.no)}</span></td>
+      <td class="mono-cell">${escapeHtml(l.code || "—")}</td>
+      <td><div class="bom-part-cell"><span class="bom-indent" style="padding-left:${(r.depth - 1) * 18}px">${tog}</span><span>${escapeHtml(l.part || "")}</span>${r.hasKids ? ` <span class="pill pill-schedule">${r.kidCount} รายการย่อย</span>` : ""}</div></td>
+      <td class="num">${escapeHtml(String(l.qty ?? ""))}</td>
+      <td class="num"><strong>${escapeHtml(String(Math.round(r.per * 100) / 100))}</strong></td>
+      <td>${escapeHtml(l.unit || "")}</td>
+    </tr>`;
+  }).join("");
+  tbody.querySelectorAll("[data-wtog]").forEach((b) => b.addEventListener("click", () => {
+    const k = `${model}|${b.dataset.wtog}`;
+    if (bxOpen.has(k)) bxOpen.delete(k); else bxOpen.add(k);
+    bxSaveOpen();
+    renderBOMTable();
+  }));
+}
+
+function woBomLevel(lv) {
+  if (!woBomModel || typeof bxTree !== "function") return;
+  bxTree(woBomModel).filter((r) => r.line && r.hasKids).forEach((r) => {
+    const k = `${woBomModel}|${r.line.id}`;
+    if (r.depth < lv) bxOpen.add(k); else bxOpen.delete(k);
+  });
+  bxSaveOpen();
+  renderBOMTable();
 }
 
 function renderIssuanceTable() {

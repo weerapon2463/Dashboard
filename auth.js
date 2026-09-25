@@ -35,7 +35,7 @@ const PERM_RANK = { none: 0, view: 1, create: 2, manage: 3 };
 const CROSS_CREATE_TYPES = ["mtr", "ncr", "saf", "mreq", "ecr", "svc", "tq"];
 
 const ALL_VIEWS = [
-  ["overview", "ภาพรวม"], ["pilot", "ผลทดสอบนำร่อง"], ["dept", "งานตามแผนก / เอกสาร"], ["plans", "แผนงานของฉัน"],
+  ["overview", "ภาพรวม"], ["pilot", "ผลทดสอบนำร่อง"], ["dept", "งานตามแผนก / เอกสาร"], ["plans", "แผนงาน & Schedule"],
   ["mytasks", "งานของฉัน"], ["priority", "Priority Matrix"], ["capacity", "Capacity Planning"], ["schedule", "Master Schedule"],
   ["makeorbuy", "Make-or-Buy"], ["resource", "ทรัพยากรการผลิต"], ["p2p", "ติดตามจัดซื้อ (PR→PO→รับของ)"], ["procurement", "จัดซื้อ"], ["workorder", "ใบสั่งผลิต & BOM"],
   ["rnd", "R&D Workbench"], ["bomx", "BOM & เบิกวัสดุ"], ["service", "บริการหลังการขาย"], ["reports", "รายงาน"],

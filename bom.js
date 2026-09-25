@@ -242,16 +242,42 @@ function renderBomEditor() {
 
   const tbody = document.querySelector("#bomEdTable tbody");
   tbody.innerHTML = "";
-  const itemNos = typeof bxItemNumbers === "function" ? bxItemNumbers(bomModel) : {};
-  lines.forEach((l, i) => {
+  // Tree view: group › assembly › sub-part. Only the main items show until an assembly is opened
+  // (open/closed state is shared with the BOM & เบิกวัสดุ page and remembered per device).
+  const idx = new Map(lines.map((l, i) => [l.id, i]));
+  const tree = typeof bxTree === "function" ? bxTree(bomModel) : lines.map((l, i) => ({ line: l, no: String(i + 1), depth: 1, hasKids: false }));
+  const hiddenIds = new Set();
+  const visible = tree.filter((r) => {
+    if (r.isGroup || !r.line) return true;
+    const p = r.line.parent;
+    if (p && idx.has(p) && (hiddenIds.has(p) || !bxIsOpen(bomModel, p))) { hiddenIds.add(r.line.id); return false; }
+    return true;
+  });
+  const groupSize = {};
+  tree.forEach((r) => { if (r.line) groupSize[r.group] = (groupSize[r.group] || 0) + 1; });
+  document.getElementById("bomTreeInfo").textContent = `แสดง ${visible.filter((r) => r.line).length} จาก ${lines.length} รายการ`;
+  visible.forEach((r) => {
     const tr = document.createElement("tr");
-    const no = itemNos[l.id] ? `<span class="bx-itemno">${escapeHtml(itemNos[l.id])}</span>` : i + 1;
+    if (r.isGroup) {
+      tr.className = "bom-group-row";
+      tr.innerHTML = `<td colspan="9"><strong>${escapeHtml(r.no)} · ${escapeHtml(r.group)}</strong> <span class="muted-inline">${groupSize[r.group] || 0} รายการ</span></td>`;
+      tbody.appendChild(tr);
+      return;
+    }
+    const l = r.line;
+    const i = idx.get(l.id);
+    const no = `<span class="bx-itemno">${escapeHtml(r.no)}</span>`;
+    const open = r.hasKids && bxIsOpen(bomModel, l.id);
+    const tog = `<span class="bom-indent" style="padding-left:${(r.depth - 1) * 18}px">${r.hasKids
+      ? `<button type="button" class="bx-tog" data-btog="${escapeHtml(l.id)}" aria-expanded="${open}" aria-label="${open ? "ย่อ" : "ขยาย"} ${escapeHtml(l.part || "")}">${open ? "▾" : "▸"}</button>`
+      : `<span class="bx-tog-space">${r.depth > 1 ? "└" : ""}</span>`}</span>`;
+    if (r.hasKids) tr.classList.add("bom-assy-row");
     if (editable) {
       const opts = (list, v) => list.map((o) => `<option${o === v ? " selected" : ""}>${escapeHtml(o)}</option>`).join("");
       tr.innerHTML = `
         <td>${no}</td>
         <td><input class="bom-inline bom-code" data-i="${i}" data-k="code" value="${escapeHtml(l.code || "")}" placeholder="รหัส" aria-label="รหัสชิ้นส่วน"></td>
-        <td><input class="bom-inline bom-part" data-i="${i}" data-k="part" value="${escapeHtml(l.part || "")}" aria-label="ชื่อชิ้นส่วน"></td>
+        <td><div class="bom-part-cell">${tog}<input class="bom-inline bom-part" data-i="${i}" data-k="part" value="${escapeHtml(l.part || "")}" aria-label="ชื่อชิ้นส่วน"></div></td>
         <td><input class="bom-inline bom-qty" type="number" min="0" step="any" data-i="${i}" data-k="qty" value="${escapeHtml(String(l.qty ?? ""))}" aria-label="จำนวนต่อคัน"></td>
         <td><select class="bom-inline" data-i="${i}" data-k="unit" aria-label="หน่วย">${opts(BOM_UNITS.includes(l.unit) ? BOM_UNITS : [l.unit, ...BOM_UNITS], l.unit)}</select></td>
         <td><select class="bom-inline" data-i="${i}" data-k="source" aria-label="ผลิตเองหรือซื้อ">${opts(BOM_SOURCES, l.source || "ซื้อ")}</select></td>
@@ -263,7 +289,7 @@ function renderBomEditor() {
       tr.innerHTML = `
         <td>${no}</td>
         <td class="mono-cell">${escapeHtml(l.code || "—")}</td>
-        <td>${escapeHtml(l.part || "")}</td>
+        <td><div class="bom-part-cell">${tog}<span>${escapeHtml(l.part || "")}</span>${r.hasKids ? ` <span class="pill pill-schedule">${r.kidCount || ""} รายการย่อย</span>` : ""}</div></td>
         <td>${escapeHtml(String(l.qty ?? ""))}</td>
         <td>${escapeHtml(l.unit || "")}</td>
         <td>${escapeHtml(l.source || "—")}</td>
@@ -276,6 +302,12 @@ function renderBomEditor() {
   });
   document.getElementById("bomEmptyNote").hidden = lines.length > 0;
   wireDrawingChips(tbody);
+  tbody.querySelectorAll("[data-btog]").forEach((b) => b.addEventListener("click", () => {
+    const k = `${bomModel}|${b.dataset.btog}`;
+    if (bxOpen.has(k)) bxOpen.delete(k); else bxOpen.add(k);
+    bxSaveOpen();
+    renderBomEditor();
+  }));
 
   tbody.querySelectorAll(".bom-inline").forEach((el) => el.addEventListener("change", () => {
     const line = MASTER_BOM[bomModel][Number(el.dataset.i)];
@@ -441,6 +473,14 @@ function initBomInteractions() {
     if (parts.length) parts[parts.length - 1].focus();
   });
   document.getElementById("bomNewSaveBtn").addEventListener("click", saveBomNew);
+  // show the tree down to a level: 1 = main items only, 99 = everything
+  document.getElementById("bomLevelSel").addEventListener("change", (e) => {
+    const lv = Number(e.target.value);
+    const rows = bxTree(bomModel).filter((r) => r.line && r.hasKids);
+    rows.forEach((r) => { const k = `${bomModel}|${r.line.id}`; if (r.depth < lv) bxOpen.add(k); else bxOpen.delete(k); });
+    bxSaveOpen();
+    renderBomEditor();
+  });
   document.getElementById("bomSheetImport").addEventListener("click", () => bomImportFromSheet(bomModel));
   document.getElementById("bomRevSaveBtn").addEventListener("click", saveBomRev);
   ["bomNewBackdrop", "bomRevBackdrop"].forEach((id) => {
