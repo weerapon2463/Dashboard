@@ -30,6 +30,14 @@ const Y2JStore = (() => {
   const rawGet = (k) => { try { return origGet.call(ls, k); } catch (e) { return null; } };
   const readJson = (k, dflt) => { try { return JSON.parse(rawGet(k) || "null") || dflt; } catch (e) { return dflt; } };
 
+  // ?reset=1 — start this browser from scratch (stale data, a test device, a shared tablet)
+  try {
+    if (new URLSearchParams(location.search).get("reset") === "1") {
+      ls.clear();
+      try { sessionStorage.clear(); } catch (e) { /* ignore */ }
+      history.replaceState(null, "", location.pathname + location.hash);
+    }
+  } catch (e) { /* ignore */ }
   let cfg = readJson(CONFIG_KEY, { mode: "local", url: "", token: "" });
   // A device that was never set up joins the public DEMO: a separate Google Sheet that holds only the
   // simulated company (sample data, demo-* users). Its key is public on purpose and opens nothing else.

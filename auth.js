@@ -401,6 +401,13 @@ function authUserName(id) {
 function renderLoginConn() {
   const box = document.getElementById("loginConn");
   if (!box || typeof Y2JStore === "undefined") return;
+  // which build this device is running (asset version) — tells stale caches apart at a glance
+  const card = document.querySelector(".login-card");
+  if (card && !document.getElementById("loginBuild")) {
+    const src = (document.querySelector('script[src*="storage.js"]') || {}).src || "";
+    const v = (src.match(/[?&]v=([^&]+)/) || [])[1] || "";
+    card.insertAdjacentHTML("beforeend", `<div class="login-build" id="loginBuild">เวอร์ชัน ${escapeHtml(v)} · ${Y2JStore.config().demo ? "ระบบทดลอง" : Y2JStore.isRemote() ? "ข้อมูลบริษัท" : "เฉพาะเครื่องนี้"} · <a href="./?reset=1">ล้างข้อมูลในเครื่องนี้</a></div>`);
+  }
   if (Y2JStore.isRemote() && Y2JStore.config().demo) {
     box.className = "login-conn login-conn-demo";
     box.innerHTML = `<strong>🧪 ระบบทดลอง (ข้อมูลจำลองทั้งหมด)</strong>
