@@ -48,8 +48,9 @@ function initBomData() {
     if (!MASTER_BOM[m]) MASTER_BOM[m] = [];
     if (!BOM_META[m]) BOM_META[m] = bomDefaultMeta(m);
     bomEnsureStructure(m);
-    // a released BOM is the state of its current revision — keep a copy so revisions can be compared later
-    if (BOM_META[m].status === BOM_RELEASED) bomSnapshot(m, false);
+    // the current revision is read from the live lines; a copy of it is only kept once it is superseded
+    // (saveBomRev) — dropping the duplicate halves the stored size of large BOMs
+    if (BOM_META[m].snapshots) delete BOM_META[m].snapshots[BOM_META[m].rev];
   });
   bomModel = MACHINE_MODELS[0] || null;
   return hadStored;
@@ -108,7 +109,7 @@ function bomAddSampleChildren(onlyModel) {
   return added;
 }
 
-// Frozen copy of a revision's lines (BOM_META[model].snapshots[rev]); newest 12 kept
+// Frozen copy of a superseded revision's lines (BOM_META[model].snapshots[rev]); newest 12 kept
 function bomSnapshot(model, overwrite) {
   const meta = BOM_META[model];
   if (!meta) return;
@@ -383,7 +384,7 @@ function releaseBom() {
   if (lines.some((l) => !l.part || !(Number(l.qty) > 0))) { showToast("มีรายการที่ยังไม่มีชื่อชิ้นส่วนหรือจำนวน", "warn"); return; }
   if (!confirm(`อนุมัติใช้งาน BOM ${bomModel} Rev.${meta.rev}? หลังอนุมัติจะแก้ไขได้โดยออก Revision ใหม่เท่านั้น`)) return;
   meta.status = BOM_RELEASED;
-  bomSnapshot(bomModel, true);
+  if (meta.snapshots) delete meta.snapshots[meta.rev]; // live lines are this revision until the next one starts
   bomAudit("อนุมัติใช้งาน BOM", `Rev.${meta.rev}`);
   const last = meta.history[meta.history.length - 1];
   if (last && last.rev === meta.rev) last.date = new Date().toISOString().slice(0, 10);
