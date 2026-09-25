@@ -84,6 +84,7 @@ function handle_(p) {
       case "file": return json_(file_(p.id));
       case "bomfiles": return json_(bomFiles_(p.company === "y2j" ? "" : p.company));
       case "bomread": return json_(bomRead_(p.company === "y2j" ? "" : p.company, String(p.model || "")));
+      case "rebuild": return json_(rebuildTabs_());
       default: return json_({ ok: false, error: "unknown action" });
     }
   } catch (err) {
@@ -470,13 +471,40 @@ function writeTab_(name, header, rows) {
   const sh = ss.getSheetByName(name) || ss.insertSheet(name);
   sh.clearContents();
   // text typed by users must never run as a formula in the report tabs
-  const safe = (v) => (typeof v === "string" && /^[=+\-@]/.test(v) ? "'" + v : v);
+  const iso = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+  const safe = (v) => {
+    if (typeof v !== "string") return v;
+    if (iso.test(v)) { const d = new Date(v); if (!isNaN(d)) return Utilities.formatDate(d, "Asia/Bangkok", "yyyy-MM-dd HH:mm"); }
+    return /^[=+\-@]/.test(v) ? "'" + v : v;
+  };
   const data = [header].concat(rows.length ? rows.map((r) => r.map(safe)) : [header.map(() => "")]);
+  if (sh.getFilter()) sh.getFilter().remove();
   sh.getRange(1, 1, data.length, header.length).setValues(data);
-  sh.getRange(1, 1, 1, header.length).setFontWeight("bold").setBackground("#e8eef7");
+  sh.getRange(1, 1, 1, header.length).setFontWeight("bold").setBackground("#1f4e79").setFontColor("#ffffff").setVerticalAlignment("middle");
   sh.setFrozenRows(1);
+  sh.getRange(1, 1, data.length, header.length).createFilter();
+  sh.autoResizeColumns(1, header.length);
+  for (let c = 1; c <= header.length; c++) { if (sh.getColumnWidth(c) > 360) sh.setColumnWidth(c, 360); }
   const note = "สร้างอัตโนมัติจาก Dashboard — แก้ข้อมูลที่ Dashboard (แก้ในแท็บนี้จะถูกเขียนทับ)";
   sh.getRange(1, 1).setNote(note);
+}
+
+// "2/3 · ผู้จัดทำ: A · ผู้ตรวจสอบ: B" — slot labels come from the form settings when present
+function sigText_(sigs) {
+  if (!sigs) return "";
+  const labels = ["ผู้จัดทำ", "ผู้ตรวจสอบ", "ผู้อนุมัติ"];
+  const got = [0, 1, 2].filter((i) => sigs[i]);
+  return got.length ? got.length + "/3 · " + got.map((i) => labels[i] + ": " + (sigs[i].name || "")).join(" · ") : "";
+}
+
+// Rebuild every readable tab from the stored data (after a layout change, or on request)
+function rebuildTabs_() {
+  const all = readAll_(true);
+  const done = [];
+  Object.keys(all).forEach((k) => {
+    try { mirror_(k, all[k].value); done.push(k); } catch (err) { done.push(k + " ✗ " + err.message); }
+  });
+  return { ok: true, rebuilt: done };
 }
 
 function userNames_() {
@@ -506,8 +534,9 @@ function mirror_(key, value) {
     Object.keys(d).forEach((t) => (d[t] || []).forEach((doc) => rows.push([
       t.toUpperCase(), doc.no || "", doc.title || "", doc.status || "", doc.model || "", doc.owner || "", doc.date || doc.due || "",
       VIS_[(doc.visibility && doc.visibility.mode) || "all"] || "", who(doc.createdBy), doc.createdAt || "", who(doc.updatedBy), doc.updatedAt || "", (doc.files || []).length,
+      sigText_(doc.signatures),
     ])));
-    writeTab_(tab("เอกสาร"), ["ชนิด", "เลขที่", "เรื่อง", "สถานะ", "รุ่น", "ผู้รับผิดชอบ", "วันที่", "การมองเห็น", "สร้างโดย", "สร้างเมื่อ", "แก้ล่าสุดโดย", "แก้เมื่อ", "ไฟล์แนบ"], rows);
+    writeTab_(tab("เอกสาร"), ["ชนิด", "เลขที่", "เรื่อง", "สถานะ", "รุ่น", "ผู้รับผิดชอบ", "วันที่", "การมองเห็น", "สร้างโดย", "สร้างเมื่อ", "แก้ล่าสุดโดย", "แก้เมื่อ", "ไฟล์แนบ", "ลายเซ็น"], rows);
   }
   if (key === "y2j-dept-docs-v1") {
     const mcByNo = {};
@@ -535,8 +564,15 @@ function mirror_(key, value) {
   }
   if (key === "y2j-stock-v1") {
     const items = d.items || {};
-    writeTab_(tab("คงคลัง"), ["รหัส", "ที่เก็บ", "คงคลัง", "จุดสั่งซื้อ", "สถานะ"],
-      Object.keys(items).sort().map((k) => { const it = items[k]; const q = Number(it.qty) || 0, mn = Number(it.min) || 0; return [k, it.loc || "", q, mn || "", q <= 0 ? "หมด" : mn && q <= mn ? "ถึงจุดสั่งซื้อ" : "ปกติ"]; }));
+    const names = {};
+    try {
+      const bk = "y2j-bom-v1" + (co ? "--c-" + co : "");
+      const b = JSON.parse(readAll_(true, [bk])[bk].value).bom || {};
+      Object.keys(b).forEach((m) => (b[m] || []).forEach((l) => { const k = String(l.code || "").trim() || String(l.part || "").trim(); if (k && !names[k]) names[k] = [l.part || "", []]; if (k) names[k][1].push(m); }));
+    } catch (err) { /* no BOM */ }
+    writeTab_(tab("คงคลัง"), ["รหัส", "ชื่อชิ้นส่วน", "ใช้ในรุ่น", "ที่เก็บ", "คงคลัง", "จุดสั่งซื้อ", "สถานะ"],
+      Object.keys(items).sort().map((k) => { const it = items[k]; const q = Number(it.qty) || 0, mn = Number(it.min) || 0; const n = names[k] || ["", []];
+        return [k, n[0], n[1].filter((m, i, a) => a.indexOf(m) === i).join(", "), it.loc || "", q, mn || "", q <= 0 ? "หมด" : mn && q <= mn ? "ถึงจุดสั่งซื้อ" : "ปกติ"]; }));
   }
   if (key === "y2j-procurement-v1" && d.suppliers) {
     writeTab_(tab("ผู้ขาย"), ["ผู้ขาย", "ประเภท", "ผู้ติดต่อ", "โทร", "อีเมล", "เงื่อนไขชำระ", "Lead time (วัน)", "คะแนน", "ชิ้นส่วนที่ซื้อ", "สถานะ"],
@@ -563,11 +599,12 @@ function mirror_(key, value) {
       (d.users || []).map((u) => [u.name, u.username, u.position || "", u.role, u.dept || "ส่วนกลาง", (u.teams || []).map((t) => teams[t] || t).join(", "), u.active ? "ใช่" : "ไม่", u.lastLogin || ""]));
   }
   if (key === "y2j-plans-v1") {
-    writeTab_(tab("แผนงาน"), ["แผน", "เจ้าของ", "สถานะ", "เริ่ม", "กำหนดเสร็จ", "ความคืบหน้า", "การมองเห็น"],
-      (d || []).map((p) => {
+    writeTab_(tab("แผนงาน"), ["งาน / นัดหมาย", "วันเริ่ม", "เวลาเริ่ม", "วันสิ้นสุด", "เวลาสิ้นสุด", "ผู้รับผิดชอบ", "ผู้ร่วมแก้ไข", "สร้างโดย", "สถานะ", "ความคืบหน้า", "แท็ก", "การมองเห็น", "แก้ล่าสุด"],
+      (d || []).slice().sort((a, b) => String(a.start || "").localeCompare(String(b.start || "")) || String(a.startTime || "").localeCompare(String(b.startTime || ""))).map((p) => {
         const items = p.items || [];
         const pct = p.status === "เสร็จแล้ว" ? 100 : items.length ? Math.round(items.filter((i) => i.done).length / items.length * 100) : 0;
-        return [p.title, who(p.owner), p.status, p.start || "", p.due || "", pct + "%", VIS_[(p.visibility && p.visibility.mode) || "all"] || ""];
+        return [p.title, p.start || "", p.startTime || "", p.due || "", p.endTime || "", (p.assignees || [p.owner]).map(who).join(", "), (p.editors || []).map(who).join(", "),
+          who(p.owner), p.status, pct + "%", (p.tags || []).map((t) => "#" + t).join(" "), VIS_[(p.visibility && p.visibility.mode) || "all"] || "", p.updatedAt || ""];
       }));
   }
   if (key === "y2j-pilot-v1") {
