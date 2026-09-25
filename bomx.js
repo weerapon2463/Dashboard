@@ -920,8 +920,10 @@ function bxRenderReqModal() {
   if (!Array.isArray(d.items)) { document.getElementById("bxReqBackdrop").classList.remove("open"); openDocView("mreq", i); return; }
   const open = BX_OPEN_REQ.includes(d.status);
   const me = bxUser();
-  const canApprove = bxCanApprove() && d.status === "รออนุมัติ";
-  const canIssue = bxCanIssue() && (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน");
+  const own = me && d.createdBy === me.id && me.role !== "admin";
+  const canApprove = bxCanApprove() && d.status === "รออนุมัติ" && !own;
+  const canIssue = bxCanIssue() && (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && !(me && d.receiver === me.id && me.role !== "admin");
+  const sodNote = bxCanApprove() && d.status === "รออนุมัติ" && own ? "ใบเบิกนี้คุณเป็นผู้ขอเบิก — ต้องให้หัวหน้าคนอื่นอนุมัติ" : "";
   const isReceiver = me && (d.receiver === me.id || d.createdBy === me.id);
   const canReturn = (bxCanIssue() || isReceiver) && d.items.some((it) => bxNum(it.issued) - bxNum(it.ret) > 0);
   const logs = [].concat(d.log || []).concat(...d.items.map((it) => (it.log || []).map((g) => Object.assign({ part: `${it.code || ""} ${it.part}` }, g))))
@@ -962,6 +964,7 @@ function bxRenderReqModal() {
       ${logs.length ? `<ul class="bx-list">${logs.map((g) => `<li>${fmtDateTime(g.at)} · <strong>${bxEsc(g.by)}</strong> · ${bxEsc(g.kind)}${g.part ? ` ${bxEsc(g.part)}` : ""}${g.qty ? ` × ${bxFmt(g.qty)}` : ""}${g.note ? ` — ${bxEsc(g.note)}` : ""}</li>`).join("")}</ul>` : `<p class="muted-inline">ยังไม่มีการดำเนินการ</p>`}
     </div>
     <div class="modal-actions">
+      ${sodNote ? `<p class="muted-note">🔒 ${bxEsc(sodNote)}</p>` : ""}
       ${canApprove ? `<button type="button" class="btn-secondary" id="bxReject">ปฏิเสธ</button><button type="button" class="btn-primary" id="bxApprove">อนุมัติ</button>` : ""}
       ${canIssue ? `<button type="button" class="btn-primary" id="bxIssue">บันทึกจ่ายของ</button>` : ""}
       ${canIssue && d.status === "จ่ายบางส่วน" ? `<button type="button" class="btn-secondary" id="bxCloseShort">ปิดใบเบิก (ไม่จ่ายส่วนที่เหลือ)</button>` : ""}

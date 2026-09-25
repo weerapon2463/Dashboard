@@ -15,6 +15,9 @@ let deptEditing = null; // { type, index } or { type, index: null } when adding
 // With a signed-in user, permissions come from the user's per-document-type
 // rights (auth.js / Admin page). Without one (older cached page), fall back to
 // the role rules: anyone but executives can file; heads and plant manage.
+// statuses that mean "approved / released" — the creator may not set these on their own document
+function deptIsApproval(status) { return /^อนุมัติ|Released|มีผลใช้งาน/.test(status); }
+
 function deptCanCreate(role, type) {
   if (typeof authCurrentUser === "function" && authCurrentUser()) return authCan(type || deptDocType, "create");
   return role !== "group";
@@ -407,7 +410,11 @@ function openDeptModal(type, index) {
   } else if (visBox) { visBox.innerHTML = ""; meta.innerHTML = ""; }
 
   const statusSel = document.getElementById("deptDocStatus");
-  statusSel.innerHTML = def.statuses.map((s) => `<option value="${escapeHtml(s[0])}"${s[0] === doc.status ? " selected" : ""}>${escapeHtml(s[0])}</option>`).join("");
+  const ownDoc = isEdit && typeof authCurrentUser === "function" && doc.createdBy && authCurrentUser() && doc.createdBy === authCurrentUser().id && currentRole() !== "admin";
+  statusSel.innerHTML = def.statuses.map((s) => {
+    const blocked = ownDoc && deptIsApproval(s[0]) && s[0] !== doc.status;
+    return `<option value="${escapeHtml(s[0])}"${s[0] === doc.status ? " selected" : ""}${blocked ? " disabled" : ""}>${escapeHtml(s[0])}${blocked ? " (ต้องให้ผู้อื่นอนุมัติ)" : ""}</option>`;
+  }).join("");
   // New documents always start at the first status; changing status is a manager action
   statusSel.disabled = readOnly || !isEdit || !deptCanManage(role, type);
 
@@ -454,7 +461,13 @@ function saveDeptModal() {
     const doc = DEPT_DOCS[type][index];
     const before = Object.assign({}, doc);
     Object.assign(doc, entry);
-    doc.status = document.getElementById("deptDocStatus").value;
+    const nextStatus = document.getElementById("deptDocStatus").value;
+    const meNow = hasAuth ? authCurrentUser() : null;
+    if (meNow && doc.createdBy === meNow.id && meNow.role !== "admin" && nextStatus !== before.status && deptIsApproval(nextStatus)) {
+      showToast("ผู้สร้างเอกสารอนุมัติเอกสารของตัวเองไม่ได้ — ให้หัวหน้าหรือผู้มีอำนาจอนุมัติ", "warn");
+      return;
+    }
+    doc.status = nextStatus;
     if (vis) doc.visibility = vis;
     if (hasAuth) {
       const changes = [auditDiff(before, doc, def.fields.concat([{ key: "status", label: "สถานะ" }]))];

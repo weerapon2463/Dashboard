@@ -121,15 +121,29 @@ function esDocHash(type, doc) {
   return (h >>> 0).toString(16);
 }
 
-function esCanSign(type, doc, slot) {
+// Why this user may not sign this box ("" = may sign). Rules (separation of duties):
+//  · one person, one box — also the same signature image can't appear twice (one person, two accounts)
+//  · boxes in order: ผู้จัดทำ → ผู้ตรวจสอบ → ผู้อนุมัติ
+//  · ผู้จัดทำ = the creator; ผู้ตรวจสอบ = can manage this document type; ผู้อนุมัติ = has approval authority
+function esWhyNot(type, doc, slot) {
   const me = authCurrentUser();
-  if (!me) return false;
-  const sig = (doc.signatures || {})[slot];
-  if (sig) return false;
-  if (Object.values(doc.signatures || {}).some((s) => s && s.uid === me.id)) return false; // one person, one box
-  if (slot === 0) return doc.createdBy === me.id || deptCanCreate(currentRole(), type);
-  return deptCanManage(currentRole(), type) || (type === "mreq" && typeof authHasAbility === "function" && authHasAbility("approve"));
+  if (!me) return "ยังไม่ได้เข้าระบบ";
+  const sigs = doc.signatures || {};
+  if (sigs[slot]) return "ช่องนี้ลงนามแล้ว";
+  if (Object.values(sigs).some((s) => s && s.uid === me.id)) return "คุณลงนามในเอกสารนี้แล้ว — หนึ่งคนลงนามได้หนึ่งช่อง";
+  if (me.signature && Object.values(sigs).some((s) => s && s.img && s.img === me.signature)) return "ลายเซ็นนี้ถูกใช้ในเอกสารนี้แล้ว (บัญชีอื่น)";
+  if (slot > 0 && !sigs[slot - 1]) return `ต้องรอ "${esSlots()[slot - 1]}" ลงนามก่อน`;
+  const role = currentRole();
+  if (slot === 0) {
+    if (doc.createdBy) return doc.createdBy === me.id ? "" : "ช่องผู้จัดทำ ลงนามได้เฉพาะผู้สร้างเอกสาร";
+    return deptCanCreate(role, type) ? "" : "ไม่มีสิทธิ์จัดทำเอกสารชนิดนี้";
+  }
+  const manage = deptCanManage(role, type) || (type === "mreq" && typeof authHasAbility === "function" && authHasAbility("approve"));
+  if (slot === 1) return manage ? "" : "ไม่มีสิทธิ์ตรวจสอบเอกสารชนิดนี้";
+  const approver = ["admin", "plant", "group", "depthead"].includes(me.role) || (typeof authHasAbility === "function" && authHasAbility("approve"));
+  return manage && approver ? "" : "ช่องผู้อนุมัติ ลงนามได้เฉพาะผู้มีอำนาจอนุมัติ (หัวหน้าแผนกขึ้นไป)";
 }
+function esCanSign(type, doc, slot) { return !esWhyNot(type, doc, slot); }
 function esSignable(type, doc) { return [0, 1, 2].filter((s) => esCanSign(type, doc, s)); }
 
 // Boxes for the paper form (replaces the blank lines when the document has signatures or can be signed)
@@ -159,7 +173,7 @@ function esStartSign(type, index) {
   const me = authCurrentUser();
   if (!doc || !me) return;
   const slots = esSignable(type, doc);
-  if (!slots.length) { showToast("ไม่มีช่องที่คุณลงนามได้ในเอกสารนี้", "warn"); return; }
+  if (!slots.length) { showToast(esWhyNot(type, doc, [0, 1, 2].find((s) => !(doc.signatures || {})[s]) ?? 0) || "ไม่มีช่องที่คุณลงนามได้ในเอกสารนี้", "warn"); return; }
   if (!me.signature) { closeDocView(); esOpenPad(() => esStartSign(type, index)); showToast("ตั้งลายเซ็นก่อน แล้วค่อยลงนาม", "warn"); return; }
   esPending = { type, index };
   const labels = esSlots();
@@ -210,6 +224,7 @@ function esWithdraw(type, index, slot) {
   const me = authCurrentUser();
   const s = (doc.signatures || {})[slot];
   if (!s || !me || (s.uid !== me.id && me.role !== "admin")) return;
+  if ((doc.signatures || {})[slot + 1]) { showToast(`ถอนไม่ได้ — "${esSlots()[slot + 1]}" ลงนามต่อจากช่องนี้แล้ว ต้องถอนช่องถัดไปก่อน`, "warn"); return; }
   if (!confirm(`ถอนลายเซ็นช่อง "${esSlots()[slot]}" ของ ${s.name}?`)) return;
   delete doc.signatures[slot];
   saveDeptDocs();
