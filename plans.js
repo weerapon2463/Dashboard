@@ -16,6 +16,7 @@ let plansMode = "week";      // week | list
 let plansWeek = null;        // Monday (YYYY-MM-DD) of the week shown
 let plansTag = "";
 let plansDept = "";          // department shown in the "แผนก" tab ("" = my own)
+let plansMasterBy = "dept";  // Master tab rows: dept | person
 let planEditingId = null;
 
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -135,12 +136,18 @@ function renderPlans() {
   dsel.hidden = plansTab !== "dept";
   if (!dsel.options.length) dsel.innerHTML = DEPT_WORKSPACES.map((w) => `<option value="${escapeHtml(w.id)}">${escapeHtml(w.name)}</option>`).join("");
   dsel.value = dept;
+  const msel = document.getElementById("planMasterBy");
+  msel.hidden = plansTab !== "master";
+  msel.value = plansMasterBy;
+  // Master: everyone plans on their own; this puts every department's (or person's) plans side by side
+  const masterList = PLANS.filter((p) => planVisibleTo(p, me));
+  document.getElementById("planCountMaster").textContent = masterList.length;
   document.getElementById("planTabAll").hidden = !authIsAdmin();
   document.querySelectorAll(".plan-tab").forEach((b) => { const on = b.dataset.tab === plansTab; b.classList.toggle("active", on); b.setAttribute("aria-pressed", on ? "true" : "false"); });
   document.querySelectorAll(".plan-mode").forEach((b) => { const on = b.dataset.mode === plansMode; b.classList.toggle("active", on); b.setAttribute("aria-pressed", on ? "true" : "false"); });
 
   // "mine" in the calendar = everything I own or am assigned to: my whole schedule
-  let list = plansTab === "mine" ? (plansMode === "week" ? mine.concat(assigned) : mine) : plansTab === "assigned" ? assigned : plansTab === "shared" ? shared : plansTab === "dept" ? deptList : PLANS.slice();
+  let list = plansTab === "mine" ? (plansMode === "week" ? mine.concat(assigned) : mine) : plansTab === "assigned" ? assigned : plansTab === "shared" ? shared : plansTab === "dept" ? deptList : plansTab === "master" ? masterList : PLANS.slice();
   const tags = [...new Set(list.flatMap((p) => p.tags || []))].sort();
   document.getElementById("planTagBar").innerHTML = tags.length
     ? `<button type="button" class="btn-chip${plansTag ? "" : " active"}" data-ptag="">ทุกแท็ก</button>` + tags.map((t) => `<button type="button" class="btn-chip${plansTag === t ? " active" : ""}" data-ptag="${escapeHtml(t)}">#${escapeHtml(t)}</button>`).join("")
@@ -150,7 +157,9 @@ function renderPlans() {
   const wrap = document.getElementById("planList");
   const weekBar = document.getElementById("planWeekBar");
   weekBar.hidden = plansMode !== "week";
-  if (plansMode === "week") {
+  if (plansTab === "master") {
+    planRenderMaster(wrap, list, me, deptOf);
+  } else if (plansMode === "week") {
     const days = [...Array(7)].map((_, i) => planAddDays(plansWeek, i));
     document.getElementById("planWeekLabel").textContent = `${formatThaiDate(days[0])} – ${formatThaiDate(days[6])}`;
     const today = planIsoDay(new Date());
@@ -178,6 +187,44 @@ function renderPlans() {
   wrap.querySelectorAll("[data-planedit]").forEach((b) => b.addEventListener("click", () => openPlanEditor(b.dataset.planedit)));
   wrap.querySelectorAll("[data-newday]").forEach((b) => b.addEventListener("click", () => openPlanEditor(null, b.dataset.newday)));
   document.querySelectorAll("#planTagBar [data-ptag]").forEach((b) => b.addEventListener("click", () => { plansTag = b.dataset.ptag; renderPlans(); }));
+}
+
+// rows × days (week) or grouped cards (list): one row per department or per person
+function planRenderMaster(wrap, list, me, deptOf) {
+  const days = [...Array(7)].map((_, i) => planAddDays(plansWeek, i));
+  document.getElementById("planWeekLabel").textContent = `${formatThaiDate(days[0])} – ${formatThaiDate(days[6])}`;
+  const today = planIsoDay(new Date());
+  const DOW = ["จ.", "อ.", "พ.", "พฤ.", "ศ.", "ส.", "อา."];
+  const people = (p) => [p.owner].concat(p.assignees || []);
+  const inWeek = (p) => p.start && p.start <= days[6] && (p.due || p.start) >= days[0];
+  let rows;
+  if (plansMasterBy === "person") {
+    const ids = [...new Set(list.flatMap((p) => (p.assignees && p.assignees.length ? p.assignees : [p.owner])))];
+    rows = ids.map((id) => ({ key: id, label: authUserName(id), sub: authDeptName(deptOf(id)), items: list.filter((p) => (p.assignees && p.assignees.length ? p.assignees : [p.owner]).includes(id)) }))
+      .sort((a, b) => a.sub.localeCompare(b.sub) || a.label.localeCompare(b.label));
+  } else {
+    rows = DEPT_WORKSPACES.map((w) => ({ key: w.id, label: w.name, sub: "", items: list.filter((p) => people(p).some((id) => deptOf(id) === w.id)) }));
+  }
+  if (plansMode === "week") {
+    wrap.className = "plan-master-wrap";
+    wrap.innerHTML = `<div class="plan-master">
+      <div class="pm-head pm-corner">${plansMasterBy === "person" ? "บุคคล" : "แผนก"}</div>
+      ${days.map((d, i) => `<div class="pm-head${d === today ? " plan-today" : ""}">${DOW[i]} <strong>${Number(d.slice(8))}</strong></div>`).join("")}
+      ${rows.filter((r) => plansMasterBy === "dept" || r.items.some(inWeek)).map((r) => {
+        const n = r.items.filter(inWeek).length;
+        return `<div class="pm-row-head"><strong>${escapeHtml(r.label)}</strong>${r.sub ? `<span>${escapeHtml(r.sub)}</span>` : ""}<span class="pm-count${n > 6 ? " pm-busy" : ""}">${n} งานสัปดาห์นี้</span></div>
+        ${days.map((d) => {
+          const items = r.items.filter((p) => p.start && p.start <= d && (p.due || p.start) >= d).sort((a, b) => (a.startTime || "99").localeCompare(b.startTime || "99"));
+          return `<div class="pm-cell${d === today ? " pm-today" : ""}">${items.map((p) => planChip(p, d, me)).join("")}</div>`;
+        }).join("")}`;
+      }).join("") || ""}
+    </div>`;
+  } else {
+    wrap.className = "plan-master-list";
+    wrap.innerHTML = rows.filter((r) => r.items.length).map((r) => `<section class="pm-group"><h4>${escapeHtml(r.label)}${r.sub ? ` <span class="muted-inline">${escapeHtml(r.sub)}</span>` : ""} <span class="dept-tab-count">${r.items.length}</span></h4>
+      <div class="plan-grid">${r.items.slice().sort((a, b) => (a.start || "").localeCompare(b.start || "")).map((p) => planCard(p, me)).join("")}</div></section>`).join("")
+      || '<p class="muted-note">ยังไม่มีแผนงานที่คุณมองเห็น</p>';
+  }
 }
 
 function planPeople(p) {
@@ -393,6 +440,7 @@ function initPlans() {
   document.getElementById("planPrevWeek").addEventListener("click", () => { plansWeek = planAddDays(plansWeek, -7); renderPlans(); });
   document.getElementById("planNextWeek").addEventListener("click", () => { plansWeek = planAddDays(plansWeek, 7); renderPlans(); });
   document.getElementById("planDeptSel").addEventListener("change", (e) => { plansDept = e.target.value; renderPlans(); });
+  document.getElementById("planMasterBy").addEventListener("change", (e) => { plansMasterBy = e.target.value; renderPlans(); });
   document.getElementById("planThisWeek").addEventListener("click", () => { plansWeek = planMonday(planIsoDay(new Date())); renderPlans(); });
   document.getElementById("planAddBtn").addEventListener("click", () => openPlanEditor(null));
   const bd = document.getElementById("planEdBackdrop");

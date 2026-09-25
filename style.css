@@ -1222,3 +1222,20 @@ html[data-density="compact"] body { zoom: 0.9; }
 .login-build { margin-top: 10px; font-size: 11px; color: var(--text-muted); text-align: center; }
 .login-build a { color: inherit; }
 .login-code-toggle { align-self: flex-start; }
+
+/* Master schedule: rows (department / person) × days */
+.plan-master-wrap { overflow-x: auto; margin-top: 12px; }
+.plan-master { display: grid; grid-template-columns: 170px repeat(7, minmax(120px, 1fr)); min-width: 1010px; border: 1px solid var(--border-hairline); border-radius: 10px; overflow: hidden; }
+.pm-head { background: var(--surface-page); padding: 8px; font-size: 13px; color: var(--text-secondary); border-bottom: 1px solid var(--border-hairline); }
+.pm-head strong { color: var(--text-primary); font-size: 16px; }
+.pm-corner { font-weight: 700; }
+.pm-row-head { padding: 8px; border-top: 1px solid var(--border-hairline); background: var(--surface-1); display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.pm-row-head span { color: var(--text-muted); font-size: 12px; }
+.pm-count { font-weight: 600; }
+.pm-busy { color: var(--status-critical) !important; }
+.pm-cell { border-top: 1px solid var(--border-hairline); border-left: 1px solid var(--border-hairline); padding: 4px; min-height: 58px; display: flex; flex-direction: column; gap: 4px; }
+.pm-today { background: rgba(42,120,214,.06); }
+.pm-cell .plan-chip { padding: 4px 6px; }
+.pm-cell .plan-chip-title { -webkit-line-clamp: 2; font-size: 12px; }
+.plan-master-list { margin-top: 12px; display: flex; flex-direction: column; gap: 14px; }
+.pm-group h4 { margin: 0 0 6px; }

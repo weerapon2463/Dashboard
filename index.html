@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Y2J ONE | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260927g">
+<link rel="stylesheet" href="style.css?v=20260927h">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -420,10 +420,12 @@
               <button type="button" class="dept-tab plan-tab" data-tab="assigned">มอบหมายให้ฉัน <span class="dept-tab-count" id="planCountAssigned">0</span></button>
               <button type="button" class="dept-tab plan-tab" data-tab="shared">แชร์กับฉัน <span class="dept-tab-count" id="planCountShared">0</span></button>
               <button type="button" class="dept-tab plan-tab" data-tab="dept">แผนก <span class="dept-tab-count" id="planCountDept">0</span></button>
+              <button type="button" class="dept-tab plan-tab" data-tab="master">Master (ทุกแผนก) <span class="dept-tab-count" id="planCountMaster">0</span></button>
               <button type="button" class="dept-tab plan-tab" data-tab="all" id="planTabAll" hidden>ทั้งหมด (Admin)</button>
             </div>
             <div class="plan-toolbar">
               <select id="planDeptSel" aria-label="แผนก" hidden></select>
+              <select id="planMasterBy" aria-label="แถวตาม" hidden><option value="dept">แถวตาม: แผนก</option><option value="person">แถวตาม: บุคคล</option></select>
               <div class="plan-modes" role="group" aria-label="รูปแบบการแสดง">
                 <button type="button" class="btn-chip plan-mode" data-mode="week">🗓 ปฏิทินสัปดาห์</button>
                 <button type="button" class="btn-chip plan-mode" data-mode="list">☰ รายการ</button>
@@ -1730,40 +1732,40 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260927g"></script>
-  <script src="data.js?v=20260927g"></script>
-  <script src="partcode.js?v=20260927g"></script>
-  <script src="priority-matrix.js?v=20260927g"></script>
-  <script src="capacity-planning.js?v=20260927g"></script>
-  <script src="master-schedule.js?v=20260927g"></script>
-  <script src="make-or-buy.js?v=20260927g"></script>
-  <script src="resource.js?v=20260927g"></script>
-  <script src="procurement.js?v=20260927g"></script>
-  <script src="workorder.js?v=20260927g"></script>
-  <script src="alerts.js?v=20260927g"></script>
-  <script src="overview-charts.js?v=20260927g"></script>
-  <script src="pilot.js?v=20260927g"></script>
-  <script src="pilot-measure.js?v=20260927g"></script>
-  <script src="dept-data.js?v=20260927g"></script>
-  <script src="dept-samples.js?v=20260927g"></script>
-  <script src="org.js?v=20260927g"></script>
-  <script src="dept.js?v=20260927g"></script>
-  <script src="bom.js?v=20260927g"></script>
-  <script src="bomx.js?v=20260927g"></script>
-  <script src="bomsheet.js?v=20260927g"></script>
-  <script src="service.js?v=20260927g"></script>
-  <script src="reports.js?v=20260927g"></script>
-  <script src="integrity.js?v=20260927g"></script>
-  <script src="overview.js?v=20260927g"></script>
-  <script src="rnd.js?v=20260927g"></script>
-  <script src="docview.js?v=20260927g"></script>
-  <script src="esign.js?v=20260927g"></script>
-  <script src="p2p-data.js?v=20260927g"></script>
-  <script src="p2p.js?v=20260927g"></script>
-  <script src="suppliers.js?v=20260927g"></script>
-  <script src="auth.js?v=20260927g"></script>
-  <script src="admin.js?v=20260927g"></script>
-  <script src="plans.js?v=20260927g"></script>
-  <script src="app.js?v=20260927g"></script>
+  <script src="storage.js?v=20260927h"></script>
+  <script src="data.js?v=20260927h"></script>
+  <script src="partcode.js?v=20260927h"></script>
+  <script src="priority-matrix.js?v=20260927h"></script>
+  <script src="capacity-planning.js?v=20260927h"></script>
+  <script src="master-schedule.js?v=20260927h"></script>
+  <script src="make-or-buy.js?v=20260927h"></script>
+  <script src="resource.js?v=20260927h"></script>
+  <script src="procurement.js?v=20260927h"></script>
+  <script src="workorder.js?v=20260927h"></script>
+  <script src="alerts.js?v=20260927h"></script>
+  <script src="overview-charts.js?v=20260927h"></script>
+  <script src="pilot.js?v=20260927h"></script>
+  <script src="pilot-measure.js?v=20260927h"></script>
+  <script src="dept-data.js?v=20260927h"></script>
+  <script src="dept-samples.js?v=20260927h"></script>
+  <script src="org.js?v=20260927h"></script>
+  <script src="dept.js?v=20260927h"></script>
+  <script src="bom.js?v=20260927h"></script>
+  <script src="bomx.js?v=20260927h"></script>
+  <script src="bomsheet.js?v=20260927h"></script>
+  <script src="service.js?v=20260927h"></script>
+  <script src="reports.js?v=20260927h"></script>
+  <script src="integrity.js?v=20260927h"></script>
+  <script src="overview.js?v=20260927h"></script>
+  <script src="rnd.js?v=20260927h"></script>
+  <script src="docview.js?v=20260927h"></script>
+  <script src="esign.js?v=20260927h"></script>
+  <script src="p2p-data.js?v=20260927h"></script>
+  <script src="p2p.js?v=20260927h"></script>
+  <script src="suppliers.js?v=20260927h"></script>
+  <script src="auth.js?v=20260927h"></script>
+  <script src="admin.js?v=20260927h"></script>
+  <script src="plans.js?v=20260927h"></script>
+  <script src="app.js?v=20260927h"></script>
 </body>
 </html>
