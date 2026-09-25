@@ -15,6 +15,7 @@ let plansTab = "mine";       // mine | assigned | shared | all
 let plansMode = "week";      // week | list
 let plansWeek = null;        // Monday (YYYY-MM-DD) of the week shown
 let plansTag = "";
+let plansDept = "";          // department shown in the "แผนก" tab ("" = my own)
 let planEditingId = null;
 
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -125,12 +126,21 @@ function renderPlans() {
   document.getElementById("planCountMine").textContent = mine.length;
   document.getElementById("planCountAssigned").textContent = assigned.length;
   document.getElementById("planCountShared").textContent = shared.length;
+  // department schedule: every task someone of that department owns or works on — only those this user may see
+  const dept = plansDept || me.dept || "";
+  const deptOf = (id) => (authUserById(id) || {}).dept;
+  const deptList = PLANS.filter((p) => planVisibleTo(p, me) && [p.owner].concat(p.assignees || []).some((id) => deptOf(id) === dept));
+  document.getElementById("planCountDept").textContent = PLANS.filter((p) => planVisibleTo(p, me) && [p.owner].concat(p.assignees || []).some((id) => deptOf(id) === (me.dept || ""))).length;
+  const dsel = document.getElementById("planDeptSel");
+  dsel.hidden = plansTab !== "dept";
+  if (!dsel.options.length) dsel.innerHTML = DEPT_WORKSPACES.map((w) => `<option value="${escapeHtml(w.id)}">${escapeHtml(w.name)}</option>`).join("");
+  dsel.value = dept;
   document.getElementById("planTabAll").hidden = !authIsAdmin();
   document.querySelectorAll(".plan-tab").forEach((b) => { const on = b.dataset.tab === plansTab; b.classList.toggle("active", on); b.setAttribute("aria-pressed", on ? "true" : "false"); });
   document.querySelectorAll(".plan-mode").forEach((b) => { const on = b.dataset.mode === plansMode; b.classList.toggle("active", on); b.setAttribute("aria-pressed", on ? "true" : "false"); });
 
   // "mine" in the calendar = everything I own or am assigned to: my whole schedule
-  let list = plansTab === "mine" ? (plansMode === "week" ? mine.concat(assigned) : mine) : plansTab === "assigned" ? assigned : plansTab === "shared" ? shared : PLANS.slice();
+  let list = plansTab === "mine" ? (plansMode === "week" ? mine.concat(assigned) : mine) : plansTab === "assigned" ? assigned : plansTab === "shared" ? shared : plansTab === "dept" ? deptList : PLANS.slice();
   const tags = [...new Set(list.flatMap((p) => p.tags || []))].sort();
   document.getElementById("planTagBar").innerHTML = tags.length
     ? `<button type="button" class="btn-chip${plansTag ? "" : " active"}" data-ptag="">ทุกแท็ก</button>` + tags.map((t) => `<button type="button" class="btn-chip${plansTag === t ? " active" : ""}" data-ptag="${escapeHtml(t)}">#${escapeHtml(t)}</button>`).join("")
@@ -382,6 +392,7 @@ function initPlans() {
   document.querySelectorAll(".plan-mode").forEach((b) => b.addEventListener("click", () => { plansMode = b.dataset.mode; renderPlans(); }));
   document.getElementById("planPrevWeek").addEventListener("click", () => { plansWeek = planAddDays(plansWeek, -7); renderPlans(); });
   document.getElementById("planNextWeek").addEventListener("click", () => { plansWeek = planAddDays(plansWeek, 7); renderPlans(); });
+  document.getElementById("planDeptSel").addEventListener("change", (e) => { plansDept = e.target.value; renderPlans(); });
   document.getElementById("planThisWeek").addEventListener("click", () => { plansWeek = planMonday(planIsoDay(new Date())); renderPlans(); });
   document.getElementById("planAddBtn").addEventListener("click", () => openPlanEditor(null));
   const bd = document.getElementById("planEdBackdrop");
