@@ -309,17 +309,31 @@ let bomFilesCache = null; // { at, files: { model: url } }
 
 async function bomShowSheetLink() {
   const link = document.getElementById("bomSheetLink");
+  const imp = document.getElementById("bomSheetImport");
   if (!link) return;
   link.hidden = true;
+  if (imp) imp.hidden = true;
   if (typeof Y2JStore === "undefined" || !Y2JStore.isRemote()) return;
   try {
-    if (!bomFilesCache || Date.now() - bomFilesCache.at > 60000 || !bomFilesCache.files[bomModel]) {
-      const res = await Y2JStore.bomFiles();
-      bomFilesCache = { at: Date.now(), files: res.files || {} };
+    const files = await bomSheetFiles();
+    const url = files.files[bomModel];
+    if (url) {
+      link.href = url; link.hidden = false;
+      const edited = !!(files.edited || {})[bomModel];
+      link.classList.toggle("bom-sheet-edited", edited);
+      link.textContent = edited ? "📊 เปิด BOM ใน Google Sheets (มีการแก้ที่ยังไม่นำเข้า)" : "📊 เปิด BOM นี้ใน Google Sheets";
+      if (imp) imp.hidden = !(typeof bsAvailable === "function" && bsAvailable());
     }
-    const url = bomFilesCache.files[bomModel];
-    if (url) { link.href = url; link.hidden = false; }
   } catch (e) { /* offline — no link */ }
+}
+
+// { files: { model: url }, edited: { model: true } } — cached for a minute
+async function bomSheetFiles() {
+  if (!bomFilesCache || Date.now() - bomFilesCache.at > 60000) {
+    const res = await Y2JStore.bomFiles();
+    bomFilesCache = { at: Date.now(), files: res.files || {}, edited: res.edited || {} };
+  }
+  return bomFilesCache;
 }
 
 /* ---- actions ------------------------------------------------------------ */
@@ -427,6 +441,7 @@ function initBomInteractions() {
     if (parts.length) parts[parts.length - 1].focus();
   });
   document.getElementById("bomNewSaveBtn").addEventListener("click", saveBomNew);
+  document.getElementById("bomSheetImport").addEventListener("click", () => bomImportFromSheet(bomModel));
   document.getElementById("bomRevSaveBtn").addEventListener("click", saveBomRev);
   ["bomNewBackdrop", "bomRevBackdrop"].forEach((id) => {
     const bd = document.getElementById(id);

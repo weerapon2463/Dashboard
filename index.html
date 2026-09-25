@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Production Dashboard | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260926u">
+<link rel="stylesheet" href="style.css?v=20260926v">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -360,6 +360,7 @@
               <button id="bomRevBtn" class="btn-secondary" type="button">ออก Revision ใหม่เพื่อแก้ไข</button>
               <button id="bomExportBtn" class="btn-secondary" type="button">ส่งออก CSV</button>
               <a id="bomSheetLink" class="btn-secondary bom-sheet-link" href="#" target="_blank" rel="noopener" hidden>📊 เปิด BOM นี้ใน Google Sheets</a>
+              <button id="bomSheetImport" class="btn-secondary" type="button" hidden>📥 นำเข้าจาก Google Sheet</button>
             </div>
             <p class="muted-note" id="bomLockNote" hidden>🔒 BOM นี้อนุมัติใช้งานแล้ว — กด "ออก Revision ใหม่เพื่อแก้ไข" เพื่อเปิดแก้ไข ระบบจะบันทึกประวัติการเปลี่ยนแปลงให้</p>
             <div class="table-scroll">
@@ -1677,39 +1678,40 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260926u"></script>
-  <script src="data.js?v=20260926u"></script>
-  <script src="partcode.js?v=20260926u"></script>
-  <script src="priority-matrix.js?v=20260926u"></script>
-  <script src="capacity-planning.js?v=20260926u"></script>
-  <script src="master-schedule.js?v=20260926u"></script>
-  <script src="make-or-buy.js?v=20260926u"></script>
-  <script src="resource.js?v=20260926u"></script>
-  <script src="procurement.js?v=20260926u"></script>
-  <script src="workorder.js?v=20260926u"></script>
-  <script src="alerts.js?v=20260926u"></script>
-  <script src="overview-charts.js?v=20260926u"></script>
-  <script src="pilot.js?v=20260926u"></script>
-  <script src="pilot-measure.js?v=20260926u"></script>
-  <script src="dept-data.js?v=20260926u"></script>
-  <script src="dept-samples.js?v=20260926u"></script>
-  <script src="org.js?v=20260926u"></script>
-  <script src="dept.js?v=20260926u"></script>
-  <script src="bom.js?v=20260926u"></script>
-  <script src="bomx.js?v=20260926u"></script>
-  <script src="service.js?v=20260926u"></script>
-  <script src="reports.js?v=20260926u"></script>
-  <script src="integrity.js?v=20260926u"></script>
-  <script src="overview.js?v=20260926u"></script>
-  <script src="rnd.js?v=20260926u"></script>
-  <script src="docview.js?v=20260926u"></script>
-  <script src="esign.js?v=20260926u"></script>
-  <script src="p2p-data.js?v=20260926u"></script>
-  <script src="p2p.js?v=20260926u"></script>
-  <script src="suppliers.js?v=20260926u"></script>
-  <script src="auth.js?v=20260926u"></script>
-  <script src="admin.js?v=20260926u"></script>
-  <script src="plans.js?v=20260926u"></script>
-  <script src="app.js?v=20260926u"></script>
+  <script src="storage.js?v=20260926v"></script>
+  <script src="data.js?v=20260926v"></script>
+  <script src="partcode.js?v=20260926v"></script>
+  <script src="priority-matrix.js?v=20260926v"></script>
+  <script src="capacity-planning.js?v=20260926v"></script>
+  <script src="master-schedule.js?v=20260926v"></script>
+  <script src="make-or-buy.js?v=20260926v"></script>
+  <script src="resource.js?v=20260926v"></script>
+  <script src="procurement.js?v=20260926v"></script>
+  <script src="workorder.js?v=20260926v"></script>
+  <script src="alerts.js?v=20260926v"></script>
+  <script src="overview-charts.js?v=20260926v"></script>
+  <script src="pilot.js?v=20260926v"></script>
+  <script src="pilot-measure.js?v=20260926v"></script>
+  <script src="dept-data.js?v=20260926v"></script>
+  <script src="dept-samples.js?v=20260926v"></script>
+  <script src="org.js?v=20260926v"></script>
+  <script src="dept.js?v=20260926v"></script>
+  <script src="bom.js?v=20260926v"></script>
+  <script src="bomx.js?v=20260926v"></script>
+  <script src="bomsheet.js?v=20260926v"></script>
+  <script src="service.js?v=20260926v"></script>
+  <script src="reports.js?v=20260926v"></script>
+  <script src="integrity.js?v=20260926v"></script>
+  <script src="overview.js?v=20260926v"></script>
+  <script src="rnd.js?v=20260926v"></script>
+  <script src="docview.js?v=20260926v"></script>
+  <script src="esign.js?v=20260926v"></script>
+  <script src="p2p-data.js?v=20260926v"></script>
+  <script src="p2p.js?v=20260926v"></script>
+  <script src="suppliers.js?v=20260926v"></script>
+  <script src="auth.js?v=20260926v"></script>
+  <script src="admin.js?v=20260926v"></script>
+  <script src="plans.js?v=20260926v"></script>
+  <script src="app.js?v=20260926v"></script>
 </body>
 </html>

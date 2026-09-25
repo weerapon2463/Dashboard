@@ -83,6 +83,7 @@ function handle_(p) {
       case "upload": return json_(upload_(p));
       case "file": return json_(file_(p.id));
       case "bomfiles": return json_(bomFiles_(p.company === "y2j" ? "" : p.company));
+      case "bomread": return json_(bomRead_(p.company === "y2j" ? "" : p.company, String(p.model || "")));
       default: return json_({ ok: false, error: "unknown action" });
     }
   } catch (err) {
@@ -262,13 +263,33 @@ function mirrorBom_(d, co, tab) {
   } catch (err) { /* no drawings yet */ }
 
   const index = [];
+  const props = PropertiesService.getScriptProperties();
   models.forEach((m) => {
     const mt = meta[m] || {};
     const lines = bom[m] || [];
     const hist = mt.history || [];
     const last = hist[hist.length - 1] || {};
+    const tree = bomTree_(lines);
+    const content = bomContentFromTree_(tree);
+    const sig = hash_(JSON.stringify([mt.rev, mt.status, mt.sheetStamp || "", hist, content, tree.map((r) => (r.line && drawings[r.line.code] ? drawings[r.line.code].no + drawings[r.line.code].rev : ""))]));
+    const stKey = bomStateProp_(co, m);
+    const state = JSON.parse(props.getProperty(stKey) || "{}");
+    const fileId = props.getProperty(bomFileProp_(co, m));
+    const make0 = lines.filter((l) => l.source === "ผลิตเอง").length;
+    const indexRow = (url, note) => index.push(["BOM-" + m, mt.rev || "", mt.status || "", lines.length, make0, lines.length - make0, last.date || "", url, note || ""]);
+    if (fileId && state.w === sig) { indexRow("https://docs.google.com/spreadsheets/d/" + fileId + "/edit", state.pending ? "มีการแก้ใน Sheet ที่ยังไม่นำเข้า" : ""); return; }
     const ss = bomFile_(co, m, "BOM-" + m + " — " + (comp.short || comp.name));
-    const sh = ss.getSheets()[0];
+    const sh = ss.getSheetByName("BOM") || ss.getSheets()[0];
+    if (state.s) {
+      const cur = hash_(JSON.stringify(bomReadSheet_(sh).content));
+      if (cur !== state.s && cur !== mt.sheetStamp) {
+        // someone edited this file in Google Sheets and it has not been imported into the dashboard yet
+        state.pending = true;
+        props.setProperty(stKey, JSON.stringify(state));
+        indexRow(ss.getUrl(), "มีการแก้ใน Sheet ที่ยังไม่นำเข้า");
+        return;
+      }
+    }
     sh.setName("BOM");
     sh.clear();
     const head = [
@@ -285,7 +306,7 @@ function mirrorBom_(d, co, tab) {
     sh.getRange(1, 1).setFontWeight("bold").setFontSize(14);
     sh.getRange(2, 1, head.length - 1, 1).setFontWeight("bold").setBackground("#f1f3f4");
     const header = ["ข้อ", "ระดับ", "รหัสชิ้นส่วน", "ชื่อชิ้นส่วน", "จำนวน/ชุดแม่", "รวม/คัน", "หน่วย", "ผลิตเอง/ซื้อ", "ใช้ที่ (ผู้รับไปใช้ต่อ)", "ขั้นตอน", "แบบ (Drawing)", "หมายเหตุ"];
-    const rows = bomTree_(lines).map((r) => {
+    const rows = tree.map((r) => {
       if (r.group) return [r.no, "กลุ่มงาน", "", r.group, "", "", "", "", "", "", "", ""].map(safe);
       const l = r.line;
       const dw = drawings[l.code];
@@ -295,8 +316,8 @@ function mirrorBom_(d, co, tab) {
     const top = head.length + 2;
     sh.getRange(top, 1, 1, header.length).setValues([header]).setFontWeight("bold").setBackground("#e8eef7");
     if (rows.length) {
+      sh.getRange(top + 1, 1, rows.length, 1).setNumberFormat("@"); // before the values, so "1.10" stays text
       sh.getRange(top + 1, 1, rows.length, header.length).setValues(rows).setFontWeight("normal").setBackground(null);
-      sh.getRange(top + 1, 1, rows.length, 1).setNumberFormat("@");
       rows.forEach((r, i) => { if (r[1] === "กลุ่มงาน") sh.getRange(top + 1 + i, 1, 1, header.length).setFontWeight("bold").setBackground("#f1f3f4"); });
     }
     sh.setFrozenRows(top);
@@ -306,13 +327,13 @@ function mirrorBom_(d, co, tab) {
     hs.clear();
     hs.getRange(1, 1, 1, 4).setValues([["Rev.", "วันที่", "รายละเอียด", "อ้างอิง"]]).setFontWeight("bold").setBackground("#e8eef7");
     if (hist.length) hs.getRange(2, 1, hist.length, 4).setValues(hist.slice().reverse().map((h) => [h.rev || "", h.date || "", h.note || "", h.ref || ""].map(safe)));
-    const make = lines.filter((l) => l.source === "ผลิตเอง").length;
-    index.push(["BOM-" + m, mt.rev || "", mt.status || "", lines.length, make, lines.length - make, last.date || "", ss.getUrl()]);
+    SpreadsheetApp.flush();
+    props.setProperty(stKey, JSON.stringify({ w: sig, s: hash_(JSON.stringify(bomReadSheet_(sh).content)), at: new Date().toISOString() }));
+    indexRow(ss.getUrl(), "");
   });
-  writeTab_(tab("BOM (สารบัญ)"), ["เลขที่ BOM", "Revision", "สถานะ", "จำนวนรายการ", "ผลิตเอง", "ซื้อ", "แก้ไขล่าสุด", "ไฟล์ Google Sheet"], index);
+  writeTab_(tab("BOM (สารบัญ)"), ["เลขที่ BOM", "Revision", "สถานะ", "จำนวนรายการ", "ผลิตเอง", "ซื้อ", "แก้ไขล่าสุด", "ไฟล์ Google Sheet", "หมายเหตุ"], index);
 
   // models removed from the dashboard: trash their files (recoverable from Drive trash for 30 days)
-  const props = PropertiesService.getScriptProperties();
   const prefix = "BOMFILE_" + (co || "y2j") + "_";
   Object.keys(props.getProperties()).forEach((k) => {
     if (k.indexOf(prefix) !== 0) return;
@@ -320,6 +341,7 @@ function mirrorBom_(d, co, tab) {
     if (models.indexOf(model) >= 0) return;
     try { DriveApp.getFileById(props.getProperty(k)).setTrashed(true); } catch (err) { /* already gone */ }
     props.deleteProperty(k);
+    props.deleteProperty(bomStateProp_(co, model));
   });
   // earlier versions put one tab per BOM in this spreadsheet — remove those
   const main = sheet_();
@@ -344,13 +366,15 @@ function bomTree_(lines) {
   groups.sort((a, b) => rank(a) - rank(b));
   const out = [];
   const seen = {};
+  const kids = {};
+  lines.forEach((l) => { if (l.parent && ids[l.parent]) (kids[l.parent] = kids[l.parent] || []).push(l); });
   const walk = (list, prefix, depth, mult) => list.forEach((l, i) => {
     if (seen[l.id] || depth > 10) return;
     seen[l.id] = true;
     const no = prefix + "." + (i + 1);
     const per = (Number(l.qty) || 0) * mult;
     out.push({ line: l, no: no, depth: depth, per: per });
-    walk(lines.filter((c) => c.parent === l.id), no, depth + 1, per);
+    walk(kids[l.id] || [], no, depth + 1, per);
   });
   groups.forEach((g, gi) => {
     out.push({ group: g, no: String(gi + 1) });
@@ -366,7 +390,77 @@ function bomFiles_(co) {
   Object.keys(props).forEach((k) => {
     if (k.indexOf(prefix) === 0) out[k.slice(prefix.length)] = "https://docs.google.com/spreadsheets/d/" + props[k] + "/edit";
   });
-  return { ok: true, files: out, folder: PropertiesService.getScriptProperties().getProperty("BOM_FOLDER_ID") || "" };
+  const edited = {};
+  Object.keys(out).forEach((m) => {
+    try {
+      const st = JSON.parse(props[bomStateProp_(co, m)] || "{}");
+      if (!st.at) return;
+      const upd = DriveApp.getFileById(props[prefix + m]).getLastUpdated().getTime();
+      if (st.pending || upd - new Date(st.at).getTime() > 120000) edited[m] = true;
+    } catch (err) { /* unknown */ }
+  });
+  return { ok: true, files: out, edited: edited, folder: PropertiesService.getScriptProperties().getProperty("BOM_FOLDER_ID") || "" };
+}
+
+function bomStateProp_(co, model) { return "BOMSTATE_" + (co || "y2j") + "_" + model; }
+
+function hash_(text) {
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, text, Utilities.Charset.UTF_8));
+}
+
+// The comparable content of a BOM table: group rows and item rows (computed columns left out)
+function bomContentFromTree_(tree) {
+  return tree.map((r) => r.group
+    ? ["G", String(r.group).trim()]
+    : [r.depth, String(r.line.code || "").trim(), String(r.line.part || "").trim(), Number(r.line.qty) || 0, String(r.line.unit || "").trim(),
+      String(r.line.source || "").trim(), String(r.line.station || "").trim(), String(r.line.op || "").trim(), String(r.line.note || "").trim()]);
+}
+
+// Read the BOM tab as people may have edited it: columns found by their header text, so a column
+// moved or added in Sheets still reads. Group rows = "กลุ่มงาน" in the level column.
+function bomReadSheet_(sh) {
+  const v = sh.getDataRange().getValues();
+  let h = -1;
+  for (let i = 0; i < Math.min(v.length, 40); i++) { if (v[i].map((x) => String(x).trim()).indexOf("รหัสชิ้นส่วน") >= 0) { h = i; break; } }
+  if (h < 0) return { content: [], rows: [], error: "ไม่พบหัวตาราง (คอลัมน์ \"รหัสชิ้นส่วน\")" };
+  const hd = v[h].map((x) => String(x).trim());
+  const col = (name) => hd.indexOf(name);
+  const c = { level: col("ระดับ"), code: col("รหัสชิ้นส่วน"), part: col("ชื่อชิ้นส่วน"), qty: col("จำนวน/ชุดแม่"), unit: col("หน่วย"),
+    source: col("ผลิตเอง/ซื้อ"), station: col("ใช้ที่ (ผู้รับไปใช้ต่อ)"), op: col("ขั้นตอน"), note: col("หมายเหตุ") };
+  const get = (row, k) => (c[k] >= 0 ? String(row[c[k]] === null || row[c[k]] === undefined ? "" : row[c[k]]).trim() : "");
+  const content = [];
+  const rows = [];
+  for (let i = h + 1; i < v.length; i++) {
+    const row = v[i];
+    const level = get(row, "level");
+    if (level === "กลุ่มงาน") {
+      const g = get(row, "part");
+      if (g) { content.push(["G", g]); rows.push({ row: i + 1, group: g }); }
+      continue;
+    }
+    const code = get(row, "code"), part = get(row, "part");
+    if (!code && !part) continue;
+    const qtyRaw = get(row, "qty").replace(/,/g, "");
+    const item = { row: i + 1, level: Number(level) || 1, levelRaw: level, code: code, part: part, qty: qtyRaw === "" ? 0 : Number(qtyRaw), qtyRaw: qtyRaw,
+      unit: get(row, "unit"), source: get(row, "source"), station: get(row, "station"), op: get(row, "op"), note: get(row, "note") };
+    content.push([item.level, code, part, isNaN(item.qty) ? qtyRaw : item.qty, item.unit, item.source, item.station, item.op, item.note]);
+    rows.push(item);
+  }
+  return { content: content, rows: rows };
+}
+
+function bomRead_(co, model) {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty(bomFileProp_(co, model));
+  if (!id) return { ok: false, error: "ยังไม่มีไฟล์ Google Sheet ของ BOM " + model };
+  const ss = SpreadsheetApp.openById(id);
+  const sh = ss.getSheetByName("BOM") || ss.getSheets()[0];
+  const r = bomReadSheet_(sh);
+  if (r.error) return { ok: false, error: r.error };
+  const st = JSON.parse(props.getProperty(bomStateProp_(co, model)) || "{}");
+  const stamp = hash_(JSON.stringify(r.content));
+  return { ok: true, model: model, url: ss.getUrl(), rows: r.rows, stamp: stamp, edited: !!st.s && stamp !== st.s,
+    updated: DriveApp.getFileById(id).getLastUpdated().toISOString() };
 }
 
 /* ------------------------------------------------------------------ */

@@ -415,6 +415,7 @@ function renderBxTree(pane) {
           ${editable ? `<button class="btn-secondary" type="button" id="bxRelease">อนุมัติใช้งาน (Release)</button>` : ""}
           ${canEdit && !isDraft ? `<button class="btn-secondary" type="button" id="bxNewRev">ออก Revision ใหม่เพื่อแก้ไข</button>` : ""}
           <button class="btn-secondary" type="button" id="bxSheet">📄 เอกสาร BOM</button>
+          ${canEdit && typeof bsAvailable === "function" && bsAvailable() ? `<button class="btn-secondary" type="button" id="bxImportSheet">📥 นำเข้าจาก Google Sheet</button>` : ""}
         </div>
       </div>
       <div class="card-body">
@@ -456,6 +457,7 @@ function renderBxTree(pane) {
     const el = $("bxTreeSearch"); el.focus(); el.setSelectionRange(pos, pos);
   });
   $("bxSheet").addEventListener("click", () => openBomSheet(bxModel));
+  if ($("bxImportSheet")) $("bxImportSheet").addEventListener("click", () => bomImportFromSheet(bxModel));
   if ($("bxAddTop")) $("bxAddTop").addEventListener("click", () => bxOpenLineModal(bxModel, null, "", ""));
   if ($("bxRelease")) $("bxRelease").addEventListener("click", () => { bomModel = bxModel; releaseBom(); });
   if ($("bxNewRev")) $("bxNewRev").addEventListener("click", () => { bomModel = bxModel; openBomRevModal(); });
