@@ -225,7 +225,7 @@ function paperSignatures(names) {
 function paperFooter(formCode) {
   const now = new Date();
   const fs = formSettings();
-  return `<div class="paper-foot"><span>${escapeHtml(formCode)}</span>${fs.footer ? `<span>${escapeHtml(fs.footer)}</span>` : ""}<span>ออกจาก Production Dashboard · ${formatThaiDate(now.toISOString().slice(0, 10))}</span></div>`;
+  return `<div class="paper-foot"><span>${escapeHtml(formCode)}</span>${fs.footer ? `<span>${escapeHtml(fs.footer)}</span>` : ""}<span>ออกจาก Y2J ONE · ${formatThaiDate(now.toISOString().slice(0, 10))}</span></div>`;
 }
 
 function paperOutputActions() {
