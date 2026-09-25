@@ -37,13 +37,23 @@ const Y2JStore = (() => {
   const DEMO_CFG = { mode: "sheets", demo: true,
     url: "https://script.google.com/macros/s/AKfycbwbMJvGEudXfHvw0YeKNaLhA6vyIzb1qsyLNBhCy7GlgFx_3TRK7fC1McqJnu4deGXIdw/exec",
     token: "demo52d4f92df756fddcd9a5" };
+  // This device's own copies of the shared datasets (sample data from before it was connected).
+  // Dropped when it joins or leaves the demo: shown stale they confuse, uploaded they pollute.
+  const dropLocalData = () => {
+    try {
+      Object.keys(ls).forEach((k) => { if (SHARED.includes(String(k).split("--c-")[0])) ls.removeItem(k); });
+    } catch (e) { /* ignore */ }
+    rawSet(META_KEY, JSON.stringify({ keys: {}, pending: [] }));
+  };
+  const DEMO_CLEAN_KEY = "y2j-demo-clean-v1";
   try {
     if (!rawGet(CONFIG_KEY) && !new URLSearchParams(location.search).get("sheet")) {
       cfg = Object.assign({}, DEMO_CFG);
       rawSet(CONFIG_KEY, JSON.stringify(cfg));
-      rawSet(META_KEY, JSON.stringify({ keys: {}, pending: [] }));   // this device's sample edits never go up
       rawSet(COMPANY_KEY, "demo");
     }
+    // joined the demo (now, or with a version that didn't clean up): start from the demo's data only
+    if (cfg.demo && !rawGet(DEMO_CLEAN_KEY)) { dropLocalData(); rawSet(DEMO_CLEAN_KEY, "1"); rawSet(COMPANY_KEY, "demo"); }
   } catch (e) { /* stay local */ }
   let company = rawGet(COMPANY_KEY) || DEFAULT_COMPANY;
   if (!/^[a-z0-9]{2,12}$/.test(company)) company = DEFAULT_COMPANY;
@@ -67,6 +77,8 @@ const Y2JStore = (() => {
       rawSet(CONFIG_KEY, JSON.stringify(cfg));
       if (wasDemo || company === "demo") {
         // leaving the demo: start this device fresh against the company data
+        dropLocalData();
+        try { ls.removeItem(DEMO_CLEAN_KEY); } catch (e) { /* ignore */ }
         meta = { keys: {}, pending: [] };
         dirty.clear();
         rawSet(META_KEY, JSON.stringify(meta));
@@ -202,6 +214,9 @@ const Y2JStore = (() => {
     meta.keys[key] = { version: entry.version, base: entry.value };
   }
 
+  // nothing is uploaded until this device has seen the server's copy at least once
+  let pulledOnce = false;
+
   async function pullAll() {
     const res = await api("pull", {});
     const data = res.data || {};
@@ -213,17 +228,22 @@ const Y2JStore = (() => {
         if (local !== null) dirty.add(key); // first connection: upload what this device has
         return;
       }
-      if (dirty.has(key) && local !== null) {
-        // offline edits from last session: merge them onto the server copy, then push
+      if (dirty.has(key) && local !== null && meta.keys[key]) {
+        // offline edits from last session: merge them onto the server copy, then push.
+        // (Never on a key this device has not synced before — that local copy is sample data
+        // created while waiting, and the server copy wins; see the else branch.)
         const baseStr = meta.keys[key] ? meta.keys[key].base : null;
         const merged = merge3(parse(baseStr), parse(local), parse(entry.value));
         rawSet(key, JSON.stringify(merged));
         meta.keys[key] = { version: entry.version, base: entry.value };
       } else {
+        dirty.delete(key);
         applyRemote(key, entry);
       }
     });
     saveMeta();
+    pulledOnce = true;
+    if (dirty.size) schedulePush();
   }
 
   function schedulePush() {
@@ -233,7 +253,7 @@ const Y2JStore = (() => {
   }
 
   async function flush() {
-    if (pushing || !isRemote()) return;
+    if (pushing || !isRemote() || !pulledOnce) return;
     pushing = true;
     try {
       for (const key of [...dirty]) {
@@ -270,6 +290,10 @@ const Y2JStore = (() => {
 
   async function poll() {
     if (!isRemote() || document.hidden || pushing) return;
+    if (!pulledOnce) {   // the first download failed (offline / slow): finish it before anything else
+      try { await pullAll(); setStatus("synced"); reloadKeepingView(); } catch (e) { /* try again next poll */ }
+      return;
+    }
     try {
       const res = await api("versions", {});
       const changed = Object.keys(res.versions).filter((k) => isShared(k) && res.versions[k].version > ((meta.keys[k] || {}).version || 0) && !dirty.has(k));
@@ -328,7 +352,8 @@ const Y2JStore = (() => {
     const overlay = document.getElementById("syncOverlay");
     if (overlay) overlay.hidden = false;
     const done = (r) => { if (overlay) overlay.hidden = true; return r; };
-    const timeout = new Promise((resolve) => setTimeout(() => resolve({ mode: "sheets", offline: true }), 12000));
+    const first = !Object.keys(meta.keys || {}).length;
+    const timeout = new Promise((resolve) => setTimeout(() => resolve({ mode: "sheets", offline: true }), first ? 60000 : 12000));
     return Promise.race([pullAll().then(() => ({ mode: "sheets" })), timeout])
       .catch((e) => ({ mode: "sheets", offline: true, error: e.message }))
       .then((r) => {
@@ -377,7 +402,12 @@ const Y2JStore = (() => {
 
   function connect(url, token) {
     cfg = { mode: "sheets", url, token };
-    if (company === "demo" && url !== DEMO_CFG.url) { company = DEFAULT_COMPANY; rawSet(COMPANY_KEY, DEFAULT_COMPANY); } // leaving the demo
+    if (company === "demo" && url !== DEMO_CFG.url) { // leaving the demo
+      dropLocalData();
+      try { ls.removeItem(DEMO_CLEAN_KEY); } catch (e) { /* ignore */ }
+      company = DEFAULT_COMPANY;
+      rawSet(COMPANY_KEY, DEFAULT_COMPANY);
+    }
     rawSet(CONFIG_KEY, JSON.stringify(cfg));
     meta = { keys: {}, pending: [] };
     dirty.clear();
