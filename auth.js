@@ -396,10 +396,40 @@ function authUserName(id) {
 
 /* ---- login screen + user chip ---------------------------------------------- */
 
+// Which data this device shows: the shared Google Sheet, or only its own sample data.
+// A device that was never connected lists the built-in sample users — say so, and let it connect here.
+function renderLoginConn() {
+  const box = document.getElementById("loginConn");
+  if (!box || typeof Y2JStore === "undefined") return;
+  if (Y2JStore.isRemote()) {
+    const st = Y2JStore.status();
+    box.className = "login-conn login-conn-ok";
+    box.innerHTML = `☁ เชื่อมข้อมูลกลาง (Google Sheets) แล้ว${st.at ? ` · อัปเดต ${escapeHtml(String(st.at).slice(11, 16))}` : ""} — ทุกเครื่องที่เชื่อมเห็นข้อมูลชุดเดียวกัน`;
+    return;
+  }
+  box.className = "login-conn login-conn-warn";
+  box.innerHTML = `<strong>⚠ เครื่องนี้ยังไม่ได้เชื่อมข้อมูลกลาง</strong>
+    <span>รายชื่อด้านล่างเป็นข้อมูลตัวอย่างในเครื่องนี้เท่านั้น จึงไม่ตรงกับเครื่องอื่น — ขอ "ลิงก์ตั้งค่า" จากผู้ดูแลระบบ (เมนู ผู้ดูแลระบบ › ที่เก็บข้อมูล) แล้วเปิดลิงก์บนเครื่องนี้ หรือวางลิงก์ที่นี่</span>
+    <div class="login-conn-row"><input id="loginSetupLink" type="url" placeholder="วางลิงก์ตั้งค่า https://…?sheet=…&key=…" aria-label="ลิงก์ตั้งค่า"><button type="button" class="btn-primary" id="loginSetupBtn">เชื่อมต่อ</button></div>
+    <span class="login-conn-err" id="loginSetupErr" hidden></span>`;
+  const err = document.getElementById("loginSetupErr");
+  document.getElementById("loginSetupBtn").addEventListener("click", async () => {
+    err.hidden = true;
+    let url = "", key = "";
+    try { const q = new URL(document.getElementById("loginSetupLink").value.trim()).searchParams; url = q.get("sheet") || ""; key = q.get("key") || ""; } catch (e) { /* not a URL */ }
+    if (!url || !key) { err.textContent = "ลิงก์ไม่ถูกต้อง — ต้องมี ?sheet=…&key=…"; err.hidden = false; return; }
+    const btn = document.getElementById("loginSetupBtn");
+    btn.disabled = true; btn.textContent = "กำลังตรวจ…";
+    try { await Y2JStore.test(url, key); Y2JStore.connect(url, key); }
+    catch (e) { err.textContent = "เชื่อมไม่สำเร็จ: " + e.message; err.hidden = false; btn.disabled = false; btn.textContent = "เชื่อมต่อ"; }
+  });
+}
+
 function renderLoginScreen() {
   const scr = document.getElementById("loginScreen");
   scr.hidden = false;
   document.querySelector(".app-shell").hidden = true;
+  renderLoginConn();
   const list = document.getElementById("loginUsers");
   list.innerHTML = AUTH.users.filter((u) => u.active).map((u) => `
     <button type="button" class="login-user" data-uid="${escapeHtml(u.id)}">

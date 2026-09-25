@@ -87,6 +87,8 @@ function handle_(p) {
       case "rebuild": return json_(rebuildTabs_());
       case "organize": return json_(organize_(String(p.folder || "")));
       case "store": return json_(store_(p));
+      case "inspect": return json_(inspect_());
+      case "renameroot": return json_(renameRoot_(String(p.name || "")));
       default: return json_({ ok: false, error: "unknown action" });
     }
   } catch (err) {
@@ -554,6 +556,35 @@ function store_(p) {
   const blob = Utilities.newBlob(Utilities.base64Decode(p.data), p.type || "application/octet-stream", name);
   const f = sub.createFile(blob);
   return { ok: true, name: name, url: f.getUrl() };
+}
+
+// Read-only look at every tab: size, header, filter/frozen rows, column widths and two sample rows
+function inspect_() {
+  const out = [];
+  sheet_().getSheets().forEach((sh) => {
+    const rows = sh.getLastRow(), cols = sh.getLastColumn();
+    const o = { name: sh.getName(), hidden: sh.isSheetHidden(), rows: rows, cols: cols, frozen: sh.getFrozenRows(), filter: !!sh.getFilter() };
+    if (!o.hidden && rows && cols) {
+      const n = Math.min(cols, 16);
+      const v = sh.getRange(1, 1, Math.min(rows, 3), n).getDisplayValues();
+      o.header = v[0];
+      o.sample = v.slice(1).map((r) => r.map((x) => String(x).slice(0, 40)));
+      o.widths = [];
+      for (let c = 1; c <= n; c++) o.widths.push(sh.getColumnWidth(c));
+      o.headerBg = sh.getRange(1, 1).getBackground();
+    }
+    out.push(o);
+  });
+  return { ok: true, file: sheet_().getName(), tabs: out };
+}
+
+function renameRoot_(name) {
+  const id = PropertiesService.getScriptProperties().getProperty("ROOT_FOLDER_ID");
+  if (!id || !name) return { ok: false, error: "ไม่มีโฟลเดอร์หลักหรือชื่อใหม่" };
+  const f = DriveApp.getFolderById(id);
+  const old = f.getName();
+  f.setName(name);
+  return { ok: true, from: old, to: name };
 }
 
 function userNames_() {

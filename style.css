@@ -1206,3 +1206,12 @@ html[data-density="compact"] body { zoom: 0.9; }
 .bom-part-cell { display: flex; align-items: center; gap: 4px; min-width: 220px; }
 .bom-part-cell .bom-part { flex: 1; }
 .bom-indent { display: inline-flex; align-items: center; flex-shrink: 0; }
+
+/* Login: which data this device is using */
+.login-conn { border-radius: 10px; padding: 10px 12px; font-size: 13px; display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+.login-conn-ok { border: 1px solid var(--status-good); color: var(--status-good); }
+.login-conn-warn { border: 1px solid var(--status-warning); background: rgba(250,178,25,.10); color: var(--text-primary); }
+.login-conn-warn span { color: var(--text-secondary); }
+.login-conn-row { display: flex; gap: 6px; }
+.login-conn-row input { flex: 1; min-width: 0; }
+.login-conn-err { color: var(--status-critical); }
