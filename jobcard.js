@@ -58,6 +58,7 @@ function jcMinutes(job) {
   return (job.logs || []).reduce((s, l) => s + Math.max(0, ((l.to ? Date.parse(l.to) : Date.now()) - Date.parse(l.from)) / 60000), 0);
 }
 function jcDownMins(d) { return Math.max(0, ((d.to ? Date.parse(d.to) : Date.now()) - Date.parse(d.from)) / 60000); }
+function jcClock(iso) { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString("th-TH", { hour: "2-digit", minute: "2-digit" }); }
 function jcFmtMins(m) {
   m = Math.round(m);
   return m >= 60 ? `${Math.floor(m / 60)} ชม. ${m % 60} น.` : `${m} น.`;
@@ -133,9 +134,9 @@ function jcButtons(wo, i, big) {
   if (j.status === "done") return `<span class="muted-inline">เสร็จ ${jcEsc(j.qtyDone)} · ${jcEsc(String(j.doneAt || "").slice(0, 10))}</span>${!big && jcCanPlan() ? ` <button type="button" class="btn-link" data-jc="reopen" ${at}>เปิดใหม่</button>` : ""}`;
   if (!j.assignee && big) return `<button type="button" class="${cls}" data-jc="claim" ${at}>รับงานนี้</button>`;
   const hold = j.status === "wip"
-    ? `<select class="bom-inline jc-reason" ${at} aria-label="เหตุผลที่หยุด">${JC_STOP_REASONS.map((r) => `<option>${jcEsc(r)}</option>`).join("")}</select><button type="button" class="${cls2}" data-jc="hold" ${at}>⏸ พัก</button>`
+    ? `<select class="bom-inline jc-reason" ${at} aria-label="เหตุผลที่หยุด"><option value="">— สาเหตุที่หยุด —</option>${JC_STOP_REASONS.map((r) => `<option>${jcEsc(r)}</option>`).join("")}</select><button type="button" class="${cls2}" data-jc="hold" ${at}>⏸ พัก</button>`
     : `<button type="button" class="${cls}" data-jc="start" ${at}>▶ ${j.status === "hold" ? "ทำต่อ" : "เริ่ม"}</button>`;
-  return `${hold} <input type="number" class="bom-inline jc-qty" ${at} min="0" step="1" value="${jcEsc(wo.qty)}" aria-label="จำนวนที่เสร็จ" title="จำนวนที่เสร็จ"> <button type="button" class="${cls2}" data-jc="done" ${at}>✔ เสร็จ</button>`;
+  return `${hold} <label class="jc-qtylab">จำนวนเสร็จ <input type="number" class="bom-inline jc-qty" ${at} min="0" step="1" value="${jcEsc(wo.qty)}" aria-label="จำนวนที่เสร็จ"></label> <button type="button" class="${cls2}" data-jc="done" ${at}>✔ เสร็จ</button>`;
 }
 
 function jcWireButtons(root) {
@@ -145,6 +146,8 @@ function jcWireButtons(root) {
     const i = +b.dataset.i;
     const q = root.querySelector(`.jc-qty[data-jcwo="${b.dataset.jcwo}"][data-i="${i}"]`);
     const r = root.querySelector(`.jc-reason[data-jcwo="${b.dataset.jcwo}"][data-i="${i}"]`);
+    if (b.dataset.jc === "hold" && r && !r.value) { showToast("เลือกสาเหตุที่หยุดก่อน", "warn"); r.focus(); return; }
+    if (b.dataset.jc === "done" && q && !(jcNum(q.value) > 0)) { showToast("ใส่จำนวนที่เสร็จ", "warn"); q.focus(); return; }
     jcAct(wo, wo.jobs[i], b.dataset.jc, q ? jcNum(q.value) : 0, r ? r.value : "");
   }));
 }
@@ -194,17 +197,15 @@ function renderJobCards() {
     const c = jcCost(wo);
     const downTot = Object.values(c.down).reduce((s, v) => s + v, 0);
     body = `<div class="jc-sum">ขั้นตอนเสร็จ <b>${done}/${jobs.length}</b> · เวลาทำงานจริง <b>${jcFmtMins(act)}</b>${plan ? ` จากแผน ${jcFmtMins(plan)}` : ""} · เวลาหยุด <b>${jcFmtMins(downTot)}</b> · ผลิตเสร็จเข้าคลังแล้ว <b>${jcNum(wo.produced)}/${jcNum(wo.qty)}</b></div>
-      <div class="table-scroll"><table class="data-table"><thead><tr><th>#</th><th>Job Card</th><th>ขั้นตอน</th><th>สถานี</th><th>ผู้รับผิดชอบ</th><th class="num">แผน</th><th class="num">จริง</th><th class="num">หยุด</th><th>สถานะ</th><th></th></tr></thead><tbody>
+      <div class="table-scroll"><table class="data-table jc-table"><thead><tr><th>#</th><th>ขั้นตอน</th><th>ผู้รับผิดชอบ</th><th class="num">เวลาจริง / แผน</th><th>สถานะ</th><th></th></tr></thead><tbody>
       ${jobs.map((j, i) => {
         const prevOpen = jobs.slice(0, i).some((p) => p.status !== "done");
         const dm = (j.downs || []).reduce((s, d) => s + jcDownMins(d), 0);
         const openDown = (j.downs || []).find((d) => !d.to);
-        return `<tr${j.status === "wip" ? ` class="jc-wip"` : ""}><td>${j.seq}</td><td class="mono-cell">${jcEsc(j.no)}</td>
-          <td>${jcEsc(j.op)}${prevOpen && j.status === "wip" ? ` <span class="muted-inline" title="ขั้นก่อนหน้ายังไม่เสร็จ">⚠ ขั้นก่อนยังไม่เสร็จ</span>` : ""}</td><td>${jcEsc(j.station)}</td>
+        return `<tr${j.status === "wip" ? ` class="jc-wip"` : ""}><td>${j.seq}</td>
+          <td><b>${jcEsc(j.op)}</b><div class="muted-inline">${jcEsc(j.no)} · ${jcEsc(j.station)}</div>${prevOpen && j.status === "wip" ? `<div class="muted-inline" title="ขั้นก่อนหน้ายังไม่เสร็จ">⚠ ขั้นก่อนยังไม่เสร็จ</div>` : ""}</td>
           <td>${jcCanPlan() ? `<select class="bom-inline jc-who" data-i="${i}"><option value="">—</option>${[...new Set(users.concat(j.assignee ? [j.assignee] : []))].map((n) => `<option${n === j.assignee ? " selected" : ""}>${jcEsc(n)}</option>`).join("")}</select>` : jcEsc(j.assignee || "—")}</td>
-          <td class="num">${j.planMins ? jcFmtMins(j.planMins) : "—"}</td>
-          <td class="num"><span class="${j.planMins && jcMinutes(j) > j.planMins ? "bx-neg" : ""}">${(j.logs || []).length ? jcFmtMins(jcMinutes(j)) : "—"}</span></td>
-          <td class="num">${dm ? jcFmtMins(dm) : "—"}</td>
+          <td class="num"><span class="${j.planMins && jcMinutes(j) > j.planMins ? "bx-neg" : ""}">${(j.logs || []).length ? jcFmtMins(jcMinutes(j)) : "—"}</span><div class="muted-inline">แผน ${j.planMins ? jcFmtMins(j.planMins) : "—"}${dm ? ` · หยุด ${jcFmtMins(dm)}` : ""}</div></td>
           <td>${jcPill(j.status)}${openDown ? `<div class="muted-inline">${jcEsc(openDown.reason)}</div>` : ""}</td><td class="jc-btns">${jcButtons(wo, i, false)}</td></tr>`;
       }).join("")}</tbody></table></div>
       ${jcCostHtml(wo, c)}
@@ -336,7 +337,7 @@ function renderJcOperator() {
     return `<div class="jc-op${j.status === "wip" ? " jc-op-wip" : ""}">
       <div class="jc-op-head"><b>${jcEsc(j.op)}</b> ${jcPill(j.status)}</div>
       <div class="muted-inline">${jcEsc(w.wo)} · ${jcEsc(w.model)} × ${jcEsc(w.qty)} · สถานี ${jcEsc(j.station || "—")} · ${jcEsc(j.no)}</div>
-      <div class="jc-op-time">${openLog ? `เริ่ม ${jcEsc(openLog.from.slice(11, 16))} · ` : ""}ทำไปแล้ว ${jcFmtMins(jcMinutes(j))}${j.planMins ? ` / แผน ${jcFmtMins(j.planMins)}` : ""}${openDown ? ` · หยุด: ${jcEsc(openDown.reason)}` : ""}</div>
+      <div class="jc-op-time">${openLog ? `เริ่มรอบนี้ ${jcEsc(jcClock(openLog.from))} น. · ` : ""}ทำไปแล้ว ${jcFmtMins(jcMinutes(j))}${j.planMins ? ` / แผน ${jcFmtMins(j.planMins)}` : ""}${openDown ? ` · หยุด: ${jcEsc(openDown.reason)}` : ""}</div>
       <div class="jc-op-btns">${jcButtons(w, i, true)}</div></div>`;
   };
   box.innerHTML = `<div class="card"><div class="card-header"><h3>Job Card ของฉัน — ${jcEsc(me)}</h3>

@@ -1269,3 +1269,17 @@ html[data-density="compact"] body { zoom: 0.9; }
 .jc-op-btns .jc-qty { width: 70px; min-height: 40px; }
 .jc-op-btns .jc-reason { min-height: 40px; max-width: 100%; }
 .jc-free-t { margin-top: 16px; }
+
+.jc-table .jc-who { min-width: 150px; }
+.jc-table td { vertical-align: top; }
+.jc-btns { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; white-space: normal; min-width: 220px; }
+.jc-qtylab { display: inline-flex; align-items: center; gap: 4px; font-size: 0.85rem; }
+@media (max-width: 1024px) {
+  .jc-table thead { display: none; }
+  .jc-table, .jc-table tbody, .jc-table tr, .jc-table td { display: block; width: 100%; }
+  .jc-table tr { border: 1px solid var(--border, #333); border-radius: 10px; margin-bottom: 10px; padding: 8px; }
+  .jc-table td { border: 0; padding: 4px 6px; text-align: left; }
+  .jc-table td:first-child { display: none; }
+}
+.jc-table td.jc-btns { display: flex; flex-wrap: wrap; }
+.jc-btns .jc-reason { width: auto; flex: 1 1 160px; min-width: 0; }
