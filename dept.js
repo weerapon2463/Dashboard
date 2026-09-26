@@ -118,6 +118,7 @@ function deptNextStatus(type, status) {
 }
 
 function deptNextNumber(type) {
+  if (typeof namingNext === "function") return namingNext(`doc:${type}`, (DEPT_DOCS[type] || []).map((d) => d.no));
   const prefix = `${DOC_TYPES[type].prefix}-${new Date().getFullYear()}-`;
   let max = 0;
   (DEPT_DOCS[type] || []).forEach((d) => {

@@ -30,6 +30,7 @@ function renderAdmin() {
   if (adminTab === "audit") renderAdminAudit();
   if (adminTab === "storage") renderAdminStorage();
   if (adminTab === "org" && typeof renderAdminOrg === "function") renderAdminOrg();
+  if (adminTab === "naming" && typeof renderAdminNaming === "function") renderAdminNaming();
 }
 
 /* ---- storage location ------------------------------------------------------ */

@@ -13,6 +13,8 @@ const BX_OPEN_REQ = ["รออนุมัติ", "อนุมัติ", "�
 
 let BX_STOCK = {};                          // key -> { qty, loc, min }
 let BX_SETTINGS = { requesters: [], issuers: [] }; // user ids; empty requesters = everyone allowed by role
+let SX_LEDGER = [];   // stock ledger rows (append-only) — see stockx.js
+let SX_ENTRIES = [];  // stock entry documents
 let bxModel = null;
 let bxTab = "tree";
 let bxRef = "";
@@ -90,13 +92,18 @@ function bxLoadStock() {
   if (parsed && parsed.items) {
     BX_STOCK = parsed.items;
     BX_SETTINGS = Object.assign({ requesters: [], issuers: [] }, parsed.settings || {});
+    SX_LEDGER = Array.isArray(parsed.ledger) ? parsed.ledger : [];
+    SX_ENTRIES = Array.isArray(parsed.entries) ? parsed.entries : [];
   } else {
     BX_STOCK = JSON.parse(JSON.stringify(typeof STOCK_SAMPLE !== "undefined" ? STOCK_SAMPLE : {}));
     BX_SETTINGS = { requesters: [], issuers: [] };
+    SX_LEDGER = [];
+    SX_ENTRIES = [];
   }
+  if (typeof sxRebuild === "function") sxRebuild();
 }
 function bxSaveStock() {
-  try { localStorage.setItem(BX_STOCK_KEY, JSON.stringify({ items: BX_STOCK, settings: BX_SETTINGS })); }
+  try { localStorage.setItem(BX_STOCK_KEY, JSON.stringify({ items: BX_STOCK, settings: BX_SETTINGS, ledger: SX_LEDGER, entries: SX_ENTRIES })); }
   catch (e) { showToast("บันทึกข้อมูลคงคลังไม่สำเร็จ", "warn"); }
 }
 function bxStock(key) { return BX_STOCK[key] || null; }
@@ -104,7 +111,7 @@ function bxStockCell(key) {
   const s = bxStock(key);
   if (!s) return `<span class="muted-inline">—</span>`;
   const low = s.min && bxNum(s.qty) <= bxNum(s.min);
-  return `<span class="${bxNum(s.qty) <= 0 ? "bx-neg" : low ? "bx-low" : ""}">${bxFmt(s.qty)}</span>${s.loc ? ` <span class="muted-inline">@${bxEsc(s.loc)}</span>` : ""}`;
+  return `<span class="${bxNum(s.qty) <= 0 ? "bx-neg" : low ? "bx-low" : ""}">${bxFmt(s.qty)}</span>${s.loc ? ` <span class="muted-inline">@${bxEsc(s.loc)}</span>` : ""}${typeof sxWhBreakdown === "function" ? sxWhBreakdown(key) : ""}`;
 }
 
 /* ---- BOM tree ------------------------------------------------------------- */
@@ -331,6 +338,7 @@ function renderBomx() {
   else if (bxTab === "pick") renderBxPick(pane);
   else if (bxTab === "track") renderBxTrack(pane);
   else if (bxTab === "mrp") renderBxMrp(pane);
+  else if (bxTab === "sx" && typeof renderSxTab === "function") renderSxTab(pane);
   else renderBxStockTab(pane);
   if (bxReqOpenNo && document.getElementById("bxReqBackdrop").classList.contains("open")) bxRenderReqModal();
 }
@@ -1030,7 +1038,7 @@ function bxIssue(d, note) {
     it.issued = bxNum(it.issued) + n;
     it.log = it.log || [];
     it.log.push({ at, by: bxUserName(), kind: "จ่าย", qty: n, note: d.owner ? `ให้ ${d.owner}${note ? ` · ${note}` : ""}` : note });
-    if (s) s.qty = bxNum(s.qty) - n;
+    if (s) bxMove(it.key, sxPickWh(it.key, n), -n, { vt: "ใบเบิก", v: d.no }, "จ่ายตามใบเบิก", d.owner ? `ให้ ${d.owner}` : "");
   });
   const before = d.status;
   d.status = d.items.every((it) => bxNum(it.issued) >= bxNum(it.req)) ? "จ่ายของแล้ว" : "จ่ายบางส่วน";
@@ -1055,8 +1063,7 @@ function bxReturn(d, note) {
     it.ret = bxNum(it.ret) + n;
     it.log = it.log || [];
     it.log.push({ at, by: bxUserName(), kind: "คืนคลัง", qty: n, note });
-    const s = bxStock(it.key);
-    if (s) s.qty = bxNum(s.qty) + n;
+    if (bxStock(it.key)) bxMove(it.key, "MAIN", n, { vt: "ใบเบิก", v: d.no }, "คืนคลัง", note || "");
   });
   if (typeof auditLog === "function") auditLog("คืนของเข้าคลัง", d.no, plan.map(({ it, n }) => `${it.code || it.part} × ${n}`).join(", "));
   bxAfterReqChange(d);
@@ -1318,7 +1325,7 @@ function renderBxStockTab(pane) {
     <div class="card">
       <div class="card-header">
         <h3>คงคลัง (Stock on hand) ${can ? "" : `<span class="muted-inline">— ดูอย่างเดียว</span>`}</h3>
-        <p class="card-sub">จ่ายของ/คืนของตามใบเบิกจะตัด/เพิ่มยอดให้อัตโนมัติ · ปรับยอดหลังตรวจนับ (STK) หรือรับของ (GRN) ได้ที่นี่ ทุกการปรับบันทึกในประวัติ</p>
+        <p class="card-sub">จ่ายของ/คืนของตามใบเบิกจะตัด/เพิ่มยอดให้อัตโนมัติ · แก้ยอดตรงนี้ = ปรับยอดคลังหลัก (MAIN) · รับเข้า/โอนย้าย/ผลิตเสร็จ/ตรวจนับแยกคลัง ใช้แท็บ "เคลื่อนไหวคลัง" · ทุกการเปลี่ยนแปลงลงสมุดคุมคลัง</p>
       </div>
       <div class="card-body table-scroll">
         <div class="filter-row"><label for="bxStockSearch">ค้นหา:</label><input type="text" id="bxStockSearch" class="wo-search" placeholder="รหัส / ชื่อ / ที่เก็บ" value="${bxEsc(bxStockSearch)}"></div>
@@ -1333,7 +1340,7 @@ function renderBxStockTab(pane) {
             return `<tr>
               <td class="mono-cell"><button type="button" class="bx-link" data-stockdetail="${bxEsc(p.key)}" data-model="${bxEsc(p.models[0] || "")}">${bxEsc(p.line.code || "—")}</button></td>
               <td>${bxEsc(p.line.part)}</td><td class="muted-inline">${bxEsc(p.models.join(", "))}</td>
-              <td>${inp("loc", st.loc)}</td><td class="num">${inp("qty", st.qty, "n")}</td><td class="num">${inp("min", st.min, "n")}</td>
+              <td>${inp("loc", st.loc)}</td><td class="num">${inp("qty", st.qty, "n")}${typeof sxWhBreakdown === "function" ? sxWhBreakdown(p.key) : ""}</td><td class="num">${inp("min", st.min, "n")}</td>
               <td class="num">${dem ? bxFmt(dem) : "0"}</td><td class="num">${bxStock(p.key) ? `<span class="${after < 0 ? "bx-neg" : ""}">${bxFmt(after)}</span>` : "—"}</td>
               <td>${status}</td>
             </tr>`;
@@ -1359,7 +1366,11 @@ function renderBxStockTab(pane) {
     const f = el.dataset.f;
     const st = BX_STOCK[k] = BX_STOCK[k] || { qty: 0, loc: "" };
     const prev = st[f];
-    st[f] = f === "loc" ? el.value.trim() : Number(el.value) || 0;
+    if (f === "qty") {
+      // counted total → adjust the main store by the difference (ledger row "ปรับยอด")
+      const diff = (Number(el.value) || 0) - bxNum(st.qty);
+      if (diff) bxMove(k, "MAIN", diff, { vt: "ปรับยอด", v: "" }, "ปรับยอดคงคลัง", "แก้ยอดที่แท็บคงคลัง");
+    } else st[f] = f === "loc" ? el.value.trim() : Number(el.value) || 0;
     bxSaveStock();
     if (typeof auditLog === "function") auditLog("ปรับยอดคงคลัง", k, `${f === "qty" ? "คงคลัง" : f === "min" ? "จุดสั่งซื้อ" : "ที่เก็บ"}: "${prev ?? ""}" → "${st[f]}"`);
     renderBxStats();
@@ -1386,8 +1397,8 @@ function bxReceiveFromP2P(c, ev) {
   const key = bxKeyForItem(c.item);
   const n = bxNum(ev.qtyReceived);
   if (!key || !(n > 0)) return "";
-  const st = BX_STOCK[key] = BX_STOCK[key] || { qty: 0, loc: "" };
-  st.qty = bxNum(st.qty) + n;
+  bxMove(key, "MAIN", n, { vt: "GRN", v: c.po || c.pr || "" }, "รับของจากจัดซื้อ", c.pr || "");
+  const st = BX_STOCK[key];
   ev.stockKey = key;
   ev.stockQty = n;
   bxSaveStock();
@@ -1397,8 +1408,7 @@ function bxReceiveFromP2P(c, ev) {
 
 function bxReverseFromP2P(c, ev) {
   if (!ev.stockKey || !(bxNum(ev.stockQty) > 0)) return "";
-  const st = BX_STOCK[ev.stockKey] = BX_STOCK[ev.stockKey] || { qty: 0, loc: "" };
-  st.qty = bxNum(st.qty) - bxNum(ev.stockQty);
+  bxMove(ev.stockKey, "MAIN", -bxNum(ev.stockQty), { vt: "IQC ไม่ผ่าน", v: c.po || c.pr || "" }, "ตัดคืน (ของไม่ผ่านตรวจ)", c.pr || "");
   bxSaveStock();
   return ` · ตัดคืนจากคลัง ${ev.stockKey} −${bxFmt(ev.stockQty)} (ของไม่ผ่านตรวจ)`;
 }

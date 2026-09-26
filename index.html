@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Y2J ONE | Y2J Machinery</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
-<link rel="stylesheet" href="style.css?v=20260927h">
+<link rel="stylesheet" href="style.css?v=20260927i">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -461,6 +461,7 @@
               <button type="button" class="dept-tab admin-tab" data-tab="integrity">✔ ตรวจสอบความสอดคล้อง</button>
               <button type="button" class="dept-tab admin-tab" data-tab="audit">ประวัติการใช้งาน (Audit Log)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="org">🏢 องค์กร (บริษัท / ฝ่าย / โลโก้)</button>
+              <button type="button" class="dept-tab admin-tab" data-tab="naming">เลขที่เอกสาร (Naming Series)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="storage">☁ ที่เก็บข้อมูล</button>
             </div>
             <p class="admin-note">ข้อมูลใช้ร่วมกันทุกเครื่องเมื่อเชื่อม Google Sheets (แท็บ "ที่เก็บข้อมูล") · การเข้าสู่ระบบด้วย PIN เป็นระดับแอป — ถ้าต้องการความปลอดภัยระดับองค์กร ขั้นต่อไปคือเข้าสู่ระบบด้วยบัญชี Google ของบริษัท</p>
@@ -555,6 +556,7 @@
               </ol>
               <p class="admin-note">ใน Sheets จะมีแท็บอ่านง่ายให้ดูและทำรายงาน: เอกสาร · จัดซื้อ · ผู้ใช้ · ประวัติ · แผนงาน · Pilot · ใบสั่งผลิต (สร้างใหม่ทุกครั้งที่บันทึก — แก้ข้อมูลที่ Dashboard) · ไฟล์แนบเก็บในโฟลเดอร์ Google Drive · ข้อมูลเครื่องนี้ยังเก็บสำเนาไว้เผื่อเน็ตหลุด</p>
             </div>
+            <div class="admin-panel" data-panel="naming" hidden><div id="namingPanel"></div></div>
             <div class="admin-panel" data-panel="audit" hidden>
               <div class="filter-row">
                 <label for="auditUser">ผู้ใช้:</label><select id="auditUser"></select>
@@ -684,6 +686,7 @@
           <button class="dept-tab" type="button" data-bxtab="track">ใบเบิก · ค้างเบิก · ค้างจ่าย <span class="dept-tab-count" id="bxTrackCount">0</span></button>
           <button class="dept-tab" type="button" data-bxtab="mrp">วางแผนวัสดุ (MRP) → MRQ / PR</button>
           <button class="dept-tab" type="button" data-bxtab="stock">คงคลัง / สิทธิ์การเบิก</button>
+          <button class="dept-tab" type="button" data-bxtab="sx">เคลื่อนไหวคลัง · สมุดคุมคลัง</button>
         </div>
         <div id="bxPane"></div>
       </section>
@@ -1239,6 +1242,13 @@
             </table>
           </div>
         </div>
+        <div class="card" id="jcCard">
+          <div class="card-header">
+            <h3>Job Card — ขั้นตอนการผลิตตาม Routing</h3>
+            <p class="card-sub">แต่ละใบสั่งผลิตแตกเป็นขั้นตอน (ตัด · เชื่อม · กลึง · พ่นสี · ประกอบ · QC) มีผู้รับผิดชอบ และจับเวลาจริงด้วยปุ่มเริ่ม / พัก / เสร็จ — แบบ Job Card ของ ERPNext</p>
+          </div>
+          <div class="card-body" id="jcBody"></div>
+        </div>
       </section>
     </main>
     <div class="nav-overlay" id="navOverlay" hidden></div>
@@ -1732,40 +1742,43 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260927h"></script>
-  <script src="data.js?v=20260927h"></script>
-  <script src="partcode.js?v=20260927h"></script>
-  <script src="priority-matrix.js?v=20260927h"></script>
-  <script src="capacity-planning.js?v=20260927h"></script>
-  <script src="master-schedule.js?v=20260927h"></script>
-  <script src="make-or-buy.js?v=20260927h"></script>
-  <script src="resource.js?v=20260927h"></script>
-  <script src="procurement.js?v=20260927h"></script>
-  <script src="workorder.js?v=20260927h"></script>
-  <script src="alerts.js?v=20260927h"></script>
-  <script src="overview-charts.js?v=20260927h"></script>
-  <script src="pilot.js?v=20260927h"></script>
-  <script src="pilot-measure.js?v=20260927h"></script>
-  <script src="dept-data.js?v=20260927h"></script>
-  <script src="dept-samples.js?v=20260927h"></script>
-  <script src="org.js?v=20260927h"></script>
-  <script src="dept.js?v=20260927h"></script>
-  <script src="bom.js?v=20260927h"></script>
-  <script src="bomx.js?v=20260927h"></script>
-  <script src="bomsheet.js?v=20260927h"></script>
-  <script src="service.js?v=20260927h"></script>
-  <script src="reports.js?v=20260927h"></script>
-  <script src="integrity.js?v=20260927h"></script>
-  <script src="overview.js?v=20260927h"></script>
-  <script src="rnd.js?v=20260927h"></script>
-  <script src="docview.js?v=20260927h"></script>
-  <script src="esign.js?v=20260927h"></script>
-  <script src="p2p-data.js?v=20260927h"></script>
-  <script src="p2p.js?v=20260927h"></script>
-  <script src="suppliers.js?v=20260927h"></script>
-  <script src="auth.js?v=20260927h"></script>
-  <script src="admin.js?v=20260927h"></script>
-  <script src="plans.js?v=20260927h"></script>
-  <script src="app.js?v=20260927h"></script>
+  <script src="storage.js?v=20260927i"></script>
+  <script src="data.js?v=20260927i"></script>
+  <script src="partcode.js?v=20260927i"></script>
+  <script src="priority-matrix.js?v=20260927i"></script>
+  <script src="capacity-planning.js?v=20260927i"></script>
+  <script src="master-schedule.js?v=20260927i"></script>
+  <script src="make-or-buy.js?v=20260927i"></script>
+  <script src="resource.js?v=20260927i"></script>
+  <script src="procurement.js?v=20260927i"></script>
+  <script src="workorder.js?v=20260927i"></script>
+  <script src="jobcard.js?v=20260927i"></script>
+  <script src="alerts.js?v=20260927i"></script>
+  <script src="overview-charts.js?v=20260927i"></script>
+  <script src="pilot.js?v=20260927i"></script>
+  <script src="pilot-measure.js?v=20260927i"></script>
+  <script src="dept-data.js?v=20260927i"></script>
+  <script src="dept-samples.js?v=20260927i"></script>
+  <script src="org.js?v=20260927i"></script>
+  <script src="dept.js?v=20260927i"></script>
+  <script src="bom.js?v=20260927i"></script>
+  <script src="bomx.js?v=20260927i"></script>
+  <script src="stockx.js?v=20260927i"></script>
+  <script src="naming.js?v=20260927i"></script>
+  <script src="bomsheet.js?v=20260927i"></script>
+  <script src="service.js?v=20260927i"></script>
+  <script src="reports.js?v=20260927i"></script>
+  <script src="integrity.js?v=20260927i"></script>
+  <script src="overview.js?v=20260927i"></script>
+  <script src="rnd.js?v=20260927i"></script>
+  <script src="docview.js?v=20260927i"></script>
+  <script src="esign.js?v=20260927i"></script>
+  <script src="p2p-data.js?v=20260927i"></script>
+  <script src="p2p.js?v=20260927i"></script>
+  <script src="suppliers.js?v=20260927i"></script>
+  <script src="auth.js?v=20260927i"></script>
+  <script src="admin.js?v=20260927i"></script>
+  <script src="plans.js?v=20260927i"></script>
+  <script src="app.js?v=20260927i"></script>
 </body>
 </html>

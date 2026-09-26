@@ -482,6 +482,7 @@ function openP2PCase(id) {
 /* ---- record a stage ---------------------------------------------------------- */
 
 function p2pNextNumber(prefix, list) {
+  if (typeof namingNext === "function") return namingNext(prefix.toLowerCase(), list);
   let max = 0;
   list.forEach((n) => { const m = String(n || "").match(new RegExp(`^${prefix}-2026-(\\d+)$`)); if (m) max = Math.max(max, Number(m[1])); });
   return `${prefix}-2026-${String(max + 1).padStart(4, "0")}`;

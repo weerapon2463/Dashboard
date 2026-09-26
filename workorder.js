@@ -171,6 +171,7 @@ function renderWorkOrders() {
   renderBOMTable(bomFilter ? bomFilter.value : MACHINE_MODELS[0]);
   renderIssuanceTable();
   updateWorkOrderStats();
+  if (typeof renderJobCards === "function") renderJobCards();
 
   const addBtn = document.getElementById("woAddBtn");
   if (addBtn) addBtn.hidden = !woCanAdd(currentRole());
@@ -379,6 +380,7 @@ function openUpdateModal(woId) {
 }
 
 function generateWONumber() {
+  if (typeof namingNext === "function") return namingNext("wo", WORK_ORDERS.map((w) => w.wo));
   const nums = WORK_ORDERS.map((w) => {
     const m = /WO-\d+-(\d+)/.exec(w.wo);
     return m ? Number(m[1]) : 0;

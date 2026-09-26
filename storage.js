@@ -15,7 +15,7 @@ const Y2JStore = (() => {
   const SHARED = [
     "y2j-auth-v1", "y2j-audit-v1", "y2j-dept-docs-v1", "y2j-bom-v1", "y2j-p2p-v1", "y2j-plans-v1", "y2j-pilot-v1",
     "y2j-workorders-v1", "y2j-procurement-v1", "y2j-master-schedule-v1", "y2j-priority-jobs-v1", "y2j-resource-v1",
-    "y2j-form-settings-v1", "y2j-org-v1", "y2j-stock-v1", "y2j-reports-v1", "y2j-rnd-v1",
+    "y2j-form-settings-v1", "y2j-org-v1", "y2j-stock-v1", "y2j-reports-v1", "y2j-rnd-v1", "y2j-naming-v1",
   ];
   // Datasets that belong to one company. Users/teams/companies and the audit log are group-wide.
   const COMPANY_SCOPED = SHARED.filter((k) => k !== "y2j-auth-v1" && k !== "y2j-audit-v1");

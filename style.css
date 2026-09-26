@@ -1239,3 +1239,20 @@ html[data-density="compact"] body { zoom: 0.9; }
 .pm-cell .plan-chip-title { -webkit-line-clamp: 2; font-size: 12px; }
 .plan-master-list { margin-top: 12px; display: flex; flex-direction: column; gap: 14px; }
 .pm-group h4 { margin: 0 0 6px; }
+
+/* ---- stock ledger / stock entry (stockx.js) ---- */
+.sx-subtabs { margin-bottom: 12px; }
+.sx-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px 14px; margin-bottom: 12px; }
+.sx-form label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-secondary, #555); }
+.sx-form .sx-wide { grid-column: 1 / -1; }
+.sx-items { margin: 8px 0; }
+.sx-actions { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+.sx-whline { font-size: 0.75rem; }
+/* ---- job cards (jobcard.js) ---- */
+.jc-sum { margin: 8px 0 12px; }
+.jc-wip td { background: rgba(255, 184, 0, 0.08); }
+.jc-btns { white-space: nowrap; }
+.jc-btns .jc-qty { width: 64px; }
+.jc-routing { margin-top: 16px; }
+.jc-routing summary { cursor: pointer; font-weight: 600; }
+.jc-mine { margin: 8px 0 14px; }
