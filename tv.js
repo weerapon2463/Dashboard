@@ -140,7 +140,7 @@ function tvClock() {
 function tvRender() {
   const root = document.getElementById("tvRoot");
   if (!root || !tvMode) return;
-  const slides = tvMode === "exec" ? [["ภาพรวมวันนี้", tvExecKpi], ["ต้นทุน & เวลาหยุด", tvExecCost]] : [["สถานีงานตอนนี้", tvFloorStations], ["ความคืบหน้าใบสั่งผลิต", tvFloorOrders]];
+  const slides = tvMode === "exec" ? [["ภาพรวมวันนี้", tvExecKpi], ["ต้นทุน & เวลาหยุด", tvExecCost]] : [["สถานีงานตอนนี้", tvFloorStations], ["ทีมงานตอนนี้ — ทุกคนทำอะไรอยู่", tvFloorPeople], ["ความคืบหน้าใบสั่งผลิต", tvFloorOrders]];
   const i = tvSlide % slides.length;
   const co = typeof orgCurrent === "function" && orgCurrent() ? orgCurrent().name : APP_NAME;
   let body = "";
@@ -202,6 +202,68 @@ function tvFloorStations() {
         ${here.map(card).join("") || `<div class="tv-idle">ว่าง</div>`}
         ${queue[s.id] ? `<div class="tv-queue">รอเริ่ม ${queue[s.id]} งาน</div>` : ""}</section>`;
     }).join("")}</div>`;
+}
+
+/* ---- floor: every person — what they are on now, stops, done today, queue ---------------- */
+
+function tvFloorPeople() {
+  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const t0 = today0.getTime();
+  const byName = {};
+  tvWOs().forEach((w) => (w.jobs || []).forEach((j) => {
+    if (!j.assignee) return;
+    const p = byName[j.assignee] = byName[j.assignee] || { name: j.assignee, now: null, done: 0, queue: 0, mins: 0 };
+    if (j.status === "wip" || j.status === "hold") { if (!p.now || j.status === "wip") p.now = { w, j }; }
+    else if (j.status === "open" && w.status !== "เสร็จสมบูรณ์") p.queue++;
+    if (j.status === "done" && j.doneAt && Date.parse(j.doneAt) >= t0) p.done++;
+    (j.logs || []).forEach((l) => { const a = Math.max(t0, Date.parse(l.from)); const b = l.to ? Date.parse(l.to) : Date.now(); if (b > a) p.mins += (b - a) / 60000; });
+  }));
+  // people of the shop floor with nothing assigned still appear, as free hands
+  const users = typeof AUTH !== "undefined" && AUTH ? AUTH.users.filter((u) => u.active && u.role !== "admin" && (!u.company || typeof orgCurrent !== "function" || !orgCurrent() || u.company === orgCurrent().id)) : [];
+  users.filter((u) => ["prod", "qc"].includes(u.dept) && u.role === "operator" || u.dept === "qc").forEach((u) => { if (!byName[u.name]) byName[u.name] = { name: u.name, now: null, done: 0, queue: 0, mins: 0 }; });
+  // support people who keep the line running: store, maintenance, incoming inspection
+  const docs = typeof DEPT_DOCS !== "undefined" ? DEPT_DOCS : {};
+  const reqs = typeof bxReqs === "function" ? bxReqs() : [];
+  users.filter((u) => ["wh", "mt", "qc"].includes(u.dept)).forEach((u) => {
+    const p = byName[u.name] = byName[u.name] || { name: u.name, now: null, done: 0, queue: 0, mins: 0 };
+    const tasks = [];
+    if (u.dept === "wh") {
+      const toIssue = reqs.filter((d) => d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน");
+      if (toIssue.length) tasks.push(`📦 ใบเบิกรอจ่าย ${toIssue.length} ใบ (${toIssue.slice(0, 2).map((d) => d.no).join(", ")})`);
+      const issuedToday = reqs.reduce((n, d) => n + d.items.reduce((m, it) => m + (it.log || []).filter((g) => g.kind === "จ่าย" && Date.parse(g.at) >= t0).length, 0), 0);
+      p.done += issuedToday;
+    }
+    if (u.dept === "mt") (docs.mtr || []).filter((d) => d.owner === u.name && !/ซ่อมเสร็จ/.test(d.status || "")).forEach((d) => tasks.push(`🔧 ${d.no} ${d.title} (${d.status})`));
+    if (u.dept === "qc") {
+      const iqc = (docs.iqc || []).filter((d) => d.status === "รอตรวจ").length;
+      if (iqc) tasks.push(`🔍 ของรอตรวจรับ (IQC) ${iqc} รายการ`);
+      const ncr = (docs.ncr || []).filter((d) => !/ปิด/.test(d.status || "")).length;
+      if (ncr) tasks.push(`⚠ NCR ที่ยังไม่ปิด ${ncr} เรื่อง`);
+    }
+    p.tasks = tasks;
+    p.support = true;
+  });
+  const info = (name) => users.find((u) => u.name === name) || {};
+  const order = (p) => (p.now ? (p.now.j.status === "wip" ? 0 : 1) : p.tasks && p.tasks.length ? 2 : 3);
+  const people = Object.values(byName).sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name));
+  if (!people.length) return `<p class="tv-empty">ยังไม่มีการมอบหมาย Job Card</p>`;
+  const cols = people.length > 8 ? 4 : people.length > 4 ? 4 : people.length;
+  return `<div class="tv-people" style="--cols:${cols}">${people.map((p) => {
+    const u = info(p.name);
+    const cur = p.now;
+    const down = cur && (cur.j.downs || []).find((d) => !d.to);
+    const mins = cur ? jcMinutes(cur.j) : 0;
+    const pct = cur && cur.j.planMins ? Math.min(100, Math.round(mins / cur.j.planMins * 100)) : 0;
+    return `<div class="tv-person tv-person-${cur ? cur.j.status : p.tasks && p.tasks.length ? "support" : "idle"}">
+      <div class="tv-person-head"><span class="tv-avatar">${tvEsc((p.name || "?").trim().charAt(0))}</span><div><b>${tvEsc(p.name)}</b><small>${tvEsc(u.position || "")}</small></div></div>
+      ${cur ? `<div class="tv-person-job"><span class="tv-step tv-step-${cur.j.status}">${tvEsc(cur.j.station)}</span> ${tvEsc(cur.j.op)}</div>
+        <div class="tv-person-wo">${tvEsc(cur.w.serial || cur.w.wo)} · ${tvEsc(cur.w.wo)}</div>
+        ${down ? `<div class="tv-job-stop">⏸ ${tvEsc(down.reason)} · ${jcFmtMins(jcDownMins(down))}</div>` : `<div class="tv-bar"><i style="width:${pct}%"></i></div><div class="tv-job-time">${jcFmtMins(mins)}${cur.j.planMins ? ` / แผน ${jcFmtMins(cur.j.planMins)}` : ""}</div>`}`
+        : p.tasks && p.tasks.length ? `<div class="tv-person-tasks">${p.tasks.slice(0, 3).map((t) => `<div>${tvEsc(t)}</div>`).join("")}</div>`
+        : `<div class="tv-person-free">ว่าง — รอรับงาน</div>`}
+      <div class="tv-person-foot">${p.mins >= 1 || !p.support ? `<span>วันนี้ทำงาน <b>${jcFmtMins(p.mins)}</b></span>` : ""}<span>${p.support && !cur ? "จ่าย/ปิดวันนี้" : "เสร็จวันนี้"} <b>${p.done}</b></span>${p.queue || !p.support ? `<span>รอคิว <b>${p.queue}</b></span>` : ""}</div>
+    </div>`;
+  }).join("")}</div>`;
 }
 
 /* ---- floor: order progress -------------------------------------------------------------- */

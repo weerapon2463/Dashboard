@@ -106,3 +106,24 @@ html.tv-on, html.tv-on body { overflow: hidden; }
 .tv-simbtn { background: #1a1d21; color: #f2a60d; border: 1px solid #f2a60d; border-radius: 8px; padding: 0.3em 0.7em; font: inherit; font-size: 0.8em; cursor: pointer; }
 .tv-simbtn.on { background: #f2a60d; color: #1a1204; }
 .tv-simbar { background: repeating-linear-gradient(-45deg, rgba(242,166,13,0.18) 0 12px, rgba(242,166,13,0.08) 12px 24px); color: #ffd166; border-radius: 8px; padding: 0.3em 0.8em; margin-bottom: 0.6em; font-size: 0.85em; }
+
+.tv-people { flex: 1; min-height: 0; display: grid; grid-template-columns: repeat(var(--cols), minmax(0, 1fr)); gap: 0.9em; align-content: start; overflow: hidden; }
+.tv-person { background: #121518; border: 1px solid #24272b; border-left: 6px solid #3a3d42; border-radius: 14px; padding: 0.8em 0.9em; display: flex; flex-direction: column; gap: 0.35em; }
+.tv-person-wip { border-left-color: #f2a60d; }
+.tv-person-hold { border-left-color: #ff5a4e; background: rgba(255,90,78,0.08); }
+.tv-person-head { display: flex; gap: 0.6em; align-items: center; }
+.tv-person-head b { display: block; font-family: var(--font-display, sans-serif); font-size: 1.15em; }
+.tv-person-head small { color: #9b9a95; font-size: 0.8em; }
+.tv-avatar { width: 2.2em; height: 2.2em; border-radius: 50%; background: #24272b; color: #f2a60d; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; flex: none; }
+.tv-person-wip .tv-avatar { background: #f2a60d; color: #1a1204; }
+.tv-person-hold .tv-avatar { background: #ff5a4e; color: #fff; }
+.tv-person-job { font-weight: 700; font-size: 1.05em; display: flex; gap: 0.4em; align-items: center; }
+.tv-person-wo { color: #bdbbb3; font-size: 0.85em; font-family: var(--font-mono, monospace); }
+.tv-person-free { color: #6d6c67; padding: 0.6em 0; }
+.tv-person-foot { margin-top: auto; display: flex; gap: 0.8em; flex-wrap: wrap; color: #9b9a95; font-size: 0.8em; border-top: 1px solid #24272b; padding-top: 0.4em; }
+.tv-person-foot b { color: #f3f1ea; }
+@media (max-width: 1100px) { .tv-people { grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: auto; } }
+
+.tv-person-support { border-left-color: #5b8def; }
+.tv-person-support .tv-avatar { background: #5b8def; color: #fff; }
+.tv-person-tasks { display: flex; flex-direction: column; gap: 0.3em; font-size: 0.9em; color: #d7d5cd; padding: 0.2em 0; }
