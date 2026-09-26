@@ -58,11 +58,15 @@ function icRun() {
     if (!(Number(w.qty) > 0)) add("error", "ใบสั่งผลิต", `${w.wo}: จำนวนคันไม่ถูกต้อง`, `wo:${w.wo}`);
     const reqs = bxReqs().filter((d) => d.wo === w.wo);
     if (reqs.length && models.has(w.model)) {
-      const need = bxRequirement(w.model, Number(w.qty) || 1);
+      // same coverage rule as the work order itself: an issued sub-assembly covers the parts beneath it
+      const qty = Number(w.qty) || 1;
       const use = bxRefUsage(w.wo);
+      const { rows, cov } = bxCoverage(w.model, qty, use);
+      const need = {};   // requirement per code at any BOM level (sub-assemblies can be issued too)
+      rows.forEach((r) => { const k = bxKey(r.line); if (k) need[k] = { req: ((need[k] || {}).req || 0) + r.per * qty }; });
       let tot = 0, got = 0;
-      Object.values(need).forEach((n) => { tot += n.req; got += Math.min(n.req, Math.max(0, (use[n.key] || {}).issued || 0)); });
-      const calc = tot ? Math.round((got / tot) * 100) : 0;
+      rows.filter((r) => !r.hasKids && bxKey(r.line)).forEach((r) => { const req = r.per * qty; tot += req; got += req * cov.get(r.line.id).iss; });
+      const calc = !tot ? 0 : got >= tot - 1e-9 ? 100 : Math.min(99, Math.floor((got / tot) * 100));
       if (Math.abs(calc - pct) > 1) add("warn", "ใบสั่งผลิต", `${w.wo}: % เบิกวัสดุที่บันทึก (${pct}%) ไม่ตรงกับใบเบิกจริง (${calc}%)`, `wo:${w.wo}`);
       if (w.status === "เสร็จสมบูรณ์" && reqs.some((d) => BX_OPEN_REQ.includes(d.status))) add("warn", "ใบสั่งผลิต", `${w.wo} ปิดงานแล้ว แต่ยังมีใบเบิกค้าง (${reqs.filter((d) => BX_OPEN_REQ.includes(d.status)).map((d) => d.no).join(", ")})`, `wo:${w.wo}`);
       Object.keys(use).forEach((k) => {
@@ -121,7 +125,8 @@ function icRun() {
     let line = null;
     MACHINE_MODELS.some((m) => { const r = bxRowFor(m, k); if (r) { line = r.line; return true; } return false; });
     const onOrder = line ? bxP2POnOrder(line) : 0;
-    const gap = s.demand[k] - Number((bxStock(k) || {}).qty || 0);
+    const gap = Math.round((s.demand[k] - Number(bxSxAvail(k) || 0)) * 100) / 100;
+    if (!(gap > 0)) return;
     if (line && line.source === "ผลิตเอง") add("warn", "คงคลัง", `${k}: ของไม่พอจ่าย ขาด ${bxFmt(gap)} — ชิ้นส่วนผลิตเอง ต้องสั่งผลิตเพิ่ม`, `part:${k}`);
     else if (gap > onOrder) add("warn", "คงคลัง", `${k}: ของไม่พอจ่าย ขาด ${bxFmt(gap)} แต่สั่งซื้ออยู่แค่ ${bxFmt(onOrder)} — ควรเปิด PR`, `part:${k}`);
   });

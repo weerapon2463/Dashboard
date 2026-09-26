@@ -398,7 +398,7 @@ function bxOutstandingSummary() {
     if (o > 0) demand[it.key] = (demand[it.key] || 0) + o;
   }));
   const lines = Object.keys(demand).length;
-  const short = Object.keys(demand).filter((k) => { const s = bxStock(k); return s && bxNum(s.qty) < demand[k]; });
+  const short = Object.keys(demand).filter((k) => { const a = bxSxAvail(k); return a !== null && a < demand[k] - 0.005; });
   return { reqs, waitApprove, waitIssue, demand, lines, short };
 }
 
