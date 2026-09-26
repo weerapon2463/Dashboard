@@ -109,6 +109,7 @@ function renderMyTasks() {
     ? WORK_ORDERS.filter((w) => (w.assignee || "").trim().toLowerCase() === name.trim().toLowerCase())
     : [];
   const done = mine.filter((w) => w.status === "เสร็จสมบูรณ์").length;
+  if (typeof renderJcOperator === "function") renderJcOperator();
 
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   set("myTasksStatTotal", mine.length);

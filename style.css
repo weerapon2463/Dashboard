@@ -1256,3 +1256,16 @@ html[data-density="compact"] body { zoom: 0.9; }
 .jc-routing { margin-top: 16px; }
 .jc-routing summary { cursor: pointer; font-weight: 600; }
 .jc-mine { margin: 8px 0 14px; }
+
+.jc-cost { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin: 14px 0; }
+.jc-cost-t th, .jc-cost-t td { padding: 6px 8px; }
+.jc-op-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.jc-op { border: 1px solid var(--border, #ddd); border-radius: 10px; padding: 12px; display: flex; flex-direction: column; gap: 6px; }
+.jc-op-wip { border-color: #e0a800; background: rgba(255, 184, 0, 0.07); }
+.jc-op-head { display: flex; justify-content: space-between; gap: 8px; align-items: center; font-size: 1.05rem; }
+.jc-op-time { font-size: 0.9rem; }
+.jc-op-btns { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.jc-big { min-height: 44px; padding: 8px 16px; font-size: 1rem; }
+.jc-op-btns .jc-qty { width: 70px; min-height: 40px; }
+.jc-op-btns .jc-reason { min-height: 40px; max-width: 100%; }
+.jc-free-t { margin-top: 16px; }

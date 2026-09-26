@@ -109,6 +109,14 @@ function icRun() {
     const st = BX_STOCK[k];
     if (Number(st.qty) < 0) add("error", "คงคลัง", `${k}: ยอดคงคลังติดลบ (${st.qty})`, `part:${k}`);
   });
+  Object.keys(BX_STOCK).forEach((k) => {
+    const w = BX_STOCK[k].wh || {};
+    if (Number(BX_STOCK[k].qty) >= 0) Object.keys(w).forEach((id) => { if (w[id] < 0) add("warn", "คงคลัง", `${k}: ยอดในคลัง ${id} ติดลบ (${w[id]}) — ควรโอนย้ายหรือตรวจนับ`, `part:${k}`); });
+  });
+  (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []).forEach((wo) => (wo.jobs || []).forEach((j) => {
+    const open = (j.logs || []).find((l) => !l.to);
+    if (j.status === "wip" && open && Date.now() - Date.parse(open.from) > 12 * 3600e3) add("warn", "Job Card", `${j.no} (${wo.wo} ${j.op}): สถานะกำลังทำค้างเกิน 12 ชม. — ลืมกดพักหรือเสร็จ?`, "");
+  }));
   s.short.forEach((k) => {
     let line = null;
     MACHINE_MODELS.some((m) => { const r = bxRowFor(m, k); if (r) { line = r.line; return true; } return false; });

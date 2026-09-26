@@ -370,6 +370,7 @@ function renderBxStats() {
     tile("ใบเบิกรออนุมัติ", s.waitApprove, "รอหัวหน้าแผนกผู้เบิก", s.waitApprove ? "warn" : ""),
     tile("ใบเบิกรอคลังจ่าย", s.waitIssue, `${s.lines} รายการค้างจ่าย`, s.waitIssue ? "warn" : ""),
     tile("ของไม่พอจ่าย", s.short.length, "คงคลังน้อยกว่ายอดค้างจ่าย", s.short.length ? "bad" : ""),
+    ...(typeof sxStockValue === "function" ? [tile("มูลค่าคงคลัง", sxBaht(sxStockValue()), "ถัวเฉลี่ยเคลื่อนที่ · แยกคลังที่แท็บเคลื่อนไหวคลัง")] : []),
     tile("ใบสั่งผลิตที่ยังเบิกไม่ครบ", woIncomplete, `จาก ${woOpen.length} ใบที่ยังไม่เสร็จ`),
     tile("งานบริการที่ใช้อะไหล่", s.reqs.filter((d) => /^SV-/.test(d.wo || "") && BX_OPEN_REQ.includes(d.status)).length, "ใบเบิกอะไหล่ที่ยังไม่ปิด"),
   ].join("");
@@ -1038,7 +1039,7 @@ function bxIssue(d, note) {
     it.issued = bxNum(it.issued) + n;
     it.log = it.log || [];
     it.log.push({ at, by: bxUserName(), kind: "จ่าย", qty: n, note: d.owner ? `ให้ ${d.owner}${note ? ` · ${note}` : ""}` : note });
-    if (s) bxMove(it.key, sxPickWh(it.key, n), -n, { vt: "ใบเบิก", v: d.no }, "จ่ายตามใบเบิก", d.owner ? `ให้ ${d.owner}` : "");
+    if (s) sxIssue(it.key, n, { vt: "ใบเบิก", v: d.no }, "จ่ายตามใบเบิก", d.owner ? `ให้ ${d.owner}` : "");
   });
   const before = d.status;
   d.status = d.items.every((it) => bxNum(it.issued) >= bxNum(it.req)) ? "จ่ายของแล้ว" : "จ่ายบางส่วน";
@@ -1397,7 +1398,8 @@ function bxReceiveFromP2P(c, ev) {
   const key = bxKeyForItem(c.item);
   const n = bxNum(ev.qtyReceived);
   if (!key || !(n > 0)) return "";
-  bxMove(key, "MAIN", n, { vt: "GRN", v: c.po || c.pr || "" }, "รับของจากจัดซื้อ", c.pr || "");
+  const unit = bxNum(c.value) && bxNum(c.qty) ? bxNum(c.value) / bxNum(c.qty) : 0;
+  bxMove(key, "MAIN", n, { vt: "GRN", v: c.po || c.pr || "" }, "รับของจากจัดซื้อ", c.pr || "", unit);
   const st = BX_STOCK[key];
   ev.stockKey = key;
   ev.stockQty = n;

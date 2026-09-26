@@ -4,6 +4,8 @@
    Every movement is one ledger row with an id; balances (BX_STOCK[k].qty and
    .wh) are rebuilt from the ledger on load, so movements recorded on two
    devices merge cleanly and stock can always be traced back to a document.
+   Valuation is moving average (ERPNext default): each incoming row carries
+   its rate, outgoing rows take the current average.
    ========================================================================== */
 
 const SX_WH_DEFAULT = [
@@ -43,31 +45,66 @@ function sxPartName(key) {
   return p ? p.line.part : key;
 }
 
+function sxPartCost(key) { return typeof rdCost === "function" ? (rdCost(key) || 0) : 0; }
+function sxRate(key) { const st = BX_STOCK[key]; return (st && bxNum(st.rate)) || sxPartCost(key); }
+function sxR2(n) { return Math.round(bxNum(n) * 100) / 100; }
+function sxBaht(n) { return `${Math.round(bxNum(n)).toLocaleString("th-TH")} ฿`; }
+function sxStockValue() { return Object.keys(BX_STOCK).reduce((s, k) => s + Math.max(0, bxNum(BX_STOCK[k].qty)) * bxNum(BX_STOCK[k].rate), 0); }
+
+// Material cost of a work order: what was issued on its requisitions, net of returns, at ledger value.
+// Issues made before the ledger existed are valued at today's rate.
+function sxWoMaterialCost(woNo) {
+  let cost = 0;
+  (DEPT_DOCS.mreq || []).filter((d) => d.wo === woNo && Array.isArray(d.items)).forEach((d) => {
+    d.items.forEach((it) => {
+      const rows = SX_LEDGER.filter((e) => e.vt === "ใบเบิก" && e.v === d.no && e.key === it.key);
+      const net = bxNum(it.issued) - bxNum(it.ret);
+      const inLedger = -rows.reduce((s, e) => s + bxNum(e.qty), 0);
+      cost += -rows.reduce((s, e) => s + bxNum(e.qty) * bxNum(e.rate), 0);
+      if (net - inLedger > 0) cost += (net - inLedger) * sxRate(it.key);
+    });
+  });
+  return sxR2(cost);
+}
+
 // Rebuild balances from the ledger. Stock that was set before the ledger existed becomes an opening entry.
 function sxRebuild() {
   const has = new Set(SX_LEDGER.map((e) => e.key));
   Object.keys(BX_STOCK).forEach((k) => {
     const q = sxR3(BX_STOCK[k].qty);
-    if (!has.has(k) && q) SX_LEDGER.push({ id: `open-${k}`, at: new Date().toISOString(), by: "ระบบ", key: k, wh: "MAIN", qty: q, vt: "ยอดยกมา", v: "", kind: "ยอดยกมา", note: "ยอดคงคลังก่อนเริ่มใช้สมุดคุมคลัง" });
+    if (!has.has(k) && q) SX_LEDGER.push({ id: `open-${k}`, at: new Date().toISOString(), by: "ระบบ", key: k, wh: "MAIN", qty: q, rate: sxR2(bxNum(BX_STOCK[k].rate) || sxPartCost(k)), vt: "ยอดยกมา", v: "", kind: "ยอดยกมา", note: "ยอดคงคลังก่อนเริ่มใช้สมุดคุมคลัง" });
   });
-  const bal = {};
-  SX_LEDGER.forEach((e) => { const b = bal[e.key] = bal[e.key] || {}; b[e.wh] = bxNum(b[e.wh]) + bxNum(e.qty); });
+  const bal = {}, avg = {};
+  SX_LEDGER.slice().sort((a, b) => String(a.at).localeCompare(String(b.at))).forEach((e) => {
+    const b = bal[e.key] = bal[e.key] || {};
+    const q = bxNum(e.qty);
+    if (q > 0) {
+      const tot = Math.max(0, Object.values(b).reduce((s, v) => s + v, 0));
+      const inR = bxNum(e.rate) || avg[e.key] || sxPartCost(e.key);
+      avg[e.key] = (tot * (avg[e.key] || 0) + q * inR) / (tot + q);
+    }
+    b[e.wh] = bxNum(b[e.wh]) + q;
+  });
   Object.keys(bal).forEach((k) => {
     const st = BX_STOCK[k] = BX_STOCK[k] || { qty: 0, loc: "" };
     st.wh = {};
     let tot = 0;
     Object.keys(bal[k]).forEach((w) => { const v = sxR3(bal[k][w]); if (v) st.wh[w] = v; tot += v; });
     st.qty = sxR3(tot);
+    st.rate = sxR2(avg[k] || 0);
   });
 }
 
 // The one place stock quantities change. qty > 0 = in, < 0 = out.
-function bxMove(key, wh, qty, ref, kind, note) {
+function bxMove(key, wh, qty, ref, kind, note, rate) {
   qty = sxR3(qty);
   if (!key || !qty) return null;
-  const e = { id: sxId("SLE"), at: new Date().toISOString(), by: bxUserName(), key, wh: wh || "MAIN", qty, vt: (ref && ref.vt) || "", v: (ref && ref.v) || "", kind: kind || "", note: note || "" };
-  SX_LEDGER.push(e);
   const st = BX_STOCK[key] = BX_STOCK[key] || { qty: 0, loc: "" };
+  const cur = bxNum(st.rate) || sxPartCost(key);
+  const r = qty > 0 ? (bxNum(rate) || cur) : cur;
+  if (qty > 0) { const tot = Math.max(0, bxNum(st.qty)); st.rate = sxR2((tot * cur + qty * r) / (tot + qty)); }
+  const e = { id: sxId("SLE"), at: new Date().toISOString(), by: bxUserName(), key, wh: wh || "MAIN", qty, rate: sxR2(r), vt: (ref && ref.vt) || "", v: (ref && ref.v) || "", kind: kind || "", note: note || "" };
+  SX_LEDGER.push(e);
   st.wh = st.wh || {};
   st.wh[e.wh] = sxR3(bxNum(st.wh[e.wh]) + qty);
   if (!st.wh[e.wh]) delete st.wh[e.wh];
@@ -75,12 +112,18 @@ function bxMove(key, wh, qty, ref, kind, note) {
   return e;
 }
 
-// Warehouse to issue from: the main store if it has enough, otherwise the one holding the most
-function sxPickWh(key, need) {
+// Issue n units: main store first, then the other usable warehouses (largest first) — never a
+// negative warehouse while the total is enough. Anything still missing comes off the main store.
+function sxIssue(key, n, ref, kind, note) {
   const st = BX_STOCK[key];
-  if (!st || !st.wh || sxBal(key, "MAIN") >= need) return "MAIN";
-  const best = Object.keys(st.wh).filter((w) => w !== "SCRAP" && w !== "QI").sort((a, b) => st.wh[b] - st.wh[a])[0];
-  return best || "MAIN";
+  let left = sxR3(n);
+  const whs = ["MAIN"].concat(Object.keys((st && st.wh) || {}).filter((w) => w !== "MAIN" && w !== "SCRAP" && w !== "QI").sort((a, b) => st.wh[b] - st.wh[a]));
+  whs.forEach((w) => {
+    if (left <= 0) return;
+    const take = Math.min(left, Math.max(0, sxBal(key, w)));
+    if (take > 0) { bxMove(key, w, -take, ref, kind, note); left = sxR3(left - take); }
+  });
+  if (left > 0) bxMove(key, "MAIN", -left, ref, kind, note);
 }
 
 function sxWhBreakdown(key) {
@@ -136,7 +179,7 @@ function sxRenderEntry(p) {
       <label class="sx-wide">หมายเหตุ<input id="sxNote" value="${bxEsc(d.note)}"></label>
     </div>
     ${P.wo ? `<p class="card-sub">รับ "สินค้าสำเร็จรูป ${bxEsc((WORK_ORDERS.find((w) => w.wo === d.wo) || {}).model || "")}" เข้าคลัง และเพิ่มยอดผลิตเสร็จของใบสั่งผลิต · วัตถุดิบถูกตัดคลังไปแล้วตอนจ่ายตามใบเบิก จึงไม่ตัดซ้ำ</p>` : `
-    <table class="data-table sx-items"><thead><tr><th>รหัสชิ้นส่วน</th><th>ชื่อ</th><th class="num">${P.count ? "ยอดในระบบ" : P.from ? "คงเหลือในคลังต้นทาง" : "คงคลังรวม"}</th><th class="num">${P.count ? "นับได้จริง" : "จำนวน"}</th>${P.count ? `<th class="num">ต่าง</th>` : ""}<th></th></tr></thead>
+    <table class="data-table sx-items"><thead><tr><th>รหัสชิ้นส่วน</th><th>ชื่อ</th><th class="num">${P.count ? "ยอดในระบบ" : P.from ? "คงเหลือในคลังต้นทาง" : "คงคลังรวม"}</th><th class="num">${P.count ? "นับได้จริง" : "จำนวน"}</th>${P.count ? `<th class="num">ต่าง</th>` : ""}${d.purpose === "receipt" ? `<th class="num">ราคา/หน่วย (฿)</th>` : ""}<th></th></tr></thead>
       <tbody>${d.items.map((it, i) => {
         const cur = P.count ? sxBal(it.key, d.to) : P.from ? sxBal(it.key, d.from) : bxNum((bxStock(it.key) || {}).qty);
         const diff = P.count && it.qty !== "" ? bxNum(it.qty) - cur : null;
@@ -144,6 +187,7 @@ function sxRenderEntry(p) {
           <td>${it.key ? bxEsc(sxPartName(it.key)) : ""}</td><td class="num">${it.key ? bxFmt(cur) : ""}</td>
           <td class="num"><input class="bom-inline sx-qty" type="number" step="any" data-i="${i}" value="${bxEsc(it.qty)}"></td>
           ${P.count ? `<td class="num">${diff === null ? "" : `<span class="${diff < 0 ? "bx-neg" : ""}">${diff > 0 ? "+" : ""}${bxFmt(diff)}</span>`}</td>` : ""}
+          ${d.purpose === "receipt" ? `<td class="num"><input class="bom-inline sx-rate" type="number" min="0" step="any" data-i="${i}" value="${bxEsc(it.rate || "")}" placeholder="${it.key ? bxEsc(sxR2(sxRate(it.key)) || "") : ""}"></td>` : ""}
           <td><button type="button" class="btn-link sx-del" data-i="${i}" aria-label="ลบแถว">✕</button></td></tr>`;
       }).join("")}</tbody></table>
     <datalist id="sxPartList">${bxAllParts().map((x) => `<option value="${bxEsc(x.key)}">${bxEsc(x.line.part)}</option>`).join("")}</datalist>
@@ -183,6 +227,7 @@ function sxWireEntry(p) {
   ["sxRef", "sxNote", "sxWoQty"].forEach((id) => { const el = document.getElementById(id); if (el) el.addEventListener("input", keep); });
   p.querySelectorAll(".sx-key").forEach((el) => el.addEventListener("change", () => { keep(); d.items[+el.dataset.i].key = el.value.trim(); rerender(); }));
   p.querySelectorAll(".sx-qty").forEach((el) => el.addEventListener("change", () => { keep(); d.items[+el.dataset.i].qty = el.value; rerender(); }));
+  p.querySelectorAll(".sx-rate").forEach((el) => el.addEventListener("change", () => { keep(); d.items[+el.dataset.i].rate = el.value; }));
   p.querySelectorAll(".sx-del").forEach((el) => el.addEventListener("click", () => { keep(); d.items.splice(+el.dataset.i, 1); if (!d.items.length) d.items.push({ key: "", qty: "" }); rerender(); }));
   const add = document.getElementById("sxAddRow");
   if (add) add.addEventListener("click", () => { keep(); d.items.push({ key: "", qty: "" }); rerender(); });
@@ -203,7 +248,7 @@ function sxSubmit() {
     if (!(n > 0)) { showToast("ใส่จำนวนที่ผลิตเสร็จ", "warn"); return; }
     items = [{ key: `FG-${wo.model}`, qty: n }];
   } else {
-    items = d.items.filter((it) => it.key && it.qty !== "" && (P.count ? bxNum(it.qty) >= 0 : bxNum(it.qty) > 0)).map((it) => ({ key: it.key, qty: sxR3(it.qty) }));
+    items = d.items.filter((it) => it.key && it.qty !== "" && (P.count ? bxNum(it.qty) >= 0 : bxNum(it.qty) > 0)).map((it) => ({ key: it.key, qty: sxR3(it.qty), rate: sxR2(it.rate) || undefined }));
     if (!items.length) { showToast("ใส่รหัสชิ้นส่วนและจำนวนอย่างน้อย 1 รายการ", "warn"); return; }
     const keys = items.map((it) => it.key);
     if (new Set(keys).size !== keys.length) { showToast("มีรหัสซ้ำในเอกสารเดียวกัน — รวมเป็นแถวเดียว", "warn"); return; }
@@ -221,7 +266,7 @@ function sxSubmit() {
       bxMove(it.key, d.to, it.diff, ref, kind, d.note);
     } else {
       if (P.from) bxMove(it.key, d.from, -it.qty, ref, kind, d.note);
-      if (P.to) bxMove(it.key, d.to, it.qty, ref, kind, d.note);
+      if (P.to) bxMove(it.key, d.to, it.qty, ref, kind, d.note, d.purpose === "receipt" ? it.rate : undefined);
     }
   });
   if (wo) {
@@ -246,7 +291,7 @@ function sxCancel(no) {
   const rows = SX_LEDGER.filter((r) => r.v === no && r.vt === "Stock Entry");
   const neg = rows.find((r) => r.qty > 0 && sxBal(r.key, r.wh) < r.qty);
   if (neg) { showToast(`ยกเลิกไม่ได้: ${neg.key} ในคลัง ${neg.wh} ถูกใช้ไปแล้ว (เหลือ ${bxFmt(sxBal(neg.key, neg.wh))})`, "warn"); return; }
-  rows.forEach((r) => bxMove(r.key, r.wh, -r.qty, { vt: "ยกเลิก Stock Entry", v: no }, "ยกเลิก", ""));
+  rows.forEach((r) => bxMove(r.key, r.wh, -r.qty, { vt: "ยกเลิก Stock Entry", v: no }, "ยกเลิก", "", r.qty < 0 ? r.rate : undefined));
   e.status = "ยกเลิก";
   e.cancelledBy = bxUserName();
   e.cancelledAt = new Date().toISOString();
@@ -277,10 +322,10 @@ function sxRenderLedger(p) {
     <div class="card-body table-scroll">
       <div class="filter-row"><label for="sxLq">ค้นหา:</label><input id="sxLq" class="wo-search" placeholder="รหัส / เลขเอกสาร / ผู้บันทึก" value="${bxEsc(sxLedgerQ)}">
         <label for="sxLw">คลัง:</label><select id="sxLw"><option value="">ทุกคลัง</option>${sxWhOptions(sxLedgerWh)}</select></div>
-      ${shown.length ? `<table class="data-table"><thead><tr><th>เวลา</th><th>รหัส</th><th>ชื่อ</th><th>คลัง</th><th class="num">เข้า</th><th class="num">ออก</th><th class="num">คงเหลือ</th><th>เอกสาร</th><th>ประเภท</th><th>โดย</th></tr></thead><tbody>${shown.slice(0, 300).map((e) => `<tr>
+      ${shown.length ? `<table class="data-table"><thead><tr><th>เวลา</th><th>รหัส</th><th>ชื่อ</th><th>คลัง</th><th class="num">เข้า</th><th class="num">ออก</th><th class="num">คงเหลือ</th><th class="num">มูลค่า</th><th>เอกสาร</th><th>ประเภท</th><th>โดย</th></tr></thead><tbody>${shown.slice(0, 300).map((e) => `<tr>
         <td>${bxEsc(String(e.at).slice(0, 16).replace("T", " "))}</td><td class="mono-cell">${bxEsc(e.key)}</td><td>${bxEsc(sxPartName(e.key))}</td><td>${bxEsc(e.wh)}</td>
         <td class="num">${e.qty > 0 ? bxFmt(e.qty) : ""}</td><td class="num">${e.qty < 0 ? `<span class="bx-neg">${bxFmt(-e.qty)}</span>` : ""}</td>
-        <td class="num">${bxFmt(e.bal)}</td><td class="mono-cell">${bxEsc(e.v)}</td><td>${bxEsc(e.kind || e.vt)}${e.note ? `<div class="muted-inline">${bxEsc(e.note)}</div>` : ""}</td><td>${bxEsc(e.by)}</td></tr>`).join("")}</tbody></table>
+        <td class="num">${bxFmt(e.bal)}</td><td class="num">${e.rate ? `<span class="${e.qty < 0 ? "bx-neg" : ""}">${sxBaht(e.qty * e.rate)}</span>` : "—"}</td><td class="mono-cell">${bxEsc(e.v)}</td><td>${bxEsc(e.kind || e.vt)}${e.note ? `<div class="muted-inline">${bxEsc(e.note)}</div>` : ""}</td><td>${bxEsc(e.by)}</td></tr>`).join("")}</tbody></table>
         ${shown.length > 300 ? `<p class="muted-inline">แสดง 300 จาก ${shown.length} รายการ — ค้นหาให้แคบลง</p>` : ""}` : `<p class="muted-inline">ไม่มีรายการ</p>`}
     </div></div>`;
   const inp = document.getElementById("sxLq");
@@ -294,13 +339,14 @@ function sxRenderWh(p) {
   const can = bxCanSettings();
   const whs = sxWarehouses();
   const sum = {};
-  Object.keys(BX_STOCK).forEach((k) => { const w = BX_STOCK[k].wh || {}; Object.keys(w).forEach((id) => { const s = sum[id] = sum[id] || { items: 0, qty: 0 }; if (w[id]) { s.items++; s.qty += w[id]; } }); });
+  Object.keys(BX_STOCK).forEach((k) => { const w = BX_STOCK[k].wh || {}; const r = bxNum(BX_STOCK[k].rate); Object.keys(w).forEach((id) => { const s = sum[id] = sum[id] || { items: 0, qty: 0, val: 0 }; if (w[id]) { s.items++; s.qty += w[id]; s.val += w[id] * r; } }); });
   p.innerHTML = `<div class="card"><div class="card-header"><h3>คลังสินค้า (Warehouse)</h3>
-      <p class="card-sub">แยกยอดตามคลัง เช่น คลังหลัก งานระหว่างผลิต สินค้าสำเร็จรูป · ยอดของชิ้นส่วนแต่ละตัวในแต่ละคลังดูได้ที่สมุดคุมคลัง</p></div>
-    <div class="card-body table-scroll"><table class="data-table"><thead><tr><th>รหัสคลัง</th><th>ชื่อคลัง</th><th class="num">จำนวนรายการ</th><th class="num">จำนวนรวม</th></tr></thead><tbody>
+      <p class="card-sub">แยกยอดตามคลัง เช่น คลังหลัก งานระหว่างผลิต สินค้าสำเร็จรูป · มูลค่าคิดแบบถัวเฉลี่ยเคลื่อนที่ (Moving Average) จากราคาตอนรับเข้า ถ้าไม่มีใช้ราคาจากคลังชิ้นส่วน R&D</p></div>
+    <div class="card-body table-scroll"><table class="data-table"><thead><tr><th>รหัสคลัง</th><th>ชื่อคลัง</th><th class="num">จำนวนรายการ</th><th class="num">จำนวนรวม</th><th class="num">มูลค่า (ถัวเฉลี่ย)</th></tr></thead><tbody>
       ${whs.map((w, i) => `<tr><td class="mono-cell">${bxEsc(w.id)}</td><td>${can ? `<input class="bom-inline sx-whname" data-i="${i}" value="${bxEsc(w.name)}">` : bxEsc(w.name)}</td>
-        <td class="num">${(sum[w.id] || {}).items || 0}</td><td class="num">${bxFmt((sum[w.id] || {}).qty || 0)}</td></tr>`).join("")}
-      ${Object.keys(sum).filter((id) => !whs.some((w) => w.id === id)).map((id) => `<tr><td class="mono-cell">${bxEsc(id)}</td><td class="muted-inline">(ไม่อยู่ในรายชื่อคลัง)</td><td class="num">${sum[id].items}</td><td class="num">${bxFmt(sum[id].qty)}</td></tr>`).join("")}
+        <td class="num">${(sum[w.id] || {}).items || 0}</td><td class="num">${bxFmt((sum[w.id] || {}).qty || 0)}</td><td class="num">${sxBaht((sum[w.id] || {}).val || 0)}</td></tr>`).join("")}
+      ${Object.keys(sum).filter((id) => !whs.some((w) => w.id === id)).map((id) => `<tr><td class="mono-cell">${bxEsc(id)}</td><td class="muted-inline">(ไม่อยู่ในรายชื่อคลัง)</td><td class="num">${sum[id].items}</td><td class="num">${bxFmt(sum[id].qty)}</td><td class="num">${sxBaht(sum[id].val)}</td></tr>`).join("")}
+      <tr><th colspan="4">มูลค่าคงคลังรวม</th><th class="num">${sxBaht(sxStockValue())}</th></tr>
     </tbody></table>
     ${can ? `<div class="filter-row"><input id="sxWhId" class="wo-search" placeholder="รหัสคลัง เช่น L1" maxlength="12"><input id="sxWhName" class="wo-search" placeholder="ชื่อคลัง"><button type="button" class="btn-secondary" id="sxWhAdd">+ เพิ่มคลัง</button></div>` : ""}
     </div></div>`;
