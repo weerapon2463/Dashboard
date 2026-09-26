@@ -201,6 +201,7 @@ function paperHeader(formTitle, formEn, deptName, no, dateIso, status, tone) {
         <div class="paper-docno">${escapeHtml(no)}</div>
         <div class="paper-docdate">วันที่ ${dateIso ? formatThaiDate(dateIso) : "—"}</div>
       </div>
+      ${no && no !== "—" ? `<div class="paper-qr" data-qr="${escapeHtml(no)}" title="สแกนเพื่อเปิดเอกสารนี้"></div>` : ""}
     </div>
     <div class="paper-titlebar">
       <div>
@@ -501,6 +502,9 @@ function openFormDesigner() {
     document.getElementById(`fs_${k}`).value = fs[k] || "";
   });
   document.getElementById("fs_showFlow").checked = !!fs.showFlow;
+  const pol = typeof esPolicy === "function" ? esPolicy() : { multiSign: true, selfApprove: true };
+  document.getElementById("fs_multiSign").checked = pol.multiSign;
+  document.getElementById("fs_selfApprove").checked = pol.selfApprove;
   formDesignerLogo = fs.logo || "";
   renderFormLogoPreview();
   document.getElementById("formSetBackdrop").classList.add("open");
@@ -533,7 +537,10 @@ function readLogo(file) {
 }
 
 function saveFormDesigner() {
-  const next = { logo: formDesignerLogo, showFlow: document.getElementById("fs_showFlow").checked };
+  let prevFs = {};
+  try { prevFs = JSON.parse(localStorage.getItem(FORM_SETTINGS_KEY) || "{}") || {}; } catch (e) { /* none */ }
+  const next = Object.assign({}, prevFs, { logo: formDesignerLogo, showFlow: document.getElementById("fs_showFlow").checked,
+    multiSign: document.getElementById("fs_multiSign").checked, selfApprove: document.getElementById("fs_selfApprove").checked });
   ["companyTh", "companyEn", "address", "sig1", "sig2", "sig3", "footer"].forEach((k) => {
     next[k] = document.getElementById(`fs_${k}`).value.trim();
   });

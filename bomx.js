@@ -250,12 +250,22 @@ function bxReqHolder(d) {
 function bxUpdateWoProgress(ref) {
   const wo = WORK_ORDERS.find((w) => w.wo === ref);
   if (!wo) return;
-  const need = bxRequirement(wo.model, bxNum(wo.qty) || 1);
+  const qty = bxNum(wo.qty) || 1;
   const use = bxRefUsage(ref);
+  // ERPNext-style: issuing a sub-assembly covers every part beneath it, so progress counts each
+  // leaf as covered by itself or by its nearest issued parent (fraction issued / required)
+  const rows = bxTree(wo.model).filter((r) => r.line);
+  const byId = new Map(rows.map((r) => [r.line.id, r]));
+  const frac = (r) => { const u = use[bxKey(r.line)]; return u && r.per ? Math.min(1, Math.max(0, u.issued) / (r.per * qty)) : 0; };
   let tot = 0, got = 0;
-  Object.values(need).forEach((n) => { tot += n.req; got += Math.min(n.req, Math.max(0, (use[n.key] || {}).issued || 0)); });
+  rows.filter((r) => !r.hasKids && bxKey(r.line)).forEach((r) => {
+    const req = r.per * qty;
+    let f = frac(r);
+    for (let p = byId.get(r.line.parent); p && f < 1; p = byId.get(p.line.parent)) f = Math.max(f, frac(p));
+    tot += req; got += req * f;
+  });
   if (!tot) return;
-  wo.issuedPct = Math.round((got / tot) * 100);
+  wo.issuedPct = got >= tot - 1e-9 ? 100 : Math.min(99, Math.floor((got / tot) * 100));
   if (typeof afterWOMutation === "function") afterWOMutation(); else if (typeof saveWorkOrders === "function") saveWorkOrders();
 }
 
@@ -929,9 +939,9 @@ function bxRenderReqModal() {
   if (!Array.isArray(d.items)) { document.getElementById("bxReqBackdrop").classList.remove("open"); openDocView("mreq", i); return; }
   const open = BX_OPEN_REQ.includes(d.status);
   const me = bxUser();
-  const own = me && d.createdBy === me.id && me.role !== "admin";
+  const own = me && d.createdBy === me.id && me.role !== "admin" && !(typeof esPolicy === "function" && esPolicy().selfApprove);
   const canApprove = bxCanApprove() && d.status === "รออนุมัติ" && !own;
-  const canIssue = bxCanIssue() && (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && !(me && d.receiver === me.id && me.role !== "admin");
+  const canIssue = bxCanIssue() && (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && !(me && d.receiver === me.id && me.role !== "admin" && !(typeof esPolicy === "function" && esPolicy().selfApprove));
   const sodNote = bxCanApprove() && d.status === "รออนุมัติ" && own ? "ใบเบิกนี้คุณเป็นผู้ขอเบิก — ต้องให้หัวหน้าคนอื่นอนุมัติ" : "";
   const isReceiver = me && (d.receiver === me.id || d.createdBy === me.id);
   const canReturn = (bxCanIssue() || isReceiver) && d.items.some((it) => bxNum(it.issued) - bxNum(it.ret) > 0);
@@ -1329,7 +1339,8 @@ function renderBxStockTab(pane) {
         <p class="card-sub">จ่ายของ/คืนของตามใบเบิกจะตัด/เพิ่มยอดให้อัตโนมัติ · แก้ยอดตรงนี้ = ปรับยอดคลังหลัก (MAIN) · รับเข้า/โอนย้าย/ผลิตเสร็จ/ตรวจนับแยกคลัง ใช้แท็บ "เคลื่อนไหวคลัง" · ทุกการเปลี่ยนแปลงลงสมุดคุมคลัง</p>
       </div>
       <div class="card-body table-scroll">
-        <div class="filter-row"><label for="bxStockSearch">ค้นหา:</label><input type="text" id="bxStockSearch" class="wo-search" placeholder="รหัส / ชื่อ / ที่เก็บ" value="${bxEsc(bxStockSearch)}"></div>
+        <div class="filter-row"><label for="bxStockSearch">ค้นหา:</label><input type="text" id="bxStockSearch" class="wo-search" placeholder="รหัส / ชื่อ / ที่เก็บ" value="${bxEsc(bxStockSearch)}">
+          <button type="button" class="btn-secondary" id="bxLabels">🏷 พิมพ์ป้าย QR (${Math.min(parts.length, 90)} รายการที่แสดง)</button></div>
         <table class="data-table">
           <thead><tr><th>รหัส</th><th>ชื่อชิ้นส่วน</th><th>ใช้ในรุ่น</th><th>ที่เก็บ</th><th class="num">คงคลัง</th><th class="num">จุดสั่งซื้อ</th><th class="num">ค้างจ่าย</th><th class="num">หลังจ่ายครบ</th><th>สถานะ</th></tr></thead>
           <tbody>${parts.map((p) => {
@@ -1355,6 +1366,8 @@ function renderBxStockTab(pane) {
     renderBomx();
     const el = document.getElementById("bxStockSearch"); el.focus(); el.setSelectionRange(pos, pos);
   });
+  const lab = document.getElementById("bxLabels");
+  if (lab) lab.addEventListener("click", () => snPrintLabels(parts.slice(0, 90).map((p) => ({ code: p.key, line1: p.line.part, line2: (bxStock(p.key) || {}).loc ? `ที่เก็บ ${(bxStock(p.key) || {}).loc}` : "", link: snLink({ item: p.key }) }))));
   pane.querySelectorAll("[data-bxset]").forEach((c) => c.addEventListener("change", () => {
     const g = c.dataset.bxset;
     BX_SETTINGS[g] = [...pane.querySelectorAll(`[data-bxset="${g}"]:checked`)].map((x) => x.value);
@@ -1399,20 +1412,38 @@ function bxReceiveFromP2P(c, ev) {
   const n = bxNum(ev.qtyReceived);
   if (!key || !(n > 0)) return "";
   const unit = bxNum(c.value) && bxNum(c.qty) ? bxNum(c.value) / bxNum(c.qty) : 0;
-  bxMove(key, "MAIN", n, { vt: "GRN", v: c.po || c.pr || "" }, "รับของจากจัดซื้อ", c.pr || "", unit);
+  // ERPNext quality inspection: received goods wait in QI until IQC passes, then move to the main store
+  bxMove(key, "QI", n, { vt: "GRN", v: c.po || c.pr || "" }, "รับของจากจัดซื้อ (รอ IQC)", c.pr || "", unit);
   const st = BX_STOCK[key];
   ev.stockKey = key;
   ev.stockQty = n;
   bxSaveStock();
   if (typeof renderBomx === "function") renderBomx();
-  return ` · เข้าคลัง ${key} +${bxFmt(n)} (คงคลัง ${bxFmt(st.qty)})`;
+  return ` · เข้าคลังรอตรวจ (QI) ${key} +${bxFmt(n)} (คงคลังรวม ${bxFmt(st.qty)})`;
 }
 
 function bxReverseFromP2P(c, ev) {
   if (!ev.stockKey || !(bxNum(ev.stockQty) > 0)) return "";
-  bxMove(ev.stockKey, "MAIN", -bxNum(ev.stockQty), { vt: "IQC ไม่ผ่าน", v: c.po || c.pr || "" }, "ตัดคืน (ของไม่ผ่านตรวจ)", c.pr || "");
+  const wh = ev.stockWh === "MAIN" ? "MAIN" : "QI";
+  bxMove(ev.stockKey, wh, -bxNum(ev.stockQty), { vt: "IQC ไม่ผ่าน", v: c.po || c.pr || "" }, "ส่งคืนผู้ขาย (ของไม่ผ่านตรวจ)", c.pr || "");
   bxSaveStock();
   return ` · ตัดคืนจากคลัง ${ev.stockKey} −${bxFmt(ev.stockQty)} (ของไม่ผ่านตรวจ)`;
+}
+
+// IQC passed: move the received quantity from QI to the main store
+function bxIqcPassFromP2P(c) {
+  let out = "";
+  (c.events || []).filter((e) => e.stage === "grn" && !e.superseded && e.stockKey && bxNum(e.stockQty) > 0 && e.stockWh !== "MAIN").forEach((e) => {
+    const n = Math.min(bxNum(e.stockQty), Math.max(0, sxBal(e.stockKey, "QI")));
+    if (n > 0) {
+      bxMove(e.stockKey, "QI", -n, { vt: "IQC ผ่าน", v: c.po || c.pr || "" }, "โอนเข้าคลังหลักหลังตรวจผ่าน", c.pr || "");
+      bxMove(e.stockKey, "MAIN", n, { vt: "IQC ผ่าน", v: c.po || c.pr || "" }, "โอนเข้าคลังหลักหลังตรวจผ่าน", c.pr || "");
+      out += ` · ${e.stockKey} ${bxFmt(n)} ย้าย QI → MAIN`;
+    }
+    e.stockWh = "MAIN";
+  });
+  if (out) { bxSaveStock(); if (typeof renderBomx === "function") renderBomx(); }
+  return out;
 }
 
 /* ---- deep link ?bom=<model>&item=<key> ---------------------------------------- */

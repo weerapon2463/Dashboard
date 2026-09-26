@@ -292,3 +292,21 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
   .card, .stat-tile { box-shadow: none !important; }
   .view.active > * { animation: none !important; }
 }
+
+/* ---- documents & forms polish ---- */
+.paper-head { align-items: stretch; }
+.paper-qr { width: 74px; height: 74px; flex: none; align-self: center; }
+.paper-qr svg { width: 100%; height: 100%; }
+.paper { box-shadow: 0 1px 0 rgba(0,0,0,0.04), 0 18px 40px -20px rgba(0,0,0,0.35); }
+.paper-stamp { transform: rotate(-4deg); border-width: 2.5px; letter-spacing: 0.04em; font-family: var(--font-display, inherit); box-shadow: inset 0 0 0 2px currentColor; opacity: 0.92; }
+.paper-title { font-family: var(--font-display, inherit); letter-spacing: 0.01em; }
+.docview-actions { position: sticky; top: 0; z-index: 3; backdrop-filter: blur(8px); }
+.modal h3 { font-family: var(--font-display, inherit); }
+.modal .modal-actions { position: sticky; bottom: -1px; background: var(--surface-card); padding-top: 12px; padding-bottom: 4px; margin-top: 14px; border-top: 1px solid var(--gridline); z-index: 2; }
+.form-field label { font-weight: 600; color: var(--text-secondary); }
+.form-field input, .form-field select, .form-field textarea { min-height: 40px; }
+.scan-wrap { display: flex; gap: 6px; align-items: stretch; }
+.scan-wrap > input, .scan-wrap > select { flex: 1; min-width: 0; }
+.scan-btn { flex: none; width: 42px; border-radius: 9px; border: 1px solid var(--border-hairline); background: var(--surface-1); cursor: pointer; font-size: 17px; }
+.scan-btn:hover { border-color: var(--accent, #f2a60d); }
+@media print { .paper-qr svg { display: block; } .scan-btn { display: none; } }

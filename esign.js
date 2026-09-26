@@ -125,13 +125,22 @@ function esDocHash(type, doc) {
 //  · one person, one box — also the same signature image can't appear twice (one person, two accounts)
 //  · boxes in order: ผู้จัดทำ → ผู้ตรวจสอบ → ผู้อนุมัติ
 //  · ผู้จัดทำ = the creator; ผู้ตรวจสอบ = can manage this document type; ผู้อนุมัติ = has approval authority
+// Company policy (Admin › ออกแบบฟอร์ม). ERPNext calls the second one "Allow Self Approval".
+// Defaults allow both: a small team often has one person who prepares, checks and approves.
+function esPolicy() {
+  let s = {};
+  try { s = JSON.parse(localStorage.getItem("y2j-form-settings-v1") || "{}") || {}; } catch (e) { /* defaults */ }
+  return { multiSign: s.multiSign !== false, selfApprove: s.selfApprove !== false };
+}
+
 function esWhyNot(type, doc, slot) {
   const me = authCurrentUser();
   if (!me) return "ยังไม่ได้เข้าระบบ";
   const sigs = doc.signatures || {};
   if (sigs[slot]) return "ช่องนี้ลงนามแล้ว";
-  if (Object.values(sigs).some((s) => s && s.uid === me.id)) return "คุณลงนามในเอกสารนี้แล้ว — หนึ่งคนลงนามได้หนึ่งช่อง";
-  if (me.signature && Object.values(sigs).some((s) => s && s.img && s.img === me.signature)) return "ลายเซ็นนี้ถูกใช้ในเอกสารนี้แล้ว (บัญชีอื่น)";
+  const pol = esPolicy();
+  if (!pol.multiSign && Object.values(sigs).some((s) => s && s.uid === me.id)) return "คุณลงนามในเอกสารนี้แล้ว — นโยบายบริษัท: หนึ่งคนลงนามได้หนึ่งช่อง";
+  if (me.signature && Object.values(sigs).some((s) => s && s.img && s.img === me.signature && s.uid !== me.id)) return "ลายเซ็นนี้ถูกใช้ในเอกสารนี้แล้ว (บัญชีอื่น)";
   if (slot > 0 && !sigs[slot - 1]) return `ต้องรอ "${esSlots()[slot - 1]}" ลงนามก่อน`;
   const role = currentRole();
   if (slot === 0) {

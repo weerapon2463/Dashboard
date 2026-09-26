@@ -383,6 +383,10 @@ function deptFieldInput(field, value, disabled, example) {
     default:
       input = `<input type="text" id="${id}" value="${escapeHtml(v)}"${ph}${dis}>`;
   }
+  // codes that live on a label (work order / machine / part / document) can be scanned instead of typed
+  const scannable = field.type === "part" || field.type === "ref"
+    || (!["textarea", "number", "date", "select", "model", "line"].includes(field.type) && (/^(ref|wo|machine|serial|so|po|partcode|part|code|refdoc)$/i.test(field.key) || /\b(WO|PO|SO|MC|SV)-/.test(example || "")));
+  if (scannable && !disabled) input = `<div class="scan-wrap">${input}<button type="button" class="scan-btn" data-scanfor="${id}" title="สแกน QR / บาร์โค้ด" aria-label="สแกนใส่ช่อง ${escapeHtml(field.label)}">📷</button></div>`;
   return `<div class="form-field"><label for="${id}">${escapeHtml(field.label)}${field.required ? " *" : ""}</label>${input}</div>`;
 }
 
@@ -411,7 +415,7 @@ function openDeptModal(type, index) {
   } else if (visBox) { visBox.innerHTML = ""; meta.innerHTML = ""; }
 
   const statusSel = document.getElementById("deptDocStatus");
-  const ownDoc = isEdit && typeof authCurrentUser === "function" && doc.createdBy && authCurrentUser() && doc.createdBy === authCurrentUser().id && currentRole() !== "admin";
+  const ownDoc = isEdit && typeof authCurrentUser === "function" && doc.createdBy && authCurrentUser() && doc.createdBy === authCurrentUser().id && currentRole() !== "admin" && !(typeof esPolicy === "function" && esPolicy().selfApprove);
   statusSel.innerHTML = def.statuses.map((s) => {
     const blocked = ownDoc && deptIsApproval(s[0]) && s[0] !== doc.status;
     return `<option value="${escapeHtml(s[0])}"${s[0] === doc.status ? " selected" : ""}${blocked ? " disabled" : ""}>${escapeHtml(s[0])}${blocked ? " (ต้องให้ผู้อื่นอนุมัติ)" : ""}</option>`;
@@ -464,7 +468,7 @@ function saveDeptModal() {
     Object.assign(doc, entry);
     const nextStatus = document.getElementById("deptDocStatus").value;
     const meNow = hasAuth ? authCurrentUser() : null;
-    if (meNow && doc.createdBy === meNow.id && meNow.role !== "admin" && nextStatus !== before.status && deptIsApproval(nextStatus)) {
+    if (meNow && doc.createdBy === meNow.id && meNow.role !== "admin" && !(typeof esPolicy === "function" && esPolicy().selfApprove) && nextStatus !== before.status && deptIsApproval(nextStatus)) {
       showToast("ผู้สร้างเอกสารอนุมัติเอกสารของตัวเองไม่ได้ — ให้หัวหน้าหรือผู้มีอำนาจอนุมัติ", "warn");
       return;
     }

@@ -11,6 +11,7 @@ const NAMING_KEY = "y2j-naming-v1";
 function namingSeries() {
   const out = [
     { id: "wo", name: "ใบสั่งผลิต (Work Order)", def: "WO-.YYYY.-.###" },
+    { id: "sn", name: "หมายเลขเครื่อง / Serial (MODEL = รุ่น)", def: "MODEL.-.YY.-.###" },
     { id: "pr", name: "ใบขอซื้อ (PR)", def: "PR-.YYYY.-.####" },
     { id: "po", name: "ใบสั่งซื้อ (PO)", def: "PO-.YYYY.-.####" },
     { id: "se", name: "เคลื่อนไหวคลัง (Stock Entry)", def: "SE-.YYYY.-.####" },
@@ -34,11 +35,11 @@ function namingPattern(id) {
   return d ? d.def : `${String(id).toUpperCase()}-.YYYY.-.###`;
 }
 
-function namingParse(pattern, date) {
+function namingParse(pattern, date, ctx) {
   const d = date || new Date();
   const y = String(d.getFullYear());
   const pad = (n) => String(n).padStart(2, "0");
-  const map = { YYYY: y, YY: y.slice(2), MM: pad(d.getMonth() + 1), DD: pad(d.getDate()), BE: String(d.getFullYear() + 543) };
+  const map = { YYYY: y, YY: y.slice(2), MM: pad(d.getMonth() + 1), DD: pad(d.getDate()), BE: String(d.getFullYear() + 543), MODEL: (ctx && ctx.model) || "MODEL" };
   let pre = "", suf = "", width = 0;
   String(pattern).split(".").forEach((p) => {
     if (!width && /^#+$/.test(p)) { width = p.length; return; }
@@ -48,8 +49,8 @@ function namingParse(pattern, date) {
   return { pre, suf, width: width || 3 };
 }
 
-function namingNext(id, existing, pattern) {
-  const { pre, suf, width } = namingParse(pattern || namingPattern(id));
+function namingNext(id, existing, pattern, ctx) {
+  const { pre, suf, width } = namingParse(pattern || namingPattern(id), null, ctx);
   let max = 0;
   (existing || []).forEach((n) => {
     n = String(n || "");
@@ -63,6 +64,7 @@ function namingNext(id, existing, pattern) {
 // numbers already used by a series (for the preview in admin)
 function namingUsed(id) {
   if (id === "wo") return (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []).map((w) => w.wo);
+  if (id === "sn") return typeof snAllSerials === "function" ? snAllSerials() : [];
   if (id === "se") return (typeof SX_ENTRIES !== "undefined" ? SX_ENTRIES : []).map((e) => e.no);
   if (id === "jc") return (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []).flatMap((w) => (w.jobs || []).map((j) => j.no));
   if (id === "pr" || id === "po") {
@@ -85,13 +87,13 @@ function renderAdminNaming() {
     <div class="table-scroll"><table class="data-table"><thead><tr><th>เอกสาร</th><th>รูปแบบ</th><th>เลขถัดไป</th><th></th></tr></thead><tbody>
     ${namingSeries().map((s) => `<tr><td>${escapeHtml(s.name)}</td>
       <td><input class="bom-inline nm-pat" data-id="${escapeHtml(s.id)}" value="${escapeHtml(stored[s.id] || s.def)}" aria-label="รูปแบบ ${escapeHtml(s.name)}"></td>
-      <td class="mono-cell nm-prev">${escapeHtml(namingNext(s.id, namingUsed(s.id)))}</td>
+      <td class="mono-cell nm-prev">${escapeHtml(namingNext(s.id, namingUsed(s.id), null, { model: (typeof MACHINE_MODELS !== "undefined" && MACHINE_MODELS[0]) || "YT3000" }))}</td>
       <td>${stored[s.id] ? `<button type="button" class="btn-link" data-nmreset="${escapeHtml(s.id)}">ค่าเดิม (${escapeHtml(s.def)})</button>` : ""}</td></tr>`).join("")}
     </tbody></table></div>`;
   el.querySelectorAll(".nm-pat").forEach((inp) => {
     inp.addEventListener("input", () => {
       const ok = /#/.test(inp.value);
-      inp.closest("tr").querySelector(".nm-prev").textContent = ok ? namingNext(inp.dataset.id, namingUsed(inp.dataset.id), inp.value) : "ต้องมี # อย่างน้อย 1 ตัว";
+      inp.closest("tr").querySelector(".nm-prev").textContent = ok ? namingNext(inp.dataset.id, namingUsed(inp.dataset.id), inp.value, { model: (typeof MACHINE_MODELS !== "undefined" && MACHINE_MODELS[0]) || "YT3000" }) : "ต้องมี # อย่างน้อย 1 ตัว";
     });
     inp.addEventListener("change", () => {
       const v = inp.value.trim();

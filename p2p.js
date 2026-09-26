@@ -573,6 +573,7 @@ function saveP2PStep() {
     ev.result = val("p2pStepResult");
     if (val("p2pStepRef")) ev.ref = val("p2pStepRef");
     auditDetail = ev.result === "fail" ? "IQC ไม่ผ่าน — รอของทดแทน" : "IQC ผ่าน";
+    if (ev.result !== "fail" && typeof bxIqcPassFromP2P === "function") auditDetail += bxIqcPassFromP2P(c);
   }
   if (stage === "pay" && val("p2pStepRef")) ev.ref = val("p2pStepRef");
 

@@ -196,7 +196,7 @@ function renderJobCards() {
     const act = jobs.reduce((s, j) => s + jcMinutes(j), 0);
     const c = jcCost(wo);
     const downTot = Object.values(c.down).reduce((s, v) => s + v, 0);
-    body = `<div class="jc-sum">ขั้นตอนเสร็จ <b>${done}/${jobs.length}</b> · เวลาทำงานจริง <b>${jcFmtMins(act)}</b>${plan ? ` จากแผน ${jcFmtMins(plan)}` : ""} · เวลาหยุด <b>${jcFmtMins(downTot)}</b> · ผลิตเสร็จเข้าคลังแล้ว <b>${jcNum(wo.produced)}/${jcNum(wo.qty)}</b></div>
+    body = `<div class="jc-sum"><button type="button" class="btn-secondary jc-hist" data-hist="${jcEsc(wo.wo)}">📜 ประวัติรายคัน${wo.serial ? ` ${jcEsc(wo.serial)}` : ""}</button> ขั้นตอนเสร็จ <b>${done}/${jobs.length}</b> · เวลาทำงานจริง <b>${jcFmtMins(act)}</b>${plan ? ` จากแผน ${jcFmtMins(plan)}` : ""} · เวลาหยุด <b>${jcFmtMins(downTot)}</b> · ผลิตเสร็จเข้าคลังแล้ว <b>${jcNum(wo.produced)}/${jcNum(wo.qty)}</b></div>
       <div class="table-scroll"><table class="data-table jc-table"><thead><tr><th>#</th><th>ขั้นตอน</th><th>ผู้รับผิดชอบ</th><th class="num">เวลาจริง / แผน</th><th>สถานะ</th><th></th></tr></thead><tbody>
       ${jobs.map((j, i) => {
         const prevOpen = jobs.slice(0, i).some((p) => p.status !== "done");
@@ -214,7 +214,7 @@ function renderJobCards() {
 
   el.innerHTML = `
     <div class="filter-row"><label for="jcWoSel">ใบสั่งผลิต:</label>
-      <select id="jcWoSel">${wos.map((w) => `<option value="${jcEsc(w.wo)}"${w.wo === jcWo ? " selected" : ""}>${jcEsc(w.wo)} · ${jcEsc(w.model)} × ${jcEsc(w.qty)} (${(w.jobs || []).filter((j) => j.status === "done").length}/${(w.jobs || []).length || "–"} ขั้น)</option>`).join("")}</select>
+      <select id="jcWoSel">${wos.map((w) => `<option value="${jcEsc(w.wo)}"${w.wo === jcWo ? " selected" : ""}>${jcEsc(w.wo)} · ${jcEsc(w.serial || w.model)}${jcNum(w.qty) > 1 ? ` × ${jcEsc(w.qty)}` : ""} (${(w.jobs || []).filter((j) => j.status === "done").length}/${(w.jobs || []).length || "–"} ขั้น)</option>`).join("")}</select>
       <label class="vis-opt"><input type="checkbox" id="jcMine"${jcMine ? " checked" : ""}> งานของฉัน (${mine.length})</label></div>
     ${mineHtml}
     ${body}
@@ -287,6 +287,7 @@ function jcWire(el, wo) {
   const c = document.getElementById("jcCreate");
   if (c) c.addEventListener("click", () => jcCreate(wo));
   jcWireButtons(el);
+  el.querySelectorAll("[data-hist]").forEach((b) => b.addEventListener("click", () => snOpenHistory(b.dataset.hist)));
   el.querySelectorAll(".jc-who").forEach((s) => s.addEventListener("change", () => {
     const j = wo.jobs[+s.dataset.i]; const prev = j.assignee; j.assignee = s.value;
     jcSave(wo, "มอบหมาย Job Card", `${j.no} ${j.op}: "${prev || "-"}" → "${j.assignee || "-"}"`);
@@ -336,7 +337,7 @@ function renderJcOperator() {
     const openDown = (j.downs || []).find((d) => !d.to);
     return `<div class="jc-op${j.status === "wip" ? " jc-op-wip" : ""}">
       <div class="jc-op-head"><b>${jcEsc(j.op)}</b> ${jcPill(j.status)}</div>
-      <div class="muted-inline">${jcEsc(w.wo)} · ${jcEsc(w.model)} × ${jcEsc(w.qty)} · สถานี ${jcEsc(j.station || "—")} · ${jcEsc(j.no)}</div>
+      <div class="muted-inline">${jcEsc(w.wo)}${w.serial ? ` · ${jcEsc(w.serial)}` : ""} · ${jcEsc(w.model)} · สถานี ${jcEsc(j.station || "—")} · ${jcEsc(j.no)}</div>
       <div class="jc-op-time">${openLog ? `เริ่มรอบนี้ ${jcEsc(jcClock(openLog.from))} น. · ` : ""}ทำไปแล้ว ${jcFmtMins(jcMinutes(j))}${j.planMins ? ` / แผน ${jcFmtMins(j.planMins)}` : ""}${openDown ? ` · หยุด: ${jcEsc(openDown.reason)}` : ""}</div>
       <div class="jc-op-btns">${jcButtons(w, i, true)}</div></div>`;
   };

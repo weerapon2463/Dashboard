@@ -191,7 +191,7 @@ function sxRenderEntry(p) {
           <td><button type="button" class="btn-link sx-del" data-i="${i}" aria-label="ลบแถว">✕</button></td></tr>`;
       }).join("")}</tbody></table>
     <datalist id="sxPartList">${bxAllParts().map((x) => `<option value="${bxEsc(x.key)}">${bxEsc(x.line.part)}</option>`).join("")}</datalist>
-    <button type="button" class="btn-secondary" id="sxAddRow">+ เพิ่มรายการ</button>`}
+    <button type="button" class="btn-secondary" id="sxAddRow">+ เพิ่มรายการ</button> <button type="button" class="btn-secondary" id="sxScan">📷 สแกนเพิ่มรายการ</button>`}
     <div class="sx-actions"><button type="button" class="btn-primary" id="sxSubmit">บันทึก ${bxEsc(sxNextNo())}</button> <button type="button" class="btn-secondary" id="sxReset">ล้างฟอร์ม</button></div>`;
   const list = SX_ENTRIES.slice().reverse().slice(0, 100);
   p.innerHTML = `
@@ -231,6 +231,18 @@ function sxWireEntry(p) {
   p.querySelectorAll(".sx-del").forEach((el) => el.addEventListener("click", () => { keep(); d.items.splice(+el.dataset.i, 1); if (!d.items.length) d.items.push({ key: "", qty: "" }); rerender(); }));
   const add = document.getElementById("sxAddRow");
   if (add) add.addEventListener("click", () => { keep(); d.items.push({ key: "", qty: "" }); rerender(); });
+  const scan = document.getElementById("sxScan");
+  if (scan) scan.addEventListener("click", () => { keep(); snScan("สแกนชิ้นส่วน — สแกนซ้ำ = เพิ่มจำนวน", (raw) => {
+    let v = String(raw).trim();
+    try { const u = new URL(v); v = u.searchParams.get("item") || v; } catch (e) { /* plain code */ }
+    if (!bxAllParts().some((x) => x.key === v)) { showToast(`ไม่พบรหัสชิ้นส่วน ${v}`, "warn"); return true; }
+    const row = d.items.find((it) => it.key === v);
+    if (row) row.qty = String(bxNum(row.qty) + 1);
+    else { const blank = d.items.find((it) => !it.key); if (blank) Object.assign(blank, { key: v, qty: "1" }); else d.items.push({ key: v, qty: "1" }); }
+    showToast(`${v} → ${(d.items.find((it) => it.key === v) || {}).qty}`, "good");
+    rerender();
+    return true;
+  }); });
   document.getElementById("sxReset").addEventListener("click", () => { sxDraft = sxNewDraft(d.purpose); rerender(); });
   document.getElementById("sxSubmit").addEventListener("click", () => { keep(); sxSubmit(); });
 }
@@ -273,7 +285,9 @@ function sxSubmit() {
     const st = BX_STOCK[`FG-${wo.model}`];
     if (st && !st.name) st.name = `สินค้าสำเร็จรูป ${wo.model}`;
     wo.produced = sxR3(bxNum(wo.produced) + items[0].qty);
+    if (wo.produced >= bxNum(wo.qty) && wo.status !== "เสร็จสมบูรณ์") wo.status = "เสร็จสมบูรณ์";
     if (typeof saveWorkOrders === "function") saveWorkOrders();
+    if (typeof snRegister === "function") snRegister(wo);
   }
   const entry = { no, purpose: d.purpose, at: new Date().toISOString(), by: bxUserName(), from: P.from ? d.from : "", to: P.to ? d.to : "", ref: d.ref || "", wo: wo ? wo.wo : "", note: d.note || "", items, status: "บันทึกแล้ว" };
   SX_ENTRIES.push(entry);

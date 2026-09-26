@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=20260927m">
-<link rel="stylesheet" href="theme.css?v=20260927m">
-<link rel="stylesheet" href="tv.css?v=20260927m">
+<link rel="stylesheet" href="style.css?v=20260927n">
+<link rel="stylesheet" href="theme.css?v=20260927n">
+<link rel="stylesheet" href="tv.css?v=20260927n">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -1178,7 +1178,7 @@
                   <th>อ้างอิง PO</th>
                   <th>รุ่นเครื่องจักร</th>
                   <th>แผนก/ไลน์ผลิต</th>
-                  <th>จำนวน (คัน)</th>
+                  <th>คัน</th>
                   <th>เบิกวัสดุแล้ว</th>
                   <th>กำหนดส่งมอบ</th>
                   <th>สถานะ</th>
@@ -1277,7 +1277,7 @@
         <select id="woFormDept"></select>
       </div>
       <div class="form-field">
-        <label for="woFormQty">จำนวน (คัน)</label>
+        <label for="woFormQty">จำนวนคัน — ระบบสร้าง 1 ใบสั่งผลิตต่อ 1 คัน พร้อมหมายเลขเครื่อง</label>
         <input type="number" id="woFormQty" min="1" value="1">
       </div>
       <div class="form-field">
@@ -1720,6 +1720,8 @@
         <div class="form-field"><label for="fs_footer">ข้อความท้ายกระดาษ</label><input id="fs_footer" placeholder="เช่น เอกสารควบคุม ห้ามทำสำเนาโดยไม่ได้รับอนุญาต"></div>
       </div>
       <label class="fs-check"><input type="checkbox" id="fs_showFlow"> แสดงขั้นตอนสถานะ (Workflow) บนเอกสาร</label>
+      <label class="fs-check"><input type="checkbox" id="fs_multiSign"> คนเดียวลงนามได้หลายช่องในเอกสารเดียวกัน (ผู้จัดทำ / ผู้ตรวจสอบ / ผู้อนุมัติ) — ถ้ามีสิทธิ์ของช่องนั้น</label>
+      <label class="fs-check"><input type="checkbox" id="fs_selfApprove"> ผู้สร้างเอกสารอนุมัติเอกสารของตัวเองได้ (Allow Self Approval) — ปิดไว้ถ้าต้องการแยกหน้าที่ผู้ขอ/ผู้อนุมัติ</label>
       <div class="modal-actions">
         <button id="fsResetBtn" class="btn-secondary" type="button">คืนค่าเริ่มต้น</button>
         <button id="fsCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
@@ -1748,44 +1750,45 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260927m"></script>
-  <script src="data.js?v=20260927m"></script>
-  <script src="partcode.js?v=20260927m"></script>
-  <script src="priority-matrix.js?v=20260927m"></script>
-  <script src="capacity-planning.js?v=20260927m"></script>
-  <script src="master-schedule.js?v=20260927m"></script>
-  <script src="make-or-buy.js?v=20260927m"></script>
-  <script src="resource.js?v=20260927m"></script>
-  <script src="procurement.js?v=20260927m"></script>
-  <script src="workorder.js?v=20260927m"></script>
-  <script src="jobcard.js?v=20260927m"></script>
-  <script src="alerts.js?v=20260927m"></script>
-  <script src="overview-charts.js?v=20260927m"></script>
-  <script src="pilot.js?v=20260927m"></script>
-  <script src="pilot-measure.js?v=20260927m"></script>
-  <script src="dept-data.js?v=20260927m"></script>
-  <script src="dept-samples.js?v=20260927m"></script>
-  <script src="org.js?v=20260927m"></script>
-  <script src="dept.js?v=20260927m"></script>
-  <script src="bom.js?v=20260927m"></script>
-  <script src="bomx.js?v=20260927m"></script>
-  <script src="stockx.js?v=20260927m"></script>
-  <script src="naming.js?v=20260927m"></script>
-  <script src="tv.js?v=20260927m"></script>
-  <script src="bomsheet.js?v=20260927m"></script>
-  <script src="service.js?v=20260927m"></script>
-  <script src="reports.js?v=20260927m"></script>
-  <script src="integrity.js?v=20260927m"></script>
-  <script src="overview.js?v=20260927m"></script>
-  <script src="rnd.js?v=20260927m"></script>
-  <script src="docview.js?v=20260927m"></script>
-  <script src="esign.js?v=20260927m"></script>
-  <script src="p2p-data.js?v=20260927m"></script>
-  <script src="p2p.js?v=20260927m"></script>
-  <script src="suppliers.js?v=20260927m"></script>
-  <script src="auth.js?v=20260927m"></script>
-  <script src="admin.js?v=20260927m"></script>
-  <script src="plans.js?v=20260927m"></script>
-  <script src="app.js?v=20260927m"></script>
+  <script src="storage.js?v=20260927n"></script>
+  <script src="data.js?v=20260927n"></script>
+  <script src="partcode.js?v=20260927n"></script>
+  <script src="priority-matrix.js?v=20260927n"></script>
+  <script src="capacity-planning.js?v=20260927n"></script>
+  <script src="master-schedule.js?v=20260927n"></script>
+  <script src="make-or-buy.js?v=20260927n"></script>
+  <script src="resource.js?v=20260927n"></script>
+  <script src="procurement.js?v=20260927n"></script>
+  <script src="workorder.js?v=20260927n"></script>
+  <script src="jobcard.js?v=20260927n"></script>
+  <script src="alerts.js?v=20260927n"></script>
+  <script src="overview-charts.js?v=20260927n"></script>
+  <script src="pilot.js?v=20260927n"></script>
+  <script src="pilot-measure.js?v=20260927n"></script>
+  <script src="dept-data.js?v=20260927n"></script>
+  <script src="dept-samples.js?v=20260927n"></script>
+  <script src="org.js?v=20260927n"></script>
+  <script src="dept.js?v=20260927n"></script>
+  <script src="bom.js?v=20260927n"></script>
+  <script src="bomx.js?v=20260927n"></script>
+  <script src="stockx.js?v=20260927n"></script>
+  <script src="naming.js?v=20260927n"></script>
+  <script src="tv.js?v=20260927n"></script>
+  <script src="serial.js?v=20260927n"></script>
+  <script src="bomsheet.js?v=20260927n"></script>
+  <script src="service.js?v=20260927n"></script>
+  <script src="reports.js?v=20260927n"></script>
+  <script src="integrity.js?v=20260927n"></script>
+  <script src="overview.js?v=20260927n"></script>
+  <script src="rnd.js?v=20260927n"></script>
+  <script src="docview.js?v=20260927n"></script>
+  <script src="esign.js?v=20260927n"></script>
+  <script src="p2p-data.js?v=20260927n"></script>
+  <script src="p2p.js?v=20260927n"></script>
+  <script src="suppliers.js?v=20260927n"></script>
+  <script src="auth.js?v=20260927n"></script>
+  <script src="admin.js?v=20260927n"></script>
+  <script src="plans.js?v=20260927n"></script>
+  <script src="app.js?v=20260927n"></script>
 </body>
 </html>

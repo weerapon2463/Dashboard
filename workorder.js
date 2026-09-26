@@ -245,7 +245,7 @@ function renderWOTable(lineFilter) {
     if (canClaim) actions += `<button class="btn-chip" data-action="claim" data-wo="${escapeHtml(wo.wo)}">รับงาน</button>`;
     if (canUpdate) actions += `<button class="btn-chip" data-action="update" data-wo="${escapeHtml(wo.wo)}">อัปเดต</button>`;
     tr.innerHTML = `
-      <td>${escapeHtml(wo.wo)}</td>
+      <td><button type="button" class="bx-link" data-hist="${escapeHtml(wo.wo)}" title="ประวัติรายคัน">${escapeHtml(wo.wo)}</button>${wo.serial ? `<div class="muted-inline mono-cell">${escapeHtml(wo.serial)}</div>` : ""}</td>
       <td>${escapeHtml(wo.po)}</td>
       <td>${escapeHtml(wo.model)}</td>
       <td>${escapeHtml(wo.department)}</td>
@@ -259,6 +259,7 @@ function renderWOTable(lineFilter) {
     tbody.appendChild(tr);
   });
 
+  tbody.querySelectorAll("[data-hist]").forEach((b) => b.addEventListener("click", () => { if (typeof snOpenHistory === "function") snOpenHistory(b.dataset.hist); }));
   tbody.querySelectorAll("[data-action]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const woId = btn.getAttribute("data-wo");
@@ -483,21 +484,21 @@ function initWorkOrderInteractions() {
       const dueIso = document.getElementById("woFormDue").value;
       if (!MASTER_BOM[model] || !(MASTER_BOM[model] || []).length) showToast(`รุ่น ${model} ยังไม่มี BOM — เบิกวัสดุตามรายการไม่ได้จนกว่าจะสร้าง BOM`, "warn");
       else if (BOM_META[model] && BOM_META[model].status !== BOM_RELEASED) showToast(`BOM ${model} ยังเป็นร่าง — ควรอนุมัติก่อนเริ่มผลิต`, "warn");
-      const newWoId = generateWONumber();
-      WORK_ORDERS.unshift({
-        wo: newWoId,
-        po: po || "-",
-        model,
-        department,
-        qty,
-        status: "วางแผน",
-        issuedPct: 0,
-        dueDate: dueIso ? formatThaiDate(dueIso) : "-",
-      });
-      if (typeof auditLog === "function") auditLog("สร้างใบสั่งผลิต", newWoId, `${model} × ${qty} · ${department}${po ? ` · อ้างอิง ${po}` : ""}`);
+      // one work order per machine (ERPNext Serial No style) so every unit keeps its own history
+      const made = [];
+      const serials = [];
+      for (let k = 0; k < qty; k++) {
+        const newWoId = generateWONumber();
+        const serial = typeof snNext === "function" ? snNext(model, serials) : "";
+        serials.push(serial);
+        WORK_ORDERS.unshift({ wo: newWoId, serial, po: po || "-", model, department, qty: 1, status: "วางแผน", issuedPct: 0,
+          dueDate: dueIso ? formatThaiDate(dueIso) : "-", createdAt: new Date().toISOString(), batch: qty > 1 ? `${po || model}-${Date.now().toString(36)}` : "" });
+        made.push(`${newWoId}${serial ? ` (${serial})` : ""}`);
+      }
+      if (typeof auditLog === "function") auditLog("สร้างใบสั่งผลิต", made.map((m) => m.split(" ")[0]).join(", "), `${model} ${qty} คัน · ${department}${po ? ` · อ้างอิง ${po}` : ""} · ${made.join(", ")}`);
       afterWOMutation();
       closeModal("woAddBackdrop");
-      showToast(`เพิ่มใบสั่งผลิต ${newWoId} แล้ว`, "good");
+      showToast(qty > 1 ? `สร้างใบสั่งผลิต ${qty} ใบ (1 คัน/ใบ) แล้ว` : `เพิ่มใบสั่งผลิต ${made[0]} แล้ว`, "good");
     });
   }
 

@@ -527,8 +527,8 @@ const DOC_TYPES = {
       { key: "owner", label: "ผู้ดูแลลูกค้า", type: "text" },
     ],
     cols: ["model", "customer", "delivered", "warranty"],
-    statuses: [["ใช้งานปกติ", "good"], ["อยู่ระหว่างซ่อม", "warning"], ["หยุดใช้งาน", "neutral"]],
-    flow: ["ใช้งานปกติ"],
+    statuses: [["ในโรงงาน / รอส่งมอบ", "info"], ["ใช้งานปกติ", "good"], ["อยู่ระหว่างซ่อม", "warning"], ["หยุดใช้งาน", "neutral"]],
+    flow: ["ในโรงงาน / รอส่งมอบ", "ใช้งานปกติ"],
     closed: ["หยุดใช้งาน"],
   },
   svc: {
