@@ -167,7 +167,8 @@ const Y2JStore = (() => {
     const u = url || cfg.url;
     const t = token || cfg.token;
     const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), post ? 45000 : 20000);
+    // a full pull carries every dataset (BOMs are MBs) and Apps Script can take close to a minute to answer
+    const timer = setTimeout(() => ctrl.abort(), post || (action === "pull" && !params.keys) ? 120000 : 20000);
     try {
       let res;
       if (post) {
@@ -390,7 +391,7 @@ const Y2JStore = (() => {
     if (overlay) overlay.hidden = false;
     const done = (r) => { if (overlay) overlay.hidden = true; return r; };
     const first = !Object.keys(meta.keys || {}).length;
-    const timeout = new Promise((resolve) => setTimeout(() => resolve({ mode: "sheets", offline: true }), first ? 60000 : 12000));
+    const timeout = new Promise((resolve) => setTimeout(() => resolve({ mode: "sheets", offline: true }), first ? 120000 : 12000));
     return Promise.race([pullAll().then(() => ({ mode: "sheets" })), timeout])
       .catch((e) => ({ mode: "sheets", offline: true, error: e.message }))
       .then((r) => {
