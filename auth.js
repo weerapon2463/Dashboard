@@ -597,10 +597,11 @@ function renderLoginScreen() {
     } catch (e) { /* per-device convenience only */ }
     authSignIn(picked, "login");
   };
-  // company data: sign in with employee number (or username) + password
+  // sign in with employee number or username + password
   const empForm = document.getElementById("loginEmpForm");
   if (empForm) {
-    empForm.hidden = isDemo;
+    // user + password everywhere; the demo also keeps the one-click list below it
+    empForm.hidden = false;
     document.getElementById("loginPickToggle").hidden = isDemo;
     list.hidden = !isDemo;
     document.getElementById("loginStepPick").hidden = !isDemo;
