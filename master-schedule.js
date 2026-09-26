@@ -140,7 +140,9 @@ function renderMasterSchedule() {
       <button type="button" class="btn-secondary" id="msPrev" aria-label="ย้อนหลัง">◀</button>
       <button type="button" class="btn-secondary" id="msToday">วันนี้</button>
       <button type="button" class="btn-secondary" id="msNext" aria-label="ถัดไป">▶</button>
-      <label class="vis-opt"><input type="checkbox" id="msShowWo"${showWo ? " checked" : ""}> แสดงใบสั่งผลิตจริง (จาก Job Card)</label>`;
+      <label>เรียงแผน <select id="msSort"><option value="manual"${(msView.sort || "manual") === "manual" ? " selected" : ""}>เรียงเอง (▲▼)</option><option value="start"${msView.sort === "start" ? " selected" : ""}>ตามวันเริ่ม</option><option value="end"${msView.sort === "end" ? " selected" : ""}>ตามวันส่งมอบ</option></select></label>
+      <label class="vis-opt"><input type="checkbox" id="msShowWo"${showWo ? " checked" : ""}> แสดงใบสั่งผลิตจริง (จาก Job Card)</label>
+      ${showWo ? `<label>เรียงคัน <select id="msWoSort"><option value="due"${(msView.woSort || "due") === "due" ? " selected" : ""}>ตามกำหนดส่ง</option><option value="start"${msView.woSort === "start" ? " selected" : ""}>ตามวันเริ่มผลิต</option><option value="wo"${msView.woSort === "wo" ? " selected" : ""}>ตามเลขใบสั่งผลิต</option></select></label>` : ""}`;
     const setStart = (t) => { msView.start = msIso(t); msSaveView(); renderMasterSchedule(); };
     document.getElementById("msStart").addEventListener("change", (e) => setStart(msParse(e.target.value)));
     document.getElementById("msWeeks").addEventListener("change", (e) => { msView.weeks = Number(e.target.value); msSaveView(); renderMasterSchedule(); });
@@ -148,6 +150,9 @@ function renderMasterSchedule() {
     document.getElementById("msNext").addEventListener("click", () => setStart(r.start + Math.max(1, Math.round(r.weeks / 3)) * 7 * MS_DAY));
     document.getElementById("msToday").addEventListener("click", () => setStart(msMonday(today) - Math.round(r.weeks / 4) * 7 * MS_DAY));
     document.getElementById("msShowWo").addEventListener("change", (e) => { msView.wo = e.target.checked; msSaveView(); renderMasterSchedule(); });
+    document.getElementById("msSort").addEventListener("change", (e) => { msView.sort = e.target.value; msSaveView(); renderMasterSchedule(); });
+    const ws = document.getElementById("msWoSort");
+    if (ws) ws.addEventListener("change", (e) => { msView.woSort = e.target.value; msSaveView(); renderMasterSchedule(); });
   }
 
   // header: months + weeks (Monday dates)
@@ -163,13 +168,20 @@ function renderMasterSchedule() {
 
   // planned lots
   html += `<div class="ms-section">แผนการผลิต (กำหนดเอง)</div>`;
-  html += MASTER_SCHEDULE.map((row, index) => {
+  const first = (row) => Math.min(...(row.phases || []).map((p) => msParse(p.from)));
+  const last = (row) => Math.max(...(row.phases || []).map((p) => msParse(p.to)));
+  const sortMode = msView.sort || "manual";
+  const planned = MASTER_SCHEDULE.map((row, index) => ({ row, index }));
+  if (sortMode === "start") planned.sort((a, b) => first(a.row) - first(b.row));
+  if (sortMode === "end") planned.sort((a, b) => last(a.row) - last(b.row));
+  html += planned.map(({ row, index }, pos) => {
     const bars = (row.phases || []).map((p) => msBar(msParse(p.from), msParse(p.to) + MS_DAY, r, "", `background:${PHASE_COLORS[p.phase] || "#888"}`, p.phase, `${row.model} — ${p.phase}: ${msThai(msParse(p.from), true)} – ${msThai(msParse(p.to), true)}`)).join("");
     const first = Math.min(...(row.phases || []).map((p) => msParse(p.from)));
     const last = Math.max(...(row.phases || []).map((p) => msParse(p.to)));
     const cur = (row.phases || []).find((p) => today >= msParse(p.from) && today < msParse(p.to) + MS_DAY);
     return `<div class="gantt-row">
       <div class="gantt-row-label"><span><b>${escapeHtml(row.model)}</b><small>${isFinite(first) ? `${msThai(first)} – ${msThai(last, true)}` : ""}${cur ? ` · ตอนนี้: ${escapeHtml(cur.phase)}` : ""}</small></span>
+        ${canEdit && sortMode === "manual" ? `<span class="ms-ord"><button type="button" class="ord-btn" data-msmove="${index}" data-dir="-1"${pos === 0 ? " disabled" : ""} aria-label="เลื่อนขึ้น">▲</button><button type="button" class="ord-btn" data-msmove="${index}" data-dir="1"${pos === planned.length - 1 ? " disabled" : ""} aria-label="เลื่อนลง">▼</button></span>` : ""}
         ${canEdit ? `<button type="button" class="ms-row-edit ms-edit-ic" data-msedit="${index}" title="แก้ไขวันที่" aria-label="แก้ไข ${escapeHtml(row.model)}">✎</button>` : ""}</div>
       <div class="gantt-track">${bars}${todayLine}</div></div>`;
   }).join("") || `<div class="gantt-row"><div class="gantt-row-label muted-inline">ยังไม่มีแผน</div><div class="gantt-track">${todayLine}</div></div>`;
@@ -177,6 +189,9 @@ function renderMasterSchedule() {
   // live work orders
   if (showWo) {
     const rows = msWoRows();
+    const ws = msView.woSort || "due";
+    const startOf = (x) => { const a = x.steps.filter((s) => s.from).map((s) => s.from); return a.length ? Math.min(...a) : (isNaN(x.created) ? 9e15 : x.created); };
+    rows.sort((a, b) => ws === "wo" ? a.w.wo.localeCompare(b.w.wo) : ws === "start" ? startOf(a) - startOf(b) : (isNaN(a.due) ? 9e15 : a.due) - (isNaN(b.due) ? 9e15 : b.due));
     html += `<div class="ms-section">ใบสั่งผลิตจริง — 1 แถว = 1 คัน (แท่งเข้ม = เวลาทำจริงจาก Job Card · ◆ = กำหนดส่ง)</div>`;
     html += rows.map(({ w, due, created, steps, late }) => {
       const done = (w.jobs || []).filter((j) => j.status === "done").length;
@@ -195,6 +210,12 @@ function renderMasterSchedule() {
   }
   container.innerHTML = html;
   container.querySelectorAll("[data-msedit]").forEach((b) => b.addEventListener("click", () => openScheduleModal(Number(b.dataset.msedit))));
+  container.querySelectorAll("[data-msmove]").forEach((b) => b.addEventListener("click", () => {
+    const i = Number(b.dataset.msmove), j = i + Number(b.dataset.dir);
+    if (j < 0 || j >= MASTER_SCHEDULE.length) return;
+    [MASTER_SCHEDULE[i], MASTER_SCHEDULE[j]] = [MASTER_SCHEDULE[j], MASTER_SCHEDULE[i]];
+    afterScheduleMutation();
+  }));
   container.querySelectorAll("[data-mswo]").forEach((b) => b.addEventListener("click", () => { if (typeof snOpenHistory === "function") snOpenHistory(b.dataset.mswo); }));
 
   renderGanttLegend();

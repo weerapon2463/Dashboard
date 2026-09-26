@@ -17,6 +17,27 @@ let plansWeek = null;        // Monday (YYYY-MM-DD) of the week shown
 let plansTag = "";
 let plansDept = "";          // department shown in the "แผนก" tab ("" = my own)
 let plansMasterBy = "dept";  // Master tab rows: dept | person
+// list order: manual (p.rank, shared) | start | due | progress — remembered per device
+let plansSort = (() => { try { return localStorage.getItem("y2j-plan-sort-v1") || "start"; } catch (e) { return "start"; } })();
+function planSortList(list) {
+  const by = {
+    manual: (a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9) || (a.start || "").localeCompare(b.start || ""),
+    start: (a, b) => (a.start || "").localeCompare(b.start || "") || (a.startTime || "").localeCompare(b.startTime || ""),
+    due: (a, b) => (a.due || a.start || "9999").localeCompare(b.due || b.start || "9999") || (a.endTime || "").localeCompare(b.endTime || ""),
+    progress: (a, b) => planProgress(a) - planProgress(b) || (a.due || "").localeCompare(b.due || ""),
+  }[plansSort] || null;
+  return by ? list.sort(by) : list;
+}
+// move a plan one place up/down within the list currently shown; ranks are rewritten 10, 20, 30…
+function planMove(id, dir, ids) {
+  const order = ids.slice();
+  const i = order.indexOf(id), j = i + dir;
+  if (i < 0 || j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  order.forEach((pid, k) => { const p = PLANS.find((x) => x.id === pid); if (p) p.rank = (k + 1) * 10; });
+  savePlans();
+  renderPlans();
+}
 let planEditingId = null;
 
 const pad2 = (n) => String(n).padStart(2, "0");
@@ -176,8 +197,10 @@ function renderPlans() {
     }).join("");
   } else {
     wrap.className = "plan-grid";
-    list.sort((a, b) => (a.start || "").localeCompare(b.start || "") || (a.startTime || "").localeCompare(b.startTime || ""));
-    wrap.innerHTML = list.map((p) => planCard(p, me)).join("");
+    planSortList(list);
+    const ids = list.map((p) => p.id);
+    wrap.innerHTML = list.map((p, i) => planCard(p, me, plansSort === "manual" && planCanEdit(p, me) ? { first: i === 0, last: i === list.length - 1 } : null)).join("");
+    wrap.querySelectorAll("[data-pmove]").forEach((b) => b.addEventListener("click", () => planMove(b.dataset.pmove, Number(b.dataset.dir), ids)));
   }
   const empty = document.getElementById("planEmpty");
   empty.hidden = plansMode === "week" || list.length > 0;
@@ -187,6 +210,12 @@ function renderPlans() {
   wrap.querySelectorAll("[data-planedit]").forEach((b) => b.addEventListener("click", () => openPlanEditor(b.dataset.planedit)));
   wrap.querySelectorAll("[data-newday]").forEach((b) => b.addEventListener("click", () => openPlanEditor(null, b.dataset.newday)));
   document.querySelectorAll("#planTagBar [data-ptag]").forEach((b) => b.addEventListener("click", () => { plansTag = b.dataset.ptag; renderPlans(); }));
+  const ss = document.getElementById("planSortSel");
+  if (ss) {
+    ss.hidden = plansMode === "week" || plansTab === "master";
+    ss.value = plansSort;
+    ss.onchange = () => { plansSort = ss.value; try { localStorage.setItem("y2j-plan-sort-v1", plansSort); } catch (e) { /* per device */ } renderPlans(); };
+  }
 }
 
 // rows × days (week) or grouped cards (list): one row per department or per person
@@ -242,7 +271,7 @@ function planChip(p, day, me) {
   </button>`;
 }
 
-function planCard(p, me) {
+function planCard(p, me, mover) {
   const pct = planProgress(p);
   const tone = (PLAN_STATUSES.find((s) => s[0] === p.status) || [0, "neutral"])[1];
   const today = planIsoDay(new Date());
@@ -252,6 +281,7 @@ function planCard(p, me) {
     <div class="plan-card-head">
       <span class="pill ${DOC_TONE_PILL[tone]}">${escapeHtml(p.status)}</span>
       <span class="plan-vis" title="ใครเห็นแผนนี้">${escapeHtml(visLabel(p.visibility))}</span>
+      ${mover ? `<span class="plan-move"><button type="button" class="ord-btn" data-pmove="${escapeHtml(p.id)}" data-dir="-1"${mover.first ? " disabled" : ""} aria-label="เลื่อนขึ้น">▲</button><button type="button" class="ord-btn" data-pmove="${escapeHtml(p.id)}" data-dir="1"${mover.last ? " disabled" : ""} aria-label="เลื่อนลง">▼</button></span>` : ""}
     </div>
     <h4 class="plan-title">${escapeHtml(p.title)}</h4>
     ${p.detail ? `<p class="plan-detail">${escapeHtml(p.detail)}</p>` : ""}

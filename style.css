@@ -1363,3 +1363,12 @@ html[data-density="compact"] body { zoom: 0.9; }
 .ms-edit-ic:hover { border-color: var(--accent, #f2a60d); color: var(--text-primary); }
 .ms-phase-row { grid-template-columns: 96px minmax(0, 1fr) minmax(0, 1fr); }
 .ms-phase-row input { width: 100%; min-width: 0; box-sizing: border-box; }
+
+/* ---- manual ordering (plans + master schedule) ---- */
+.ord-btn { width: 26px; height: 26px; border-radius: 7px; border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; font-size: 11px; line-height: 1; padding: 0; }
+.ord-btn:hover:not(:disabled) { border-color: var(--accent, #f2a60d); color: var(--text-primary); }
+.ord-btn:disabled { opacity: 0.3; cursor: default; }
+.ms-ord, .plan-move { display: inline-flex; gap: 3px; flex: none; }
+.plan-move { margin-left: auto; }
+.plan-sortbar { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; }
+.plan-sortbar select[hidden] { display: none; }
