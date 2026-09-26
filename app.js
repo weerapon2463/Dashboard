@@ -34,7 +34,7 @@ const MODULE_ACCESS = {
   operator: ["overview", "dept", "p2p", "mytasks", "workorder", "bomx", "service", "reports"],
   depthead: ["overview", "pilot", "dept", "p2p", "mytasks", "priority", "workorder", "rnd", "bomx", "service", "reports", "resource"],
   plant: ["overview", "pilot", "dept", "p2p", "mytasks", "priority", "capacity", "schedule", "makeorbuy", "resource", "procurement", "workorder", "rnd", "bomx", "service", "reports"],
-  group: ["overview", "pilot", "dept", "p2p", "capacity", "schedule", "makeorbuy", "rnd", "bomx", "service", "reports"],
+  group: ["overview", "pilot", "dept", "plans", "mytasks", "p2p", "capacity", "schedule", "makeorbuy", "procurement", "workorder", "rnd", "bomx", "service", "reports"],
 };
 
 const ROLE_STORAGE_KEY = "y2j-role-v1";

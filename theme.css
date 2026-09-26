@@ -310,3 +310,86 @@ input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color:
 .scan-btn { flex: none; width: 42px; border-radius: 9px; border: 1px solid var(--border-hairline); background: var(--surface-1); cursor: pointer; font-size: 17px; }
 .scan-btn:hover { border-color: var(--accent, #f2a60d); }
 @media print { .paper-qr svg { display: block; } .scan-btn { display: none; } }
+
+/* ==== readable colours in both themes (WCAG AA: 4.5:1 text, 3:1 large) ==== */
+:root {
+  --text-muted: #65676c;
+  --txt-good: #0a7a0a;
+  --txt-bad: #b3261e;
+  --txt-warn: #8a5a00;
+  --link: #1d4ed8;
+  --btn-bg: #1d4ed8;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    --text-muted: #a2a29b;
+    --txt-good: #5ed45e;
+    --txt-bad: #ff7b70;
+    --txt-warn: #ffc24d;
+    --link: #7ea6ff;
+    --btn-bg: #2f62cc;
+  }
+}
+:root[data-theme="dark"] {
+  --text-muted: #a2a29b;
+  --txt-good: #5ed45e;
+  --txt-bad: #ff7b70;
+  --txt-warn: #ffc24d;
+  --link: #7ea6ff;
+  --btn-bg: #2f62cc;
+}
+.btn-primary, .org-logo { background: var(--btn-bg); color: #fff; }
+.btn-primary { box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2) inset, 0 6px 14px -8px var(--btn-bg); }
+.btn-link { background: none; border: 0; padding: 2px 4px; font: inherit; color: var(--link); cursor: pointer; text-decoration: none; border-radius: 4px; }
+.btn-link:hover { text-decoration: underline; }
+.btn-link:disabled { color: var(--text-muted); cursor: default; text-decoration: none; }
+.bx-link, .ms-wo-link:hover b { color: var(--link); }
+.pill-good { color: var(--txt-good); }
+.pill-critical, .pill-doFirst { color: var(--txt-bad); }
+.pill-delegate, .pill-warning { color: var(--txt-warn); }
+.pill-schedule { color: var(--link); }
+.bx-neg, .ov-decide-crit, .ms-this-week, .ms-late .gantt-row-label b, .ms-due-late, .mt-stat-bad b, .ov-ec-bad b, .plan-overdue { color: var(--txt-bad); }
+.bx-low, .p2p-issue-sev { color: var(--txt-warn); }
+.status-chip.status-good { color: var(--txt-good); }
+.status-chip.status-warning { color: var(--txt-warn); }
+.status-chip.status-critical { color: var(--txt-bad); }
+/* related-document chips outside a paper form follow the app theme; on paper they stay black on white */
+.rel-chip { background: var(--surface-card); color: var(--text-primary); border-color: var(--border-hairline); }
+.rel-chip .rel-status, .rel-chip .rel-dir { color: var(--text-muted); }
+.paper .rel-chip { background: #fff; color: var(--p-ink); border-color: var(--p-line); }
+.paper .rel-chip .rel-status, .paper .rel-chip .rel-dir { color: var(--p-muted); }
+.org-logo-big span { color: var(--link); }
+.p2p-issue-critical .p2p-issue-sev { color: var(--txt-bad); }
+.btn-chip.active { background: var(--btn-bg); border-color: var(--btn-bg); color: #fff; }
+
+/* ==== paper forms / report PDF: always ink on white, never wider than A4 ==== */
+.paper {
+  --text-primary: #1a1a1a; --text-secondary: #3f4146; --text-muted: #5d5f63;
+  --surface-1: #f4f4f2; --surface-card: #ffffff; --gridline: #d9d9d4; --baseline: #bdbdb6;
+  --border-hairline: rgba(0, 0, 0, 0.14); --txt-good: #0a6e0a; --txt-bad: #b3261e; --txt-warn: #7a4f00; --link: #1d4ed8;
+  --shadow-card: none;
+  color: #1a1a1a;
+}
+.paper .data-table { width: 100%; table-layout: auto; font-size: 11.5px; }
+.paper .data-table th, .paper .data-table td { white-space: normal; word-break: break-word; padding: 5px 6px; color: #1a1a1a; }
+.paper .data-table th { background: #eceae4 !important; color: #1a1a1a !important; border-bottom: 1.5px solid #9d9b93; }
+.paper .data-table tbody tr:hover { background: transparent; }
+.paper .table-scroll { overflow: visible; }
+.paper .stat-tile { box-shadow: none; background: #fff; border: 1px solid #cfcfcf; padding: 10px 12px; }
+.paper .stat-tile::after { display: none; }
+.paper .stat-value { font-size: 22px; }
+.paper .stat-grid { gap: 8px; }
+.paper .pill { border: 1px solid currentColor; background: transparent; }
+@media print {
+  .paper .data-table { font-size: 10px; }
+  .paper .stat-grid { grid-template-columns: repeat(3, 1fr) !important; }
+}
+@media print {
+  html, body { background: #fff !important; background-image: none !important; color-scheme: light; }
+  .paper-section-title, .rp-block-title, .paper h3, .paper h4 { break-after: avoid; page-break-after: avoid; }
+  .rp-block { break-inside: auto; }
+  .paper .data-table thead { display: table-header-group; }
+}
+@media print {
+  :root, :root[data-theme="dark"], :root[data-theme="light"] { color-scheme: light !important; background: #fff !important; }
+}

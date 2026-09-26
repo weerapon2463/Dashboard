@@ -464,7 +464,7 @@ async function exportPaperPdf(mode) {
     image: { type: "jpeg", quality: 0.95 },
     html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
-    pagebreak: { mode: ["css", "legacy"], avoid: [".paper-row", "tr", ".sig-box", ".attach-item", ".paper-textbox", ".paper-titlebar"] },
+    pagebreak: { mode: ["css", "legacy"], avoid: [".paper-row", "tr", ".sig-box", ".attach-item", ".paper-textbox", ".paper-titlebar", ".stat-tile", ".paper-section-title", ".rp-block-title"] },
   };
   try {
     if (mode === "share") {

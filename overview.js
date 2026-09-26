@@ -9,6 +9,7 @@
 const OV_STORAGE_PREFIX = "y2j-overview-v1-";
 
 const OV_WIDGETS = {
+  execCost: { title: "ต้นทุน & การส่งมอบรายคัน", sub: "ต้นทุนจริงถึงวันนี้ (ค่าดำเนินการจาก Job Card + วัสดุที่เบิก) · คันที่ใกล้ส่ง/ล่าช้า · สาเหตุการหยุดงาน", size: "full" },
   hero: { title: "ตัวเลขสำคัญตอนนี้", sub: "กดตัวเลขเพื่อไปยังหน้าที่เกี่ยวข้อง", size: "full" },
   decide: { title: "สิ่งที่ต้องตัดสินใจวันนี้", sub: "ระบบจัดลำดับจากข้อมูลจริงทุกโมดูล — เรื่องที่กระทบการส่งมอบมากที่สุดอยู่บนสุด", size: "full" },
   flow: { title: "เส้นทางงาน: คำสั่งซื้อ → ผลิต → ส่งมอบ → บริการ", sub: "จำนวนงานที่อยู่ในแต่ละช่วงตอนนี้ · กรอบแดง = คอขวด (ค้าง/เกินกำหนดมากที่สุด)", size: "full" },
@@ -31,7 +32,7 @@ const OV_WIDGETS = {
 };
 
 const OV_PRESETS = [
-  { id: "exec", name: "ผู้บริหาร", widgets: ["decide", "hero", "flow", "rndProjects", "woProgress", "health", "p2pPipeline", "service", "activity", "pilot", "docsLoad", "alerts"] },
+  { id: "exec", name: "ผู้บริหาร", widgets: ["decide", "execCost", "hero", "flow", "rndProjects", "woProgress", "health", "p2pPipeline", "service", "activity", "pilot", "docsLoad", "alerts"] },
   { id: "prod", name: "ฝ่ายผลิต / วางแผน", widgets: ["decide", "hero", "flow", "woProgress", "reqAging", "capacity", "woStatus", "stockHealth", "health", "legacyStats", "alerts"] },
   { id: "store", name: "คลัง & จัดซื้อ", widgets: ["decide", "hero", "reqAging", "stockHealth", "p2pPipeline", "flow", "activity"] },
   { id: "rnd", name: "R&D / วิศวกรรม", widgets: ["rndProjects", "rndChanges", "woProgress", "health", "activity", "docsLoad"] },
@@ -63,6 +64,9 @@ function ovLoad() {
       // one-time: layouts saved before "decide" existed get it on top
       if (!p.v2 && !p.items.some((i) => i.id === "decide")) p.items.unshift({ id: "decide", size: "full" });
       p.v2 = true;
+      // one-time: executives get the cost & delivery card under the decisions list
+      if (!p.v3 && p.preset === "exec" && !p.items.some((i) => i.id === "execCost")) p.items.splice(p.items.findIndex((i) => i.id === "decide") + 1, 0, { id: "execCost", size: "full" });
+      p.v3 = true;
       return p;
     }
   } catch (e) { /* use preset */ }
@@ -94,6 +98,42 @@ function ovEmpty(text) { return `<p class="muted-note ov-empty">${text}</p>`; }
 /* ---- widgets ----------------------------------------------------------------- */
 
 const OV_RENDER = {
+  execCost() {
+    if (typeof WORK_ORDERS === "undefined" || typeof jcCost !== "function") return ovEmpty("ยังไม่มีข้อมูล");
+    const baht = (n) => `${Math.round(Number(n) || 0).toLocaleString("th-TH")} ฿`;
+    const withJobs = WORK_ORDERS.filter((w) => (w.jobs || []).length);
+    const done = withJobs.filter((w) => w.status === "เสร็จสมบูรณ์");
+    const costs = done.map((w) => jcCost(w).total / Math.max(1, Number(w.qty) || 1));
+    let plan = 0, act = 0;
+    withJobs.forEach((w) => (w.jobs || []).forEach((j) => { if (j.status === "done" && j.planMins) { plan += j.planMins; act += jcMinutes(j); } }));
+    const eff = act ? Math.round(plan / act * 100) : null;
+    const month = new Date().toISOString().slice(0, 7);
+    const delivered = (typeof SX_ENTRIES !== "undefined" ? SX_ENTRIES : []).filter((e) => e.purpose === "manufacture" && e.status !== "ยกเลิก" && String(e.at).slice(0, 7) === month).length;
+    const open = WORK_ORDERS.filter((w) => w.status !== "เสร็จสมบูรณ์").map((w) => ({ w, due: w.dueIso || (typeof ovDue === "function" ? ovDue(w.dueDate) : ""), c: (w.jobs || []).length ? jcCost(w) : null }))
+      .sort((a, b) => String(a.due).localeCompare(String(b.due))).slice(0, 6);
+    const down = {};
+    const since = Date.now() - 30 * 86400000;
+    WORK_ORDERS.forEach((w) => (w.jobs || []).forEach((j) => (j.downs || []).forEach((d) => { const a = Math.max(since, Date.parse(d.from)), b = d.to ? Date.parse(d.to) : Date.now(); if (b > a) down[d.reason] = (down[d.reason] || 0) + (b - a) / 60000; })));
+    const reasons = Object.keys(down).sort((a, b) => down[b] - down[a]).slice(0, 3);
+    const tile = (l, v, n, tone) => `<div class="ov-ec-tile${tone ? " ov-ec-" + tone : ""}"><span>${l}</span><b>${v}</b><small>${n}</small></div>`;
+    const today = new Date().toISOString().slice(0, 10);
+    return `<div class="ov-ec">
+      <div class="ov-ec-tiles">
+        ${tile("ต้นทุนเฉลี่ยต่อคันที่ผลิตเสร็จ", costs.length ? baht(costs.reduce((s, x) => s + x, 0) / costs.length) : "—", `${costs.length} คัน`)}
+        ${tile("ประสิทธิภาพเวลา (แผน ÷ จริง)", eff === null ? "—" : `${eff}%`, "ขั้นตอนที่เสร็จแล้ว", eff !== null && eff < 85 ? "bad" : "")}
+        ${tile("ผลิตเสร็จเข้าคลังเดือนนี้", `${delivered} คัน`, "จากบันทึกผลิตเสร็จ")}
+        ${tile("มูลค่าคงคลัง", typeof sxStockValue === "function" ? baht(sxStockValue()) : "—", "ถัวเฉลี่ยเคลื่อนที่")}
+      </div>
+      <div class="ov-ec-grid">
+        <div class="table-scroll"><table class="data-table"><thead><tr><th>คัน</th><th>ลูกค้า</th><th>กำหนดส่ง</th><th>ขั้นเสร็จ</th><th class="num">ต้นทุนถึงวันนี้</th></tr></thead><tbody>
+          ${open.map(({ w, due, c }) => `<tr><td><button type="button" class="bx-link" data-ovhist="${ovEsc(w.wo)}">${ovEsc(w.serial || w.wo)}</button></td><td>${ovEsc(w.customer || (w.so ? w.so : "สต็อก"))}</td>
+            <td><span class="${due && due < today ? "bx-neg" : ""}">${due ? formatThaiDate(due) : ovEsc(w.dueDate || "")}</span></td>
+            <td>${(w.jobs || []).filter((j) => j.status === "done").length}/${(w.jobs || []).length || "–"}</td><td class="num">${c ? baht(c.total) : "—"}</td></tr>`).join("")}
+        </tbody></table></div>
+        <div><div class="ov-ec-h">สาเหตุหยุดงาน 30 วัน</div>${reasons.length ? reasons.map((r) => `<div class="ov-ec-r"><span>${ovEsc(r)}</span><b>${typeof jcFmtMins === "function" ? jcFmtMins(down[r]) : Math.round(down[r]) + " น."}</b></div>`).join("") : `<p class="muted-inline">ไม่มีการหยุดงาน</p>`}
+          <button type="button" class="btn-secondary ov-ec-tv" data-ovtv="exec">📺 เปิดจอทีวีผู้บริหาร</button></div>
+      </div></div>`;
+  },
   // Ranked decisions: each item says what is wrong, why it matters, and opens the page to act on it
   decide() {
     const items = [];
@@ -498,6 +538,8 @@ function renderOverview() {
     </div>` : "");
 
   grid.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => ovGoTo(b.dataset.go, b.dataset.extra)));
+  grid.querySelectorAll("[data-ovhist]").forEach((b) => b.addEventListener("click", () => { if (typeof snOpenHistory === "function") snOpenHistory(b.dataset.ovhist); }));
+  grid.querySelectorAll("[data-ovtv]").forEach((b) => b.addEventListener("click", () => { if (typeof tvEnter === "function") tvEnter(b.dataset.ovtv); }));
   grid.querySelectorAll("[data-openreq]").forEach((b) => b.addEventListener("click", (e) => { e.stopPropagation(); switchView("bomx"); bxOpenReq(b.dataset.openreq); }));
   grid.querySelectorAll("[data-ovact]").forEach((b) => b.addEventListener("click", () => {
     const i = Number(b.dataset.i);

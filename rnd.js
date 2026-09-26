@@ -47,6 +47,30 @@ let rdChangeFilter = "open";
 let rdCmp = { a: "", ar: "", b: "", br: "", showSame: false };
 let rdPartSearch = "";
 let rdMineOnly = false;
+// project list order: manual (p.rank, shared) | start | target | progress | risk — remembered per device
+let rdSort = (() => { try { return localStorage.getItem("y2j-rd-sort-v1") || "target"; } catch (e) { return "target"; } })();
+function rdSorted() {
+  const closed = (p) => ["เสร็จแล้ว", "ยกเลิก"].includes(p.status);
+  const riskRank = (p) => ({ critical: 0, warning: 1, good: 2 }[rdHealth(p)[1]] ?? 3);
+  const by = {
+    manual: (a, b) => (a.rank ?? 1e9) - (b.rank ?? 1e9) || String(a.target).localeCompare(String(b.target)),
+    start: (a, b) => closed(a) - closed(b) || String(a.start).localeCompare(String(b.start)),
+    target: (a, b) => closed(a) - closed(b) || String(a.target).localeCompare(String(b.target)),
+    progress: (a, b) => closed(a) - closed(b) || rdProgress(a) - rdProgress(b),
+    risk: (a, b) => closed(a) - closed(b) || riskRank(a) - riskRank(b) || String(a.target).localeCompare(String(b.target)),
+  }[rdSort] || null;
+  return RD.projects.slice().sort(by);
+}
+function rdMove(id, dir, ids) {
+  const order = ids.slice();
+  const i = order.indexOf(id), j = i + dir;
+  if (i < 0 || j < 0 || j >= order.length) return;
+  [order[i], order[j]] = [order[j], order[i]];
+  order.forEach((pid, k) => { const p = RD.projects.find((x) => x.id === pid); if (p) p.rank = (k + 1) * 10; });
+  rdSave();
+  rdAudit("จัดลำดับโครงการ R&D", id, dir < 0 ? "เลื่อนขึ้น" : "เลื่อนลง");
+  renderRnd();
+}
 
 /* ---- storage & helpers --------------------------------------------------------- */
 
@@ -174,7 +198,9 @@ function renderRdStats() {
 /* ---- projects: portfolio -------------------------------------------------------- */
 
 function renderRdPortfolio(pane) {
-  const list = RD.projects.slice().sort((a, b) => (["เสร็จแล้ว", "ยกเลิก"].includes(a.status) - ["เสร็จแล้ว", "ยกเลิก"].includes(b.status)) || String(a.target).localeCompare(String(b.target)));
+  const list = rdSorted();
+  const ids = list.map((p) => p.id);
+  const manual = rdSort === "manual";
   const act = list.filter((p) => !["เสร็จแล้ว", "ยกเลิก"].includes(p.status));
   const minD = act.length ? act.map((p) => p.start).sort()[0] : bxToday();
   const maxD = act.length ? act.map((p) => p.target).sort().slice(-1)[0] : rdAddDays(bxToday(), 90);
@@ -185,13 +211,15 @@ function renderRdPortfolio(pane) {
         ${rdCanCreate() ? `<button type="button" class="btn-primary" id="rdNewBtn">+ สร้างโครงการ</button>` : ""}
       </div>
       <div class="card-body table-scroll">
+        <div class="filter-row"><label for="rdSortSel">เรียง:</label><select id="rdSortSel">${[["target", "ตามกำหนดเสร็จ"], ["start", "ตามวันเริ่ม"], ["manual", "เรียงเอง (▲▼)"], ["risk", "เสี่ยง/ล่าช้าก่อน"], ["progress", "ความคืบหน้าน้อยก่อน"]].map(([v, t]) => `<option value="${v}"${v === rdSort ? " selected" : ""}>${t}</option>`).join("")}</select></div>
         ${list.length ? `<table class="data-table">
-          <thead><tr><th>โครงการ</th><th>ประเภท</th><th>รุ่น</th><th>ผู้รับผิดชอบ</th><th>ความคืบหน้า</th><th>สถานะ</th><th>Milestone ถัดไป</th><th>กำหนดเสร็จ</th></tr></thead>
+          <thead><tr>${manual ? "<th></th>" : ""}<th>โครงการ</th><th>ประเภท</th><th>รุ่น</th><th>ผู้รับผิดชอบ</th><th>ความคืบหน้า</th><th>สถานะ</th><th>Milestone ถัดไป</th><th>กำหนดเสร็จ</th></tr></thead>
           <tbody>${list.map((p) => {
             const h = rdHealth(p);
             const prog = rdProgress(p);
             const m = rdNextMilestone(p);
-            return `<tr><td><button type="button" class="bx-link" data-rdopen="${rdEsc(p.id)}"><strong>${rdEsc(p.id)}</strong> ${rdEsc(p.name)}</button></td>
+            const k = list.indexOf(p);
+            return `<tr>${manual ? `<td class="rd-ord">${rdCanEdit(p) ? `<button type="button" class="ord-btn" data-rdmove="${rdEsc(p.id)}" data-dir="-1"${k === 0 ? " disabled" : ""} aria-label="เลื่อนขึ้น">▲</button><button type="button" class="ord-btn" data-rdmove="${rdEsc(p.id)}" data-dir="1"${k === list.length - 1 ? " disabled" : ""} aria-label="เลื่อนลง">▼</button>` : ""}</td>` : ""}<td><button type="button" class="bx-link" data-rdopen="${rdEsc(p.id)}"><strong>${rdEsc(p.id)}</strong> ${rdEsc(p.name)}</button></td>
               <td>${rdEsc((RD_TYPES[p.type] || {}).name || p.type)}</td><td>${rdEsc(p.model || "—")}</td><td>${rdEsc(rdUserName(p.owner))}</td>
               <td><div class="bx-bar"><span style="width:${prog}%"></span></div> <span class="muted-inline">${prog}%</span></td>
               <td>${bxPill(h[0], h[1])}</td>
@@ -205,6 +233,9 @@ function renderRdPortfolio(pane) {
   const nb = document.getElementById("rdNewBtn");
   if (nb) nb.addEventListener("click", rdNewProjectModal);
   pane.querySelectorAll("[data-rdopen]").forEach((b) => b.addEventListener("click", () => { rdOpenId = b.dataset.rdopen; renderRnd(); window.scrollTo(0, 0); }));
+  pane.querySelectorAll("[data-rdmove]").forEach((b) => b.addEventListener("click", () => rdMove(b.dataset.rdmove, Number(b.dataset.dir), ids)));
+  const ss = document.getElementById("rdSortSel");
+  if (ss) ss.addEventListener("change", () => { rdSort = ss.value; try { localStorage.setItem("y2j-rd-sort-v1", rdSort); } catch (e) { /* per device */ } renderRnd(); });
 }
 
 // Gantt: rows [{label, start, end, progress, tone, milestone, late, open}]
