@@ -418,7 +418,8 @@ function openDeptModal(type, index) {
   const ownDoc = isEdit && typeof authCurrentUser === "function" && doc.createdBy && authCurrentUser() && doc.createdBy === authCurrentUser().id && currentRole() !== "admin" && !(typeof esPolicy === "function" && esPolicy().selfApprove);
   statusSel.innerHTML = def.statuses.map((s) => {
     const blocked = ownDoc && deptIsApproval(s[0]) && s[0] !== doc.status;
-    return `<option value="${escapeHtml(s[0])}"${s[0] === doc.status ? " selected" : ""}${blocked ? " disabled" : ""}>${escapeHtml(s[0])}${blocked ? " (ต้องให้ผู้อื่นอนุมัติ)" : ""}</option>`;
+    const noRight = !blocked && s[0] !== doc.status && typeof wfCanSet === "function" && !wfCanSet(type, s[0]);
+    return `<option value="${escapeHtml(s[0])}"${s[0] === doc.status ? " selected" : ""}${blocked || noRight ? " disabled" : ""}>${escapeHtml(s[0])}${blocked ? " (ต้องให้ผู้อื่นอนุมัติ)" : noRight ? " (ไม่มีสิทธิ์ตาม Workflow)" : ""}</option>`;
   }).join("");
   // New documents always start at the first status; changing status is a manager action
   statusSel.disabled = readOnly || !isEdit || !deptCanManage(role, type);

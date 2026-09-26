@@ -123,7 +123,7 @@ function renderSvOrders(pane) {
     <div class="card">
       <div class="card-header card-header-actions">
         <div>
-          <h3>งานบริการ — รับแจ้ง → นัดหมาย → ดำเนินการ → ลูกค้ารับรอง → ปิดงาน</h3>
+          <h3>งานบริการ — ${bxEsc(typeof wfFlowText === "function" ? wfFlowText("svc") : DOC_TYPES.svc.flow.join(" → "))}</h3>
           <p class="card-sub">กดเลขที่เพื่อดูรายละเอียด เลื่อนสถานะ เบิกอะไหล่ตาม BOM ของเครื่อง และดูประวัติเครื่อง</p>
         </div>
         ${deptCanCreate(role, "svc") ? `<button class="btn-primary" type="button" id="svNewOrder">+ แจ้งงานบริการ</button>` : ""}
@@ -242,7 +242,7 @@ function svRenderOrderModal() {
     ${reqs.length ? `<table class="data-table"><thead><tr><th>ใบเบิก</th><th>รายการ</th><th>ผู้รับของ</th><th>สถานะ</th></tr></thead><tbody>${reqs.map((r) => `<tr><td><button type="button" class="bx-link" data-openreq="${bxEsc(r.no)}">${bxEsc(r.no)}</button></td><td>${r.items.map((it) => `${bxEsc(it.code || "")} ${bxEsc(it.part)} × ${bxFmt(it.req)} (จ่าย ${bxFmt(it.issued)})`).join("<br>")}</td><td>${bxEsc(r.owner || "")}</td><td>${bxStatusPill("mreq", r.status)}</td></tr>`).join("")}</tbody></table>` : `<p class="muted-inline">ยังไม่ได้เบิกอะไหล่</p>`}
     ${related.length ? `<h4 class="bx-h4">เอกสารที่เกี่ยวข้อง</h4><div>${related.map((r) => `<button type="button" class="rel-chip" data-docno="${bxEsc(r.doc.no)}"><span class="rel-dir">${bxEsc(r.dir)}</span> ${bxEsc(r.doc.no)} — ${bxEsc(String(r.doc.title || "").slice(0, 36))} <span class="rel-status">(${bxEsc(r.doc.status)})</span></button>`).join("")}</div>` : ""}
     <div class="modal-actions">
-      ${canManage && next ? `<button type="button" class="btn-primary" id="svNext">→ ${bxEsc(next)}</button>` : ""}
+      ${canManage && next && (typeof wfCanSet !== "function" || wfCanSet("svc", next)) ? `<button type="button" class="btn-primary" id="svNext">→ ${bxEsc(next)}</button>` : ""}
       ${canManage && svIsOpen(d) && d.status !== "รออะไหล่" ? `<button type="button" class="btn-secondary" id="svWaitParts">รออะไหล่</button>` : ""}
       ${svIsOpen(d) && bxCanRequest() && model ? `<button type="button" class="btn-secondary" id="svPick">เบิกอะไหล่จาก BOM ${bxEsc(model)}</button>` : ""}
       ${canManage ? `<button type="button" class="btn-secondary" id="svEdit">แก้ไข</button>` : ""}

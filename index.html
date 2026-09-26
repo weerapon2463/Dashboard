@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=20260928l">
-<link rel="stylesheet" href="theme.css?v=20260928l">
-<link rel="stylesheet" href="tv.css?v=20260928l">
+<link rel="stylesheet" href="style.css?v=20260928m">
+<link rel="stylesheet" href="theme.css?v=20260928m">
+<link rel="stylesheet" href="tv.css?v=20260928m">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -480,6 +480,7 @@
               <button type="button" class="dept-tab admin-tab" data-tab="integrity">✔ ตรวจสอบความสอดคล้อง</button>
               <button type="button" class="dept-tab admin-tab" data-tab="audit">ประวัติการใช้งาน (Audit Log)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="org">🏢 องค์กร (บริษัท / ฝ่าย / โลโก้)</button>
+              <button type="button" class="dept-tab admin-tab" data-tab="workflow">⚙ ขั้นตอนการทำงาน (Workflow)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="naming">เลขที่เอกสาร (Naming Series)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="storage">☁ ที่เก็บข้อมูล</button>
             </div>
@@ -575,6 +576,7 @@
               </ol>
               <p class="admin-note">ใน Sheets จะมีแท็บอ่านง่ายให้ดูและทำรายงาน: เอกสาร · จัดซื้อ · ผู้ใช้ · ประวัติ · แผนงาน · Pilot · ใบสั่งผลิต (สร้างใหม่ทุกครั้งที่บันทึก — แก้ข้อมูลที่ Dashboard) · ไฟล์แนบเก็บในโฟลเดอร์ Google Drive · ข้อมูลเครื่องนี้ยังเก็บสำเนาไว้เผื่อเน็ตหลุด</p>
             </div>
+            <div class="admin-panel" data-panel="workflow" hidden><div id="workflowPanel"></div></div>
             <div class="admin-panel" data-panel="naming" hidden><div id="namingPanel"></div></div>
             <div class="admin-panel" data-panel="audit" hidden>
               <div class="filter-row">
@@ -1699,46 +1701,47 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260928l"></script>
-  <script src="data.js?v=20260928l"></script>
-  <script src="partcode.js?v=20260928l"></script>
-  <script src="priority-matrix.js?v=20260928l"></script>
-  <script src="capacity-planning.js?v=20260928l"></script>
-  <script src="master-schedule.js?v=20260928l"></script>
-  <script src="make-or-buy.js?v=20260928l"></script>
-  <script src="resource.js?v=20260928l"></script>
-  <script src="procurement.js?v=20260928l"></script>
-  <script src="workorder.js?v=20260928l"></script>
-  <script src="jobcard.js?v=20260928l"></script>
-  <script src="alerts.js?v=20260928l"></script>
-  <script src="overview-charts.js?v=20260928l"></script>
-  <script src="pilot.js?v=20260928l"></script>
-  <script src="pilot-measure.js?v=20260928l"></script>
-  <script src="dept-data.js?v=20260928l"></script>
-  <script src="dept-samples.js?v=20260928l"></script>
-  <script src="org.js?v=20260928l"></script>
-  <script src="dept.js?v=20260928l"></script>
-  <script src="bom.js?v=20260928l"></script>
-  <script src="bomx.js?v=20260928l"></script>
-  <script src="stockx.js?v=20260928l"></script>
-  <script src="naming.js?v=20260928l"></script>
-  <script src="tv.js?v=20260928l"></script>
-  <script src="serial.js?v=20260928l"></script>
-  <script src="mytasks.js?v=20260928l"></script>
-  <script src="bomsheet.js?v=20260928l"></script>
-  <script src="service.js?v=20260928l"></script>
-  <script src="reports.js?v=20260928l"></script>
-  <script src="integrity.js?v=20260928l"></script>
-  <script src="overview.js?v=20260928l"></script>
-  <script src="rnd.js?v=20260928l"></script>
-  <script src="docview.js?v=20260928l"></script>
-  <script src="esign.js?v=20260928l"></script>
-  <script src="p2p-data.js?v=20260928l"></script>
-  <script src="p2p.js?v=20260928l"></script>
-  <script src="suppliers.js?v=20260928l"></script>
-  <script src="auth.js?v=20260928l"></script>
-  <script src="admin.js?v=20260928l"></script>
-  <script src="plans.js?v=20260928l"></script>
-  <script src="app.js?v=20260928l"></script>
+  <script src="storage.js?v=20260928m"></script>
+  <script src="data.js?v=20260928m"></script>
+  <script src="partcode.js?v=20260928m"></script>
+  <script src="priority-matrix.js?v=20260928m"></script>
+  <script src="capacity-planning.js?v=20260928m"></script>
+  <script src="master-schedule.js?v=20260928m"></script>
+  <script src="make-or-buy.js?v=20260928m"></script>
+  <script src="resource.js?v=20260928m"></script>
+  <script src="procurement.js?v=20260928m"></script>
+  <script src="workorder.js?v=20260928m"></script>
+  <script src="jobcard.js?v=20260928m"></script>
+  <script src="alerts.js?v=20260928m"></script>
+  <script src="overview-charts.js?v=20260928m"></script>
+  <script src="pilot.js?v=20260928m"></script>
+  <script src="pilot-measure.js?v=20260928m"></script>
+  <script src="dept-data.js?v=20260928m"></script>
+  <script src="workflow.js?v=20260928m"></script>
+  <script src="dept-samples.js?v=20260928m"></script>
+  <script src="org.js?v=20260928m"></script>
+  <script src="dept.js?v=20260928m"></script>
+  <script src="bom.js?v=20260928m"></script>
+  <script src="bomx.js?v=20260928m"></script>
+  <script src="stockx.js?v=20260928m"></script>
+  <script src="naming.js?v=20260928m"></script>
+  <script src="tv.js?v=20260928m"></script>
+  <script src="serial.js?v=20260928m"></script>
+  <script src="mytasks.js?v=20260928m"></script>
+  <script src="bomsheet.js?v=20260928m"></script>
+  <script src="service.js?v=20260928m"></script>
+  <script src="reports.js?v=20260928m"></script>
+  <script src="integrity.js?v=20260928m"></script>
+  <script src="overview.js?v=20260928m"></script>
+  <script src="rnd.js?v=20260928m"></script>
+  <script src="docview.js?v=20260928m"></script>
+  <script src="esign.js?v=20260928m"></script>
+  <script src="p2p-data.js?v=20260928m"></script>
+  <script src="p2p.js?v=20260928m"></script>
+  <script src="suppliers.js?v=20260928m"></script>
+  <script src="auth.js?v=20260928m"></script>
+  <script src="admin.js?v=20260928m"></script>
+  <script src="plans.js?v=20260928m"></script>
+  <script src="app.js?v=20260928m"></script>
 </body>
 </html>
