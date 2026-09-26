@@ -66,7 +66,7 @@ function planSamples() {
     },
     {
       id: "p-3", owner: "u-plant", assignees: ["u-plant", "u-prod", "u-rnd"], editors: ["u-prod"], tags: ["Pilot", "เร่งด่วน"],
-      title: "ทดสอบนำร่อง (Pilot) Y2J ONE กับโครงการ YT6500",
+      title: "ทดสอบนำร่อง (Pilot) FORGE กับโครงการ YT6500",
       detail: "เก็บค่าก่อน-หลัง ทุกแผนกใช้ระบบจริง 2 วัน", start: "2026-09-26", startTime: "08:00", due: "2026-09-27", endTime: "17:00", status: "วางแผน",
       items: [{ text: "สำรองข้อมูลก่อนเริ่ม", done: true }, { text: "เก็บค่าก่อนใช้ระบบ", done: false }, { text: "ใช้ระบบกับ YT6500 จริง", done: false }, { text: "กรอกผลในหน้า Pilot", done: false }],
       visibility: { mode: "custom", teams: ["t-award"], depts: [], users: [] }, createdAt: iso("09-20"), updatedAt: iso("09-24"),

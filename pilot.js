@@ -392,7 +392,7 @@ function pilotSummaryText() {
   const s = pilotSummary();
   const info = PILOT.info;
   const lines = [];
-  lines.push(`ผลการทดสอบนำร่อง Y2J ONE — ${info.project || "(ระบุโครงการ)"}`);
+  lines.push(`ผลการทดสอบนำร่อง ${APP_NAME} — ${info.project || "(ระบุโครงการ)"}`);
   if (info.start || info.end) lines.push(`ช่วงทดสอบ: ${info.start || "?"} ถึง ${info.end || "?"}`);
   if (info.team) lines.push(`ผู้ร่วมทดสอบ: ${info.team}`);
   if (info.scope) lines.push(`ขอบเขต: ${info.scope}`);

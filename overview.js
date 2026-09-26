@@ -99,6 +99,7 @@ function ovEmpty(text) { return `<p class="muted-note ov-empty">${text}</p>`; }
 
 const OV_RENDER = {
   execCost() {
+    if (!authCanSeeMgmtCost()) return ovEmpty("ข้อมูลต้นทุนเป็นข้อมูลลับ — เฉพาะผู้บริหารและผู้ที่ได้รับสิทธิ์ \"ดูต้นทุน\"");
     if (typeof WORK_ORDERS === "undefined" || typeof jcCost !== "function") return ovEmpty("ยังไม่มีข้อมูล");
     const baht = (n) => `${Math.round(Number(n) || 0).toLocaleString("th-TH")} ฿`;
     const withJobs = WORK_ORDERS.filter((w) => (w.jobs || []).length);
@@ -459,7 +460,7 @@ const OV_RENDER = {
     return `<div class="stat-grid">${t("งานที่ต้องทำก่อน (Do First)", "statDoFirst", "จาก Priority Matrix")}${t("Utilization เฉลี่ยทุกไลน์", "statUtil", "สัปดาห์นี้")}${t("โครงการที่กำลังผลิต", "statActiveProjects", "จาก Master Schedule")}${t("ชิ้นส่วนแนะนำให้ \"ซื้อ\"", "statBuyRec", "จาก Make-or-Buy")}${t("ไลน์ที่ขาดกำลังคน", "statLaborGap", "จาก Resource Management")}${t("เครื่องจักรที่ต้องซ่อมบำรุง", "statMachineIssue", "จาก Resource Management")}</div>`;
   },
   about() {
-    return `<p>Y2J ONE เชื่อมงานทุกฝ่ายของโรงงานไว้ในที่เดียว: คำสั่งซื้อ → วางแผน → ใบสั่งผลิต → BOM หลายระดับ → เบิกวัสดุ/คลัง → จัดซื้อ PR→PO → คุณภาพ → ส่งมอบ → บริการหลังการขายและเคลม พร้อมสิทธิ์ตามกลุ่มผู้ใช้ ประวัติการใช้งาน รายงานตามผู้อ่าน และการตรวจความสอดคล้องของข้อมูลข้ามโมดูล</p>`;
+    return `<p>${APP_NAME} เชื่อมงานทุกฝ่ายของโรงงานไว้ในที่เดียว: คำสั่งซื้อ → วางแผน → ใบสั่งผลิต → BOM หลายระดับ → เบิกวัสดุ/คลัง → จัดซื้อ PR→PO → คุณภาพ → ส่งมอบ → บริการหลังการขายและเคลม พร้อมสิทธิ์ตามกลุ่มผู้ใช้ ประวัติการใช้งาน รายงานตามผู้อ่าน และการตรวจความสอดคล้องของข้อมูลข้ามโมดูล</p>`;
   },
 };
 

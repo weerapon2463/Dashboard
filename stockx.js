@@ -179,7 +179,7 @@ function sxRenderEntry(p) {
       <label class="sx-wide">หมายเหตุ<input id="sxNote" value="${bxEsc(d.note)}"></label>
     </div>
     ${P.wo ? `<p class="card-sub">รับ "สินค้าสำเร็จรูป ${bxEsc((WORK_ORDERS.find((w) => w.wo === d.wo) || {}).model || "")}" เข้าคลัง และเพิ่มยอดผลิตเสร็จของใบสั่งผลิต · วัตถุดิบถูกตัดคลังไปแล้วตอนจ่ายตามใบเบิก จึงไม่ตัดซ้ำ</p>` : `
-    <div class="table-scroll"><table class="data-table sx-items"><thead><tr><th>รหัสชิ้นส่วน</th><th>ชื่อ</th><th class="num">${P.count ? "ยอดในระบบ" : P.from ? "คงเหลือในคลังต้นทาง" : "คงคลังรวม"}</th><th class="num">${P.count ? "นับได้จริง" : "จำนวน"}</th>${P.count ? `<th class="num">ต่าง</th>` : ""}${d.purpose === "receipt" ? `<th class="num">ราคา/หน่วย (฿)</th>` : ""}<th></th></tr></thead>
+    <div class="table-scroll"><table class="data-table sx-items"><thead><tr><th>รหัสชิ้นส่วน</th><th>ชื่อ</th><th class="num">${P.count ? "ยอดในระบบ" : P.from ? "คงเหลือในคลังต้นทาง" : "คงคลังรวม"}</th><th class="num">${P.count ? "นับได้จริง" : "จำนวน"}</th>${P.count ? `<th class="num">ต่าง</th>` : ""}${d.purpose === "receipt" && authCanSeeCost() ? `<th class="num">ราคา/หน่วย (฿)</th>` : ""}<th></th></tr></thead>
       <tbody>${d.items.map((it, i) => {
         const cur = P.count ? sxBal(it.key, d.to) : P.from ? sxBal(it.key, d.from) : bxNum((bxStock(it.key) || {}).qty);
         const diff = P.count && it.qty !== "" ? bxNum(it.qty) - cur : null;
@@ -187,7 +187,7 @@ function sxRenderEntry(p) {
           <td>${it.key ? bxEsc(sxPartName(it.key)) : ""}</td><td class="num">${it.key ? bxFmt(cur) : ""}</td>
           <td class="num"><input class="bom-inline sx-qty" type="number" step="any" data-i="${i}" value="${bxEsc(it.qty)}"></td>
           ${P.count ? `<td class="num">${diff === null ? "" : `<span class="${diff < 0 ? "bx-neg" : ""}">${diff > 0 ? "+" : ""}${bxFmt(diff)}</span>`}</td>` : ""}
-          ${d.purpose === "receipt" ? `<td class="num"><input class="bom-inline sx-rate" type="number" min="0" step="any" data-i="${i}" value="${bxEsc(it.rate || "")}" placeholder="${it.key ? bxEsc(sxR2(sxRate(it.key)) || "") : ""}"></td>` : ""}
+          ${d.purpose === "receipt" && authCanSeeCost() ? `<td class="num"><input class="bom-inline sx-rate" type="number" min="0" step="any" data-i="${i}" value="${bxEsc(it.rate || "")}" placeholder="${it.key ? bxEsc(sxR2(sxRate(it.key)) || "") : ""}"></td>` : ""}
           <td><button type="button" class="btn-link sx-del" data-i="${i}" aria-label="ลบแถว">✕</button></td></tr>`;
       }).join("")}</tbody></table></div>
     <datalist id="sxPartList">${bxAllParts().map((x) => `<option value="${bxEsc(x.key)}">${bxEsc(x.line.part)}</option>`).join("")}</datalist>
@@ -336,10 +336,10 @@ function sxRenderLedger(p) {
     <div class="card-body table-scroll">
       <div class="filter-row"><label for="sxLq">ค้นหา:</label><input id="sxLq" class="wo-search" placeholder="รหัส / เลขเอกสาร / ผู้บันทึก" value="${bxEsc(sxLedgerQ)}">
         <label for="sxLw">คลัง:</label><select id="sxLw"><option value="">ทุกคลัง</option>${sxWhOptions(sxLedgerWh)}</select></div>
-      ${shown.length ? `<table class="data-table"><thead><tr><th>เวลา</th><th>รหัส</th><th>ชื่อ</th><th>คลัง</th><th class="num">เข้า</th><th class="num">ออก</th><th class="num">คงเหลือ</th><th class="num">มูลค่า</th><th>เอกสาร</th><th>ประเภท</th><th>โดย</th></tr></thead><tbody>${shown.slice(0, 300).map((e) => `<tr>
+      ${shown.length ? `<table class="data-table"><thead><tr><th>เวลา</th><th>รหัส</th><th>ชื่อ</th><th>คลัง</th><th class="num">เข้า</th><th class="num">ออก</th><th class="num">คงเหลือ</th>${authCanSeeCost() ? `<th class="num">มูลค่า</th>` : ""}<th>เอกสาร</th><th>ประเภท</th><th>โดย</th></tr></thead><tbody>${shown.slice(0, 300).map((e) => `<tr>
         <td>${bxEsc(String(e.at).slice(0, 16).replace("T", " "))}</td><td class="mono-cell">${bxEsc(e.key)}</td><td>${bxEsc(sxPartName(e.key))}</td><td>${bxEsc(e.wh)}</td>
         <td class="num">${e.qty > 0 ? bxFmt(e.qty) : ""}</td><td class="num">${e.qty < 0 ? `<span class="bx-neg">${bxFmt(-e.qty)}</span>` : ""}</td>
-        <td class="num">${bxFmt(e.bal)}</td><td class="num">${e.rate ? `<span class="${e.qty < 0 ? "bx-neg" : ""}">${sxBaht(e.qty * e.rate)}</span>` : "—"}</td><td class="mono-cell">${bxEsc(e.v)}</td><td>${bxEsc(e.kind || e.vt)}${e.note ? `<div class="muted-inline">${bxEsc(e.note)}</div>` : ""}</td><td>${bxEsc(e.by)}</td></tr>`).join("")}</tbody></table>
+        <td class="num">${bxFmt(e.bal)}</td>${authCanSeeCost() ? `<td class="num">${e.rate ? `<span class="${e.qty < 0 ? "bx-neg" : ""}">${sxBaht(e.qty * e.rate)}</span>` : "—"}</td>` : ""}<td class="mono-cell">${bxEsc(e.v)}</td><td>${bxEsc(e.kind || e.vt)}${e.note ? `<div class="muted-inline">${bxEsc(e.note)}</div>` : ""}</td><td>${bxEsc(e.by)}</td></tr>`).join("")}</tbody></table>
         ${shown.length > 300 ? `<p class="muted-inline">แสดง 300 จาก ${shown.length} รายการ — ค้นหาให้แคบลง</p>` : ""}` : `<p class="muted-inline">ไม่มีรายการ</p>`}
     </div></div>`;
   const inp = document.getElementById("sxLq");
@@ -356,11 +356,11 @@ function sxRenderWh(p) {
   Object.keys(BX_STOCK).forEach((k) => { const w = BX_STOCK[k].wh || {}; const r = bxNum(BX_STOCK[k].rate); Object.keys(w).forEach((id) => { const s = sum[id] = sum[id] || { items: 0, qty: 0, val: 0 }; if (w[id]) { s.items++; s.qty += w[id]; s.val += w[id] * r; } }); });
   p.innerHTML = `<div class="card"><div class="card-header"><h3>คลังสินค้า (Warehouse)</h3>
       <p class="card-sub">แยกยอดตามคลัง เช่น คลังหลัก งานระหว่างผลิต สินค้าสำเร็จรูป · มูลค่าคิดแบบถัวเฉลี่ยเคลื่อนที่ (Moving Average) จากราคาตอนรับเข้า ถ้าไม่มีใช้ราคาจากคลังชิ้นส่วน R&D</p></div>
-    <div class="card-body table-scroll"><table class="data-table"><thead><tr><th>รหัสคลัง</th><th>ชื่อคลัง</th><th class="num">จำนวนรายการ</th><th class="num">จำนวนรวม</th><th class="num">มูลค่า (ถัวเฉลี่ย)</th></tr></thead><tbody>
+    <div class="card-body table-scroll"><table class="data-table"><thead><tr><th>รหัสคลัง</th><th>ชื่อคลัง</th><th class="num">จำนวนรายการ</th><th class="num">จำนวนรวม</th>${authCanSeeCost() ? `<th class="num">มูลค่า (ถัวเฉลี่ย)</th>` : ""}</tr></thead><tbody>
       ${whs.map((w, i) => `<tr><td class="mono-cell">${bxEsc(w.id)}</td><td>${can ? `<input class="bom-inline sx-whname" data-i="${i}" value="${bxEsc(w.name)}">` : bxEsc(w.name)}</td>
-        <td class="num">${(sum[w.id] || {}).items || 0}</td><td class="num">${bxFmt((sum[w.id] || {}).qty || 0)}</td><td class="num">${sxBaht((sum[w.id] || {}).val || 0)}</td></tr>`).join("")}
-      ${Object.keys(sum).filter((id) => !whs.some((w) => w.id === id)).map((id) => `<tr><td class="mono-cell">${bxEsc(id)}</td><td class="muted-inline">(ไม่อยู่ในรายชื่อคลัง)</td><td class="num">${sum[id].items}</td><td class="num">${bxFmt(sum[id].qty)}</td><td class="num">${sxBaht(sum[id].val)}</td></tr>`).join("")}
-      <tr><th colspan="4">มูลค่าคงคลังรวม</th><th class="num">${sxBaht(sxStockValue())}</th></tr>
+        <td class="num">${(sum[w.id] || {}).items || 0}</td><td class="num">${bxFmt((sum[w.id] || {}).qty || 0)}</td>${authCanSeeCost() ? `<td class="num">${sxBaht((sum[w.id] || {}).val || 0)}</td>` : ""}</tr>`).join("")}
+      ${Object.keys(sum).filter((id) => !whs.some((w) => w.id === id)).map((id) => `<tr><td class="mono-cell">${bxEsc(id)}</td><td class="muted-inline">(ไม่อยู่ในรายชื่อคลัง)</td><td class="num">${sum[id].items}</td><td class="num">${bxFmt(sum[id].qty)}</td>${authCanSeeCost() ? `<td class="num">${sxBaht(sum[id].val)}</td>` : ""}</tr>`).join("")}
+      ${authCanSeeCost() ? `<tr><th colspan="4">มูลค่าคงคลังรวม</th><th class="num">${sxBaht(sxStockValue())}</th></tr>` : ""}
     </tbody></table>
     ${can ? `<div class="filter-row"><input id="sxWhId" class="wo-search" placeholder="รหัสคลัง เช่น L1" maxlength="12"><input id="sxWhName" class="wo-search" placeholder="ชื่อคลัง"><button type="button" class="btn-secondary" id="sxWhAdd">+ เพิ่มคลัง</button></div>` : ""}
     </div></div>`;

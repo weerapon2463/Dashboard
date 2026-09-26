@@ -17,6 +17,57 @@ let tvWake = null;
 const TV_SLIDE_MS = 20000;
 const TV_STATIONS_FALLBACK = ["CUT", "WELD", "MC", "PAINT", "ASSY", "QC"];
 
+// ---- simulation: a moving copy of the work orders so the board can be demonstrated live (never saved) ----
+let tvSim = false;
+let tvSimWOs = null;
+let tvSimTimer = null;
+function tvWOs() { return tvSim && tvSimWOs ? tvSimWOs : (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []); }
+function tvSimToggle(on) {
+  tvSim = on;
+  clearInterval(tvSimTimer);
+  if (on) {
+    tvSimWOs = JSON.parse(JSON.stringify(typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []));
+    tvSimTimer = setInterval(() => { tvSimStep(); tvRender(); }, 6000);
+    tvSimStep();
+  } else tvSimWOs = null;
+  tvRender();
+}
+function tvSimStep() {
+  const now = Date.now();
+  const iso = (t) => new Date(t).toISOString();
+  const reasons = ["รอวัสดุ / ชิ้นส่วนไม่ครบ", "รอ QC ตรวจ", "เครื่องจักรเสีย", "ตั้งเครื่องนาน (Set up)", "พักเบรก / เปลี่ยนกะ"];
+  const pick = (a) => a[Math.floor(Math.random() * a.length)];
+  const live = tvSimWOs.filter((w) => w.status !== "เสร็จสมบูรณ์" && (w.jobs || []).length);
+  live.forEach((w) => w.jobs.forEach((j) => {
+    const open = (j.logs || []).find((l) => !l.to);
+    if (j.status === "wip" && open) open.from = iso(Date.parse(open.from) - (15 + Math.random() * 25) * 60000); // time passes faster
+  }));
+  const wip = live.flatMap((w) => w.jobs.filter((j) => j.status === "wip").map((j) => ({ w, j })));
+  const hold = live.flatMap((w) => w.jobs.filter((j) => j.status === "hold").map((j) => ({ w, j })));
+  const r = Math.random();
+  if (wip.length && r < 0.3) { // finish a step and start the next one
+    const { w, j } = pick(wip);
+    const open = j.logs.find((l) => !l.to); if (open) open.to = iso(now);
+    j.status = "done"; j.doneAt = iso(now); j.qtyDone = 1;
+    const next = w.jobs.find((x) => x.status === "open");
+    if (next) { next.status = "wip"; next.logs = [{ from: iso(now), by: next.assignee }]; }
+    else { w.status = "เสร็จสมบูรณ์"; w.produced = 1; }
+  } else if (wip.length && r < 0.42) { // a stop
+    const { j } = pick(wip);
+    const open = j.logs.find((l) => !l.to); if (open) open.to = iso(now);
+    j.downs = (j.downs || []).concat({ from: iso(now), reason: pick(reasons), by: j.assignee });
+    j.status = "hold";
+  } else if (hold.length && r < 0.7) { // back to work
+    const { j } = pick(hold);
+    const d = (j.downs || []).find((x) => !x.to); if (d) d.to = iso(now - 5 * 60000);
+    j.logs = (j.logs || []).concat({ from: iso(now - 5 * 60000), by: j.assignee });
+    j.status = "wip";
+  } else { // a waiting order starts its first step
+    const w = live.find((x) => !x.jobs.some((j) => j.status !== "open"));
+    if (w) { w.jobs[0].status = "wip"; w.jobs[0].logs = [{ from: iso(now), by: w.jobs[0].assignee }]; }
+  }
+}
+
 function tvEsc(v) { return escapeHtml(v === undefined || v === null ? "" : String(v)); }
 function tvN(v) { return Number(v) || 0; }
 function tvBaht(n) {
@@ -27,9 +78,9 @@ function tvBaht(n) {
 function tvCanExec() {
   const u = typeof authCurrentUser === "function" ? authCurrentUser() : null;
   if (!u) return false;
-  return ["admin", "plant", "group", "depthead"].includes(u.role) || (typeof authHasAbility === "function" && authHasAbility("reports"));
+  return typeof authCanSeeMgmtCost === "function" ? authCanSeeMgmtCost(u) : ["admin", "plant", "group"].includes(u.role);
 }
-function tvOpenWos() { return (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []).filter((w) => w.status !== "เสร็จสมบูรณ์"); }
+function tvOpenWos() { return tvWOs().filter((w) => w.status !== "เสร็จสมบูรณ์"); }
 function tvDaysLeft(w) {
   if (typeof ovDue !== "function" || typeof bxDaysBetween !== "function") return null;
   const d = ovDue(w.dueDate);
@@ -37,7 +88,7 @@ function tvDaysLeft(w) {
 }
 function tvDownIn(fromMs) {
   const by = {};
-  (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []).forEach((w) => (w.jobs || []).forEach((j) => (j.downs || []).forEach((d) => {
+  tvWOs().forEach((w) => (w.jobs || []).forEach((j) => (j.downs || []).forEach((d) => {
     const a = Math.max(fromMs, Date.parse(d.from));
     const b = d.to ? Date.parse(d.to) : Date.now();
     if (b > a) by[d.reason] = (by[d.reason] || 0) + (b - a) / 60000;
@@ -67,6 +118,7 @@ function tvEnter(mode) {
 
 function tvLeave() {
   clearInterval(tvTimer); clearInterval(tvTick);
+  clearInterval(tvSimTimer); tvSim = false; tvSimWOs = null;
   tvTimer = tvTick = null;
   tvMode = "";
   const root = document.getElementById("tvRoot");
@@ -90,22 +142,25 @@ function tvRender() {
   if (!root || !tvMode) return;
   const slides = tvMode === "exec" ? [["ภาพรวมวันนี้", tvExecKpi], ["ต้นทุน & เวลาหยุด", tvExecCost]] : [["สถานีงานตอนนี้", tvFloorStations], ["ความคืบหน้าใบสั่งผลิต", tvFloorOrders]];
   const i = tvSlide % slides.length;
-  const co = typeof orgCurrent === "function" && orgCurrent() ? orgCurrent().name : "Y2J ONE";
+  const co = typeof orgCurrent === "function" && orgCurrent() ? orgCurrent().name : APP_NAME;
   let body = "";
   try { body = slides[i][1](); } catch (e) { body = `<p class="tv-empty">แสดงหน้านี้ไม่ได้ (${tvEsc(e.message)})</p>`; }
   root.innerHTML = `
     <div class="tv-frame tv-${tvMode}">
       <header class="tv-head">
-        <div class="tv-brand"><span class="tv-mark">Y2J</span><div><div class="tv-co">${tvEsc(co)}</div><div class="tv-kind">${tvMode === "exec" ? "จอผู้บริหาร" : "จอหน้างาน"} · ${tvEsc(slides[i][0])}</div></div></div>
+        <div class="tv-brand"><span class="tv-mark">${tvEsc(typeof orgCurrent === "function" && orgCurrent() ? (orgCurrent().short || APP_NAME) : APP_NAME)}</span><div><div class="tv-co">${tvEsc(co)}</div><div class="tv-kind">${tvMode === "exec" ? "จอผู้บริหาร" : "จอหน้างาน"} · ${tvEsc(slides[i][0])}</div></div></div>
         <div class="tv-dots">${slides.map((s, k) => `<button type="button" class="tv-dot${k === i ? " on" : ""}" data-tvslide="${k}" aria-label="${tvEsc(s[0])}"></button>`).join("")}</div>
         <div class="tv-right"><div class="tv-clock" id="tvClock">${tvClock()}</div>
           <select class="tv-switch" id="tvSwitch" aria-label="เลือกจอ"><option value="floor"${tvMode === "floor" ? " selected" : ""}>จอหน้างาน</option>${tvCanExec() ? `<option value="exec"${tvMode === "exec" ? " selected" : ""}>จอผู้บริหาร</option>` : ""}</select>
+          <button type="button" class="tv-simbtn${tvSim ? " on" : ""}" id="tvSimBtn" title="จำลองการทำงาน — ข้อมูลขยับเองเพื่อสาธิต ไม่บันทึกลงระบบ">${tvSim ? "■ หยุดจำลอง" : "▶ จำลองการทำงาน"}</button>
           <button type="button" class="tv-exit" id="tvExit" aria-label="ออกจากโหมดทีวี">✕</button></div>
       </header>
+      ${tvSim ? `<div class="tv-simbar">โหมดจำลองการทำงาน — ข้อมูลขยับเองทุก 6 วินาทีเพื่อสาธิต ไม่บันทึกลงระบบ</div>` : ""}
       <main class="tv-body">${body}</main>
       <div class="tv-progress" style="animation-duration:${TV_SLIDE_MS}ms"></div>
     </div>`;
   document.getElementById("tvExit").addEventListener("click", tvLeave);
+  document.getElementById("tvSimBtn").addEventListener("click", () => tvSimToggle(!tvSim));
   document.getElementById("tvSwitch").addEventListener("change", (e) => tvEnter(e.target.value));
   root.querySelectorAll("[data-tvslide]").forEach((b) => b.addEventListener("click", () => { tvSlide = +b.dataset.tvslide; clearInterval(tvTimer); tvTimer = setInterval(() => { tvSlide++; tvRender(); }, TV_SLIDE_MS); tvRender(); }));
 }
@@ -175,7 +230,7 @@ function tvExecKpi() {
   const monthStart = new Date(); monthStart.setDate(1); monthStart.setHours(0, 0, 0, 0);
   const fg = (typeof SX_ENTRIES !== "undefined" ? SX_ENTRIES : []).filter((e) => e.purpose === "manufacture" && e.status !== "ยกเลิก" && Date.parse(e.at) >= monthStart.getTime()).reduce((s, e) => s + tvN(e.items[0] && e.items[0].qty), 0);
   let plan = 0, act = 0;
-  (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []).forEach((w) => (w.jobs || []).forEach((j) => { if (j.status === "done" && j.planMins) { plan += j.planMins; act += jcMinutes(j); } }));
+  tvWOs().forEach((w) => (w.jobs || []).forEach((j) => { if (j.status === "done" && j.planMins) { plan += j.planMins; act += jcMinutes(j); } }));
   const eff = act ? Math.round(plan / act * 100) : null;
   const down7 = Object.values(tvDownIn(Date.now() - 7 * 86400000)).reduce((s, v) => s + v, 0);
   const tile = (label, value, note, tone) => `<div class="tv-kpi${tone ? ` tv-kpi-${tone}` : ""}"><div class="tv-kpi-l">${label}</div><div class="tv-kpi-v">${value}</div><div class="tv-kpi-n">${note}</div></div>`;
@@ -194,7 +249,7 @@ function tvExecKpi() {
 /* ---- exec: cost sheet + downtime causes ----------------------------------------------------- */
 
 function tvExecCost() {
-  const wos = (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []).filter((w) => (w.jobs || []).length).slice(0, 8);
+  const wos = tvWOs().filter((w) => (w.jobs || []).length).slice(0, 8);
   const down = tvDownIn(Date.now() - 30 * 86400000);
   const reasons = Object.keys(down).sort((a, b) => down[b] - down[a]).slice(0, 6);
   const max = Math.max(1, ...reasons.map((r) => down[r]));
@@ -233,6 +288,6 @@ function initTv() {
   });
   try {
     const m = new URLSearchParams(location.search).get("tv");
-    if (m === "floor" || m === "exec") tvEnter(m);
+    if (m === "floor" || m === "exec") { tvEnter(m); if (new URLSearchParams(location.search).get("sim") === "1") tvSimToggle(true); }
   } catch (e) { /* ignore */ }
 }

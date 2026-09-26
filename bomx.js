@@ -415,7 +415,7 @@ function renderBxStats() {
     tile("ใบเบิกรออนุมัติ", s.waitApprove, "รอหัวหน้าแผนกผู้เบิก", s.waitApprove ? "warn" : ""),
     tile("ใบเบิกรอคลังจ่าย", s.waitIssue, `${s.lines} รายการค้างจ่าย`, s.waitIssue ? "warn" : ""),
     tile("ของไม่พอจ่าย", s.short.length, "คงคลังน้อยกว่ายอดค้างจ่าย", s.short.length ? "bad" : ""),
-    ...(typeof sxStockValue === "function" ? [tile("มูลค่าคงคลัง", sxBaht(sxStockValue()), "ถัวเฉลี่ยเคลื่อนที่ · แยกคลังที่แท็บเคลื่อนไหวคลัง")] : []),
+    ...(typeof sxStockValue === "function" && authCanSeeCost() ? [tile("มูลค่าคงคลัง", sxBaht(sxStockValue()), "ถัวเฉลี่ยเคลื่อนที่ · แยกคลังที่แท็บเคลื่อนไหวคลัง")] : []),
     tile("ใบสั่งผลิตที่ยังเบิกไม่ครบ", woIncomplete, `จาก ${woOpen.length} ใบที่ยังไม่เสร็จ`),
     tile("งานบริการที่ใช้อะไหล่", s.reqs.filter((d) => /^SV-/.test(d.wo || "") && BX_OPEN_REQ.includes(d.status)).length, "ใบเบิกอะไหล่ที่ยังไม่ปิด"),
   ].join("");

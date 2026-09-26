@@ -49,7 +49,22 @@ const GROUP_ABILITIES = [
   ["issue", "จ่ายของตามใบเบิก (คลัง)"],
   ["stock", "ปรับยอดคงคลัง / ตั้งสิทธิ์การเบิก"],
   ["reports", "ดูรายงานกิจกรรมทั้งระบบ"],
+  ["cost", "ดูต้นทุน / มูลค่า / ราคา (ข้อมูลลับ)"],
 ];
+// Documents that carry prices, customers or supplier ratings: other departments' heads do not see them by default
+const SENSITIVE_DOC_TYPES = ["so", "rfq", "sev"];
+// Cost, stock value, prices, hour rates, the management TV board: managers and groups granted "cost"
+function authCanSeeCost(user) {
+  const u = user || AUTH_USER;
+  if (!u) return true;
+  return ["admin", "plant", "group"].includes(u.role) || authHasAbility("cost", u);
+}
+// Management cost view (unit cost per machine, cost vs plan, management TV): managers, or "cost" + "reports" together
+function authCanSeeMgmtCost(user) {
+  const u = user || AUTH_USER;
+  if (!u) return true;
+  return ["admin", "plant", "group"].includes(u.role) || (authHasAbility("cost", u) && authHasAbility("reports", u));
+}
 
 // Starting groups — admin can rename, change or delete them (Admin › กลุ่มผู้ใช้)
 function authDefaultGroups() {
@@ -59,8 +74,8 @@ function authDefaultGroups() {
     { id: "g-lead", name: "หัวหน้างาน / ผู้อนุมัติเบิก", desc: "อนุมัติใบเบิก สั่งเบิกแทนและมอบหมายช่างรับของ", modules: ["bomx", "workorder", "reports"], docPerms: { mreq: "manage", dpr: "manage" }, abilities: ["request", "approve"], members: ["prod"] },
     { id: "g-store", name: "คลังสินค้า", desc: "จ่ายของตามใบเบิก รับของเข้าคลัง ปรับยอดคงคลัง", modules: ["bomx", "workorder", "p2p"], docPerms: { grn: "manage", stk: "manage", mreq: "create" }, abilities: ["issue", "stock"], members: ["store"] },
     { id: "g-svc", name: "ช่างบริการหลังการขาย", desc: "เปิด/อัปเดตงานบริการ เบิกอะไหล่ตาม BOM ของเครื่องลูกค้า", modules: ["service", "bomx"], docPerms: { svc: "manage", mc: "create", cc: "create", mreq: "create" }, abilities: ["request"], members: ["svc1"] },
-    { id: "g-pur", name: "จัดซื้อ", desc: "PR → PO → ผู้ขาย และของที่ต้องสั่งเพิ่ม", modules: ["p2p", "procurement", "bomx", "reports"], docPerms: { rfq: "manage", sev: "manage", mrq: "view" }, abilities: [], members: ["pur"] },
-    { id: "g-exec", name: "ผู้บริหาร / ผู้ดูรายงาน", desc: "ดูภาพรวม รายงาน และกิจกรรมทั้งระบบ", modules: ["overview", "pilot", "reports", "bomx", "service", "p2p"], docPerms: {}, abilities: ["reports"], members: ["exec", "plant"] },
+    { id: "g-pur", name: "จัดซื้อ", desc: "PR → PO → ผู้ขาย และของที่ต้องสั่งเพิ่ม", modules: ["p2p", "procurement", "bomx", "reports"], docPerms: { rfq: "manage", sev: "manage", mrq: "view" }, abilities: ["cost"], members: ["pur"] },
+    { id: "g-exec", name: "ผู้บริหาร / ผู้ดูรายงาน", desc: "ดูภาพรวม รายงาน และกิจกรรมทั้งระบบ", modules: ["overview", "pilot", "reports", "bomx", "service", "p2p"], docPerms: {}, abilities: ["reports", "cost"], members: ["exec", "plant"] },
   ];
 }
 
@@ -136,6 +151,12 @@ function authLoad() {
         seen.push(g.id);
         migrated = true;
       });
+      // one-time: "cost" (prices / stock value / unit cost) is split from general viewing — give it to executives and purchasing
+      if (!AUTH.costAbility) {
+        (AUTH.groups || []).forEach((g) => { if ((g.id === "g-exec" || g.id === "g-pur") && !(g.abilities || []).includes("cost")) g.abilities = (g.abilities || []).concat("cost"); });
+        AUTH.costAbility = true;
+        migrated = true;
+      }
       if (migrated) authSave();
       return;
     }
@@ -232,6 +253,7 @@ function roleDefaultDocPerm(user, type) {
   const own = !!ownDept && ownDept.docTypes.includes(type);
   if (role === "depthead") {
     if (own) return "manage";
+    if (SENSITIVE_DOC_TYPES.includes(type)) return "none";
     return CROSS_CREATE_TYPES.includes(type) ? "create" : "view";
   }
   // operator

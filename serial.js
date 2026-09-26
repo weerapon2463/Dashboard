@@ -105,7 +105,7 @@ function snOpenHistory(key) {
     <div class="sn-head">
       <div><div class="sn-serial">${snEsc(h.serial)}</div>
         <div class="muted-inline">${w ? `${snEsc(w.wo)} · ${snEsc(w.model)} · ${snEsc(w.status)}` : snEsc(h.mc.model)}${h.mc ? ` · ทะเบียน ${snEsc(h.mc.no)}${h.mc.customer ? ` · ${snEsc(h.mc.customer)}` : ""}` : ""}</div>
-        ${cost ? `<div class="sn-cost">ต้นทุนถึงตอนนี้ <b>${jcBaht(cost.total)}</b> (ค่าดำเนินการ ${jcBaht(cost.actOp)} · วัสดุ ${jcBaht(cost.mat)})</div>` : ""}</div>
+        ${cost && authCanSeeMgmtCost() ? `<div class="sn-cost">ต้นทุนถึงตอนนี้ <b>${jcBaht(cost.total)}</b> (ค่าดำเนินการ ${jcBaht(cost.actOp)} · วัสดุ ${jcBaht(cost.mat)})</div>` : ""}</div>
       <div class="sn-qr" id="snQr"></div>
     </div>
     <div class="sn-actions"><button type="button" class="btn-secondary" id="snPrint">🏷 พิมพ์ป้าย QR ติดรถ</button>${w ? ` <button type="button" class="btn-secondary" id="snGoJc">🛠 เปิด Job Card</button>` : ""}</div>

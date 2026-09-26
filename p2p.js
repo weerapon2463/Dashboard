@@ -442,7 +442,7 @@ function openP2PCase(id) {
       <div class="paper-row"><div class="paper-label">ผู้ขอ / แผนก</div><div class="paper-value">${escapeHtml(c.requester)}</div></div>
       <div class="paper-row"><div class="paper-label">ใช้กับงาน</div><div class="paper-value">${escapeHtml(c.wo || "—")}</div></div>
       <div class="paper-row"><div class="paper-label">ผู้ขาย</div><div class="paper-value">${escapeHtml(c.supplier || "—")}</div></div>
-      <div class="paper-row"><div class="paper-label">เลขที่ PO / มูลค่า</div><div class="paper-value">${escapeHtml(c.po || "—")}${c.value ? ` · ${Number(c.value).toLocaleString("th-TH")} บาท` : ""}</div></div>
+      <div class="paper-row"><div class="paper-label">เลขที่ PO / มูลค่า</div><div class="paper-value">${escapeHtml(c.po || "—")}${c.value && authCanSeeCost() ? ` · ${Number(c.value).toLocaleString("th-TH")} บาท` : ""}</div></div>
       <div class="paper-row"><div class="paper-label">วันที่ต้องใช้</div><div class="paper-value">${p2pDate(c.needBy)}</div></div>
       <div class="paper-row"><div class="paper-label">ผู้ขายนัดส่ง</div><div class="paper-value">${p2pDate(p2pPromised(c))}</div></div>
       <div class="paper-row paper-row-wide"><div class="paper-label">ตอนนี้อยู่ที่</div><div class="paper-value"><strong>${cur ? `${escapeHtml(cur.label)} — ${escapeHtml(p2pHolder(c))}` : meta.label}</strong>${cur ? ` · รอมาแล้ว ${p2pWaitDays(c)} วัน · กำหนด ${p2pDate(p2pDeadline(c, cur))}` : ""}</div></div>

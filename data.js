@@ -108,6 +108,10 @@ function capacityStatus(utilPct) {
 // week offsets from project start, per production order, per phase.
 // Spans a 24-week (~6 month) production outlook with multiple concurrent
 // batches for the higher-demand models (YT3000, YT6500).
+// Product name — the company name and logo come from each company's settings (org.js)
+const APP_NAME = "FORGE";
+const APP_TAGLINE = "ระบบบริหารโรงงานครบวงจร";
+
 const SCHEDULE_PHASES = ["ออกแบบ", "จัดซื้อ", "ประกอบ", "ทดสอบ", "ส่งมอบ"];
 const PHASE_COLORS = {
   "ออกแบบ": "var(--series-7)",

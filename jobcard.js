@@ -223,7 +223,7 @@ function renderJobCards() {
           <td class="num"><span class="${j.planMins && jcMinutes(j) > j.planMins ? "bx-neg" : ""}">${(j.logs || []).length ? jcFmtMins(jcMinutes(j)) : "—"}</span><div class="muted-inline">แผน ${j.planMins ? jcFmtMins(j.planMins) : "—"}${dm ? ` · หยุด ${jcFmtMins(dm)}` : ""}</div></td>
           <td>${jcPill(j.status)}${openDown ? `<div class="muted-inline">${jcEsc(openDown.reason)}</div>` : ""}</td><td class="jc-btns">${jcButtons(wo, i, false)}</td></tr>`;
       }).join("")}</tbody></table></div>
-      ${jcCostHtml(wo, c)}
+      ${authCanSeeMgmtCost() ? jcCostHtml(wo, c) : jcDownOnlyHtml(c)}
       ${done === jobs.length && jcNum(wo.produced) < jcNum(wo.qty) && typeof renderSxTab === "function" ? `<p><button type="button" class="btn-primary" id="jcToStock">ทุกขั้นตอนเสร็จ — บันทึกผลิตเสร็จเข้าคลังสินค้าสำเร็จรูป →</button></p>` : ""}`;
   }
 
@@ -234,7 +234,7 @@ function renderJobCards() {
     ${mineHtml}
     ${body}
     ${wo ? jcRoutingEditor(wo.model) : ""}
-    ${jcWsEditor()}`;
+    ${authCanSeeMgmtCost() ? jcWsEditor() : ""}`;
   jcWire(el, wo);
 }
 
@@ -254,6 +254,13 @@ function jcCostHtml(wo, c) {
     <div><div class="vis-group-title">เวลาหยุดตามสาเหตุ (Downtime)</div>
       ${downRows.length ? `<table class="data-table"><tbody>${downRows.map((r) => `<tr><td>${jcEsc(r)}</td><td class="num">${jcFmtMins(c.down[r])}</td></tr>`).join("")}</tbody></table>` : `<p class="muted-inline">ยังไม่มีการหยุดงาน</p>`}</div>
   </div>`;
+}
+
+// people without the cost right still see where time was lost
+function jcDownOnlyHtml(c) {
+  const downRows = Object.keys(c.down).sort((a, b) => c.down[b] - c.down[a]);
+  return `<div class="jc-cost"><div><div class="vis-group-title">เวลาหยุดตามสาเหตุ (Downtime)</div>
+    ${downRows.length ? `<table class="data-table"><tbody>${downRows.map((r) => `<tr><td>${jcEsc(r)}</td><td class="num">${jcFmtMins(c.down[r])}</td></tr>`).join("")}</tbody></table>` : `<p class="muted-inline">ยังไม่มีการหยุดงาน</p>`}</div></div>`;
 }
 
 function jcRoutingEditor(model) {

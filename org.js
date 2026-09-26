@@ -85,7 +85,7 @@ function applyBranding() {
   document.querySelectorAll(".footer-sub").forEach((el) => { el.textContent = c.name; });
   const sub = document.querySelector(".sidebar .brand-sub");
   if (sub) sub.textContent = c.name;
-  document.title = `Y2J ONE | ${c.short || c.name}`;
+  document.title = `${typeof APP_NAME !== "undefined" ? APP_NAME : "FORGE"} | ${c.short || c.name}`;
 }
 
 function renderCompanySwitcher() {

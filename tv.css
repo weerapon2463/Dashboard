@@ -102,3 +102,7 @@ html.tv-on, html.tv-on body { overflow: hidden; }
 }
 .tv-decide .ov-decide { zoom: 1.45; }
 .tv-decide .ov-decide-sum { font-size: 1.05em; }
+
+.tv-simbtn { background: #1a1d21; color: #f2a60d; border: 1px solid #f2a60d; border-radius: 8px; padding: 0.3em 0.7em; font: inherit; font-size: 0.8em; cursor: pointer; }
+.tv-simbtn.on { background: #f2a60d; color: #1a1204; }
+.tv-simbar { background: repeating-linear-gradient(-45deg, rgba(242,166,13,0.18) 0 12px, rgba(242,166,13,0.08) 12px 24px); color: #ffd166; border-radius: 8px; padding: 0.3em 0.8em; margin-bottom: 0.6em; font-size: 0.85em; }
