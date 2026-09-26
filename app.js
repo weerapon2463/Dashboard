@@ -328,6 +328,7 @@ function appStart() {
   if (hasDept && typeof initReports === "function") initReports();
   if (hasDept && typeof initRnd === "function") initRnd();
   if (hasDept && typeof initOverview === "function") initOverview();
+  if (typeof initTv === "function") initTv();
   populateCapacityFilter();
   populateBOMFilter();
   populatePriorityDeptFilter();

@@ -1,0 +1,294 @@
+/* ==========================================================================
+   Y2J ONE — "Industrial Precision" theme layer.
+   Loaded after style.css. Only colours, type, surfaces, spacing rhythm and
+   motion — no layout structure — so removing this file restores the old look.
+   Idea: the drafting table of a machine builder. Warm drawing-paper page with
+   a faint engineering grid, graphite navigation, harvester-amber highlights,
+   squared technical numerals (Chakra Petch) and monospace part codes.
+   ========================================================================== */
+
+:root {
+  --font-body: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", system-ui, sans-serif;
+  --font-display: "Chakra Petch", "IBM Plex Sans Thai", "Leelawadee UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  --surface-page:   #f1efe8;
+  --surface-1:      #f7f5f0;
+  --surface-card:   #fffefb;
+  --text-primary:   #16181c;
+  --text-secondary: #4d4f55;
+  --text-muted:     #85868a;
+  --gridline:       #e3e0d6;
+  --baseline:       #c9c5b8;
+  --border-hairline: rgba(22, 24, 28, 0.10);
+
+  --accent:        #f2a60d;   /* harvester amber */
+  --accent-ink:    #7a4d00;
+  --accent-soft:   rgba(242, 166, 13, 0.14);
+  --brand:         #1d4ed8;   /* Y2J blue, deeper */
+  --brand-soft:    rgba(29, 78, 216, 0.10);
+  --series-1:      #1d4ed8;
+
+  --sidebar-bg: #15181d;
+  --sidebar-fg: #e9e7e1;
+  --sidebar-fg-muted: #9b9a95;
+  --sidebar-active: rgba(242, 166, 13, 0.12);
+
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.7) inset, 0 1px 2px rgba(22, 24, 28, 0.05), 0 8px 24px -12px rgba(22, 24, 28, 0.12);
+  --shadow-lift: 0 2px 4px rgba(22, 24, 28, 0.06), 0 16px 32px -14px rgba(22, 24, 28, 0.22);
+  --grid-line: rgba(29, 78, 216, 0.045);
+  --radius: 14px;
+  --radius-sm: 10px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    --surface-page:   #0f1113;
+    --surface-1:      #171a1d;
+    --surface-card:   #1a1d21;
+    --text-primary:   #f2f1ec;
+    --text-secondary: #bdbbb3;
+    --text-muted:     #86867f;
+    --gridline:       #2a2d31;
+    --baseline:       #3a3d42;
+    --border-hairline: rgba(255, 255, 255, 0.08);
+    --accent-ink:    #ffc24d;
+    --accent-soft:   rgba(242, 166, 13, 0.16);
+    --brand:         #5b8def;
+    --brand-soft:    rgba(91, 141, 239, 0.16);
+    --series-1:      #5b8def;
+    --sidebar-bg: #0b0d0f;
+    --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 28px -16px rgba(0, 0, 0, 0.7);
+    --shadow-lift: 0 18px 36px -16px rgba(0, 0, 0, 0.8);
+    --grid-line: rgba(255, 255, 255, 0.025);
+  }
+}
+:root[data-theme="dark"] {
+  --surface-page:   #0f1113;
+  --surface-1:      #171a1d;
+  --surface-card:   #1a1d21;
+  --text-primary:   #f2f1ec;
+  --text-secondary: #bdbbb3;
+  --text-muted:     #86867f;
+  --gridline:       #2a2d31;
+  --baseline:       #3a3d42;
+  --border-hairline: rgba(255, 255, 255, 0.08);
+  --accent-ink:    #ffc24d;
+  --accent-soft:   rgba(242, 166, 13, 0.16);
+  --brand:         #5b8def;
+  --brand-soft:    rgba(91, 141, 239, 0.16);
+  --series-1:      #5b8def;
+  --sidebar-bg: #0b0d0f;
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 10px 28px -16px rgba(0, 0, 0, 0.7);
+  --shadow-lift: 0 18px 36px -16px rgba(0, 0, 0, 0.8);
+  --grid-line: rgba(255, 255, 255, 0.025);
+}
+
+/* ---- base: paper + engineering grid -------------------------------------------- */
+body {
+  font-family: var(--font-body);
+  background-color: var(--surface-page);
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 24px 24px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button, input, select, textarea { font-family: inherit; }
+::selection { background: var(--accent-soft); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.mono-cell, code, .bx-code { font-family: var(--font-mono); font-size: 0.92em; letter-spacing: -0.01em; }
+
+/* ---- sidebar ------------------------------------------------------------------- */
+.sidebar {
+  background:
+    radial-gradient(120% 60% at 0% 0%, rgba(242, 166, 13, 0.07), transparent 60%),
+    var(--sidebar-bg);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+}
+.brand { border-bottom-color: rgba(255, 255, 255, 0.07); }
+.brand-mark {
+  background: linear-gradient(135deg, var(--accent), #e07b00);
+  color: #1a1204;
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  box-shadow: 0 6px 16px -6px rgba(242, 166, 13, 0.6);
+  clip-path: polygon(0 0, 100% 0, 100% 72%, 72% 100%, 0 100%); /* machined corner */
+}
+.brand-title { font-family: var(--font-display); font-size: 16px; letter-spacing: 0.03em; }
+.nav-item {
+  position: relative;
+  border-radius: 8px;
+  font-size: 13.5px;
+  padding: 10px 12px 10px 16px;
+}
+.nav-item .nav-icon { color: rgba(242, 166, 13, 0.55); }
+.nav-item::before {
+  content: ""; position: absolute; left: 4px; top: 9px; bottom: 9px; width: 3px; border-radius: 3px;
+  background: var(--accent); transform: scaleY(0); transition: transform 0.18s ease;
+}
+.nav-item:hover { background: rgba(255, 255, 255, 0.04); }
+.nav-item.active { background: var(--sidebar-active); color: #fff; }
+.nav-item.active::before { transform: scaleY(1); }
+.nav-item.active .nav-icon { color: var(--accent); }
+
+/* ---- top bar ------------------------------------------------------------------- */
+.topbar-title {
+  font-family: var(--font-display);
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  display: inline-flex; align-items: center; gap: 10px;
+}
+.topbar-title::before {
+  content: ""; width: 10px; height: 22px; border-radius: 2px;
+  background: repeating-linear-gradient(-45deg, var(--accent) 0 4px, #1a1204 4px 7px); /* hazard stripe */
+  opacity: 0.9;
+}
+.data-badge, .theme-toggle { border-radius: 999px; box-shadow: var(--shadow-card); }
+
+/* ---- cards & tiles --------------------------------------------------------------- */
+.card {
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  border-color: var(--border-hairline);
+}
+.card-header { padding: 18px 22px 10px; }
+.card-header h3 {
+  font-family: var(--font-display);
+  font-size: 16.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+.card-sub { line-height: 1.6; }
+.card-body { padding: 8px 22px 22px; }
+
+.stat-tile {
+  position: relative;
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-card);
+  padding: 16px 18px 14px;
+  overflow: hidden;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.stat-tile::after { /* ruler ticks along the top edge */
+  content: ""; position: absolute; left: 0; right: 0; top: 0; height: 5px;
+  background: repeating-linear-gradient(90deg, var(--baseline) 0 1px, transparent 1px 10px);
+  opacity: 0.55;
+}
+.stat-label { font-size: 12.5px; letter-spacing: 0.01em; }
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 32px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.15;
+}
+button.stat-tile:hover, a.stat-tile:hover, .stat-tile[data-go]:hover { transform: translateY(-2px); box-shadow: var(--shadow-lift); }
+
+/* ---- tabs: tool-strip with amber marker ---------------------------------------- */
+.dept-tabs { gap: 6px; }
+.dept-tab {
+  border-radius: 10px;
+  background: var(--surface-card);
+  box-shadow: var(--shadow-card);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.dept-tab:hover { border-color: var(--baseline); color: var(--text-primary); }
+.dept-tab.active {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--surface-card);
+  box-shadow: inset 0 -3px 0 var(--accent), var(--shadow-card);
+}
+.dept-tab.active .dept-tab-count { background: var(--accent); color: #1a1204; }
+
+/* ---- buttons ------------------------------------------------------------------- */
+.btn-primary {
+  background: var(--brand);
+  border-radius: 10px;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.25) inset, 0 6px 14px -8px var(--brand);
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+.btn-primary:active, .btn-secondary:active { transform: translateY(1px); }
+.btn-secondary { border-radius: 10px; transition: border-color 0.15s, background 0.15s; }
+.btn-secondary:hover { border-color: var(--baseline); }
+.btn-link { color: var(--brand); }
+
+/* ---- tables -------------------------------------------------------------------- */
+.data-table th {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--baseline);
+}
+.data-table th:first-child { border-top-left-radius: 8px; }
+.data-table th:last-child { border-top-right-radius: 8px; }
+.data-table td { border-bottom-color: var(--gridline); }
+.data-table tbody tr { transition: background 0.12s; }
+.data-table tbody tr:hover { background: var(--brand-soft); }
+.data-table td.num, .data-table th.num { font-variant-numeric: tabular-nums; }
+
+/* ---- pills --------------------------------------------------------------------- */
+.pill { border-radius: 6px; letter-spacing: 0.01em; padding: 3px 8px; }
+.pill-warning { color: var(--accent-ink); background: var(--accent-soft); }
+
+/* ---- form controls ------------------------------------------------------------- */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea {
+  border-radius: 9px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--brand); }
+
+/* ---- login --------------------------------------------------------------------- */
+.login-card { border-radius: 18px; box-shadow: var(--shadow-lift); }
+.login-title { font-family: var(--font-display); letter-spacing: 0.02em; }
+.login-user { border-radius: 12px; transition: border-color 0.15s, transform 0.15s; }
+.login-user:hover { transform: translateY(-1px); border-color: var(--accent); }
+.login-user.active { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+
+/* ---- job cards / stock (new modules) ------------------------------------------- */
+.jc-op { border-radius: var(--radius); background: var(--surface-card); box-shadow: var(--shadow-card); }
+.jc-op-wip { border-color: var(--accent); background: linear-gradient(180deg, var(--accent-soft), transparent 70%), var(--surface-card); }
+.jc-op-head b { font-family: var(--font-display); font-size: 1.1rem; }
+.jc-wip td { background: var(--accent-soft); }
+.jc-sum b, .jc-cost-t th { font-family: var(--font-display); }
+
+/* ---- motion: cards rise in when a page opens ---------------------------------- */
+@keyframes y2jRise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+.view.active > * { animation: y2jRise 0.38s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.view.active > *:nth-child(2) { animation-delay: 0s; }
+.view.active > *:nth-child(3) { animation-delay: 0s; }
+.view.active > *:nth-child(4) { animation-delay: 0s; }
+.view.active > *:nth-child(n+5) { animation-delay: 0s; }
+@media (prefers-reduced-motion: reduce) {
+  .view.active > * { animation: none; }
+  * { transition: none !important; }
+}
+
+/* ---- touch devices: bigger targets ---------------------------------------------- */
+@media (max-width: 1024px), (pointer: coarse) {
+  .btn-primary, .btn-secondary, .dept-tab { min-height: 42px; }
+  .dept-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .dept-tabs::-webkit-scrollbar { display: none; }
+  .dept-tab { flex: 0 0 auto; }
+  .topbar-title { font-size: 20px; }
+  .stat-value { font-size: 27px; }
+}
+
+/* ---- print stays plain ------------------------------------------------------------ */
+@media print {
+  body { background: #fff !important; }
+  .card, .stat-tile { box-shadow: none !important; }
+  .view.active > * { animation: none !important; }
+}
