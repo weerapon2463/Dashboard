@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=20260927p">
-<link rel="stylesheet" href="theme.css?v=20260927p">
-<link rel="stylesheet" href="tv.css?v=20260927p">
+<link rel="stylesheet" href="style.css?v=20260927r">
+<link rel="stylesheet" href="theme.css?v=20260927r">
+<link rel="stylesheet" href="tv.css?v=20260927r">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -809,12 +809,13 @@
           <div class="card-header card-header-actions">
             <div>
               <h3>Master Schedule — แผนการผลิตรวมทุกรุ่น</h3>
-              <p class="card-sub">มุมมองรายสัปดาห์ ตามขั้นตอน: ออกแบบ → จัดซื้อ → ประกอบ → ทดสอบ → ส่งมอบ</p>
+              <p class="card-sub">ปฏิทินจริง: แผนแต่ละล็อต (ออกแบบ → จัดซื้อ → ประกอบ → ทดสอบ → ส่งมอบ) เทียบกับใบสั่งผลิตจริงรายคันจาก Job Card — กดชื่อคันเพื่อดูประวัติ</p>
             </div>
-            <button id="msAddBtn" class="btn-primary" type="button" hidden>+ เพิ่มโครงการใหม่</button>
+            <button id="msAddBtn" class="btn-primary" type="button" hidden>+ เพิ่มแผนใหม่</button>
           </div>
           <div class="save-status" id="msSaveStatus"></div>
           <div class="card-body">
+            <div class="filter-row ms-controls" id="msControls"></div>
             <div class="gantt-wrap">
               <div id="ganttChart" class="gantt"></div>
             </div>
@@ -1306,36 +1307,17 @@
   </div>
 
   <div class="modal-backdrop" id="msFormBackdrop">
-    <div class="modal">
+    <div class="modal modal-wide">
       <h3 id="msFormTitle">เพิ่มโครงการใหม่</h3>
       <div class="form-field">
         <label for="msFormModel">รุ่น/ล็อตการผลิต</label>
         <input type="text" id="msFormModel" placeholder="เช่น YT3000 (ล็อต 3)">
       </div>
       <div class="form-field">
-        <label for="msFormStart">เริ่มสัปดาห์ที่ (ออกแบบ)</label>
-        <input type="number" id="msFormStart" min="0" max="23" value="0">
+        <label for="msFormStart">วันเริ่มแผน (เลื่อนวันนี้ = เลื่อนทุกขั้นตอนตามกัน)</label>
+        <input type="date" id="msFormStart">
       </div>
-      <div class="form-field">
-        <label for="msFormDurDesign">ระยะเวลา — ออกแบบ (สัปดาห์)</label>
-        <input type="number" id="msFormDurDesign" min="1" value="1">
-      </div>
-      <div class="form-field">
-        <label for="msFormDurProcure">ระยะเวลา — จัดซื้อ (สัปดาห์)</label>
-        <input type="number" id="msFormDurProcure" min="1" value="2">
-      </div>
-      <div class="form-field">
-        <label for="msFormDurAssemble">ระยะเวลา — ประกอบ (สัปดาห์)</label>
-        <input type="number" id="msFormDurAssemble" min="1" value="4">
-      </div>
-      <div class="form-field">
-        <label for="msFormDurTest">ระยะเวลา — ทดสอบ (สัปดาห์)</label>
-        <input type="number" id="msFormDurTest" min="1" value="2">
-      </div>
-      <div class="form-field">
-        <label for="msFormDurDeliver">ระยะเวลา — ส่งมอบ (สัปดาห์)</label>
-        <input type="number" id="msFormDurDeliver" min="1" value="1">
-      </div>
+      <div class="ms-phases" id="msFormPhases"></div>
       <div class="modal-actions">
         <button id="msDeleteBtn" class="btn-secondary" type="button" hidden>ลบโครงการนี้</button>
         <button id="msFormCancelBtn" class="btn-secondary" type="button">ยกเลิก</button>
@@ -1702,46 +1684,46 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260927p"></script>
-  <script src="data.js?v=20260927p"></script>
-  <script src="partcode.js?v=20260927p"></script>
-  <script src="priority-matrix.js?v=20260927p"></script>
-  <script src="capacity-planning.js?v=20260927p"></script>
-  <script src="master-schedule.js?v=20260927p"></script>
-  <script src="make-or-buy.js?v=20260927p"></script>
-  <script src="resource.js?v=20260927p"></script>
-  <script src="procurement.js?v=20260927p"></script>
-  <script src="workorder.js?v=20260927p"></script>
-  <script src="jobcard.js?v=20260927p"></script>
-  <script src="alerts.js?v=20260927p"></script>
-  <script src="overview-charts.js?v=20260927p"></script>
-  <script src="pilot.js?v=20260927p"></script>
-  <script src="pilot-measure.js?v=20260927p"></script>
-  <script src="dept-data.js?v=20260927p"></script>
-  <script src="dept-samples.js?v=20260927p"></script>
-  <script src="org.js?v=20260927p"></script>
-  <script src="dept.js?v=20260927p"></script>
-  <script src="bom.js?v=20260927p"></script>
-  <script src="bomx.js?v=20260927p"></script>
-  <script src="stockx.js?v=20260927p"></script>
-  <script src="naming.js?v=20260927p"></script>
-  <script src="tv.js?v=20260927p"></script>
-  <script src="serial.js?v=20260927p"></script>
-  <script src="mytasks.js?v=20260927p"></script>
-  <script src="bomsheet.js?v=20260927p"></script>
-  <script src="service.js?v=20260927p"></script>
-  <script src="reports.js?v=20260927p"></script>
-  <script src="integrity.js?v=20260927p"></script>
-  <script src="overview.js?v=20260927p"></script>
-  <script src="rnd.js?v=20260927p"></script>
-  <script src="docview.js?v=20260927p"></script>
-  <script src="esign.js?v=20260927p"></script>
-  <script src="p2p-data.js?v=20260927p"></script>
-  <script src="p2p.js?v=20260927p"></script>
-  <script src="suppliers.js?v=20260927p"></script>
-  <script src="auth.js?v=20260927p"></script>
-  <script src="admin.js?v=20260927p"></script>
-  <script src="plans.js?v=20260927p"></script>
-  <script src="app.js?v=20260927p"></script>
+  <script src="storage.js?v=20260927r"></script>
+  <script src="data.js?v=20260927r"></script>
+  <script src="partcode.js?v=20260927r"></script>
+  <script src="priority-matrix.js?v=20260927r"></script>
+  <script src="capacity-planning.js?v=20260927r"></script>
+  <script src="master-schedule.js?v=20260927r"></script>
+  <script src="make-or-buy.js?v=20260927r"></script>
+  <script src="resource.js?v=20260927r"></script>
+  <script src="procurement.js?v=20260927r"></script>
+  <script src="workorder.js?v=20260927r"></script>
+  <script src="jobcard.js?v=20260927r"></script>
+  <script src="alerts.js?v=20260927r"></script>
+  <script src="overview-charts.js?v=20260927r"></script>
+  <script src="pilot.js?v=20260927r"></script>
+  <script src="pilot-measure.js?v=20260927r"></script>
+  <script src="dept-data.js?v=20260927r"></script>
+  <script src="dept-samples.js?v=20260927r"></script>
+  <script src="org.js?v=20260927r"></script>
+  <script src="dept.js?v=20260927r"></script>
+  <script src="bom.js?v=20260927r"></script>
+  <script src="bomx.js?v=20260927r"></script>
+  <script src="stockx.js?v=20260927r"></script>
+  <script src="naming.js?v=20260927r"></script>
+  <script src="tv.js?v=20260927r"></script>
+  <script src="serial.js?v=20260927r"></script>
+  <script src="mytasks.js?v=20260927r"></script>
+  <script src="bomsheet.js?v=20260927r"></script>
+  <script src="service.js?v=20260927r"></script>
+  <script src="reports.js?v=20260927r"></script>
+  <script src="integrity.js?v=20260927r"></script>
+  <script src="overview.js?v=20260927r"></script>
+  <script src="rnd.js?v=20260927r"></script>
+  <script src="docview.js?v=20260927r"></script>
+  <script src="esign.js?v=20260927r"></script>
+  <script src="p2p-data.js?v=20260927r"></script>
+  <script src="p2p.js?v=20260927r"></script>
+  <script src="suppliers.js?v=20260927r"></script>
+  <script src="auth.js?v=20260927r"></script>
+  <script src="admin.js?v=20260927r"></script>
+  <script src="plans.js?v=20260927r"></script>
+  <script src="app.js?v=20260927r"></script>
 </body>
 </html>

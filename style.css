@@ -1325,3 +1325,41 @@ html[data-density="compact"] body { zoom: 0.9; }
 .mt-go { font-size: 22px; color: var(--text-muted); flex: none; }
 .mt-empty { text-align: center; color: var(--status-good); font-weight: 600; padding: 18px 0; }
 @media (max-width: 600px) { .mt-tag { display: none; } .mt-stat b { font-size: 22px; } }
+
+/* ---- master schedule on a real calendar ---- */
+.gantt { min-width: 900px; }
+.gantt-row, .gantt-header { grid-template-columns: 210px 1fr; }
+.ms-controls { flex-wrap: wrap; gap: 8px 12px; margin-bottom: 10px; }
+.ms-controls label { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.ms-corner { font-size: 12px; color: var(--text-muted); align-self: end; padding-bottom: 4px; }
+.ms-months { display: grid; font-size: 12px; font-weight: 600; color: var(--text-secondary); }
+.ms-months > div { border-left: 1px solid var(--baseline); padding: 0 4px 2px; white-space: nowrap; overflow: hidden; }
+.ms-this-week { color: var(--status-critical); font-weight: 700; }
+.ms-today { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--status-critical); opacity: 0.75; z-index: 2; }
+.ms-section { margin: 12px 0 4px; font-size: 12.5px; font-weight: 700; color: var(--text-secondary); border-bottom: 1px solid var(--gridline); padding-bottom: 4px; }
+.gantt-row-label b { display: block; font-size: 13px; }
+.gantt-row-label small { display: block; font-size: 11px; color: var(--text-muted); }
+.ms-wo-link { background: none; border: 0; padding: 0; text-align: left; cursor: pointer; color: inherit; font: inherit; }
+.ms-wo-link:hover b { color: var(--series-1); text-decoration: underline; }
+.ms-span { background: repeating-linear-gradient(45deg, var(--gridline) 0 4px, transparent 4px 8px) !important; border: 1px dashed var(--baseline); height: 10px !important; top: 50% !important; transform: translateY(-50%); opacity: 0.9; }
+.ms-step { z-index: 1; font-size: 10px; }
+.ms-hold { outline: 2px solid var(--status-critical); }
+.ms-wip { outline: 2px solid var(--accent, #f2a60d); }
+.ms-due { position: absolute; top: 50%; transform: translate(-50%, -50%); font-size: 14px; color: var(--text-primary); z-index: 3; }
+.ms-due-late { color: var(--status-critical); }
+.ms-late .gantt-row-label b { color: var(--status-critical); }
+.ms-finished { opacity: 0.6; }
+.ms-phases { display: flex; flex-direction: column; gap: 8px; margin: 6px 0 4px; }
+.ms-phase-row { display: grid; grid-template-columns: 110px 1fr 1fr; gap: 8px; align-items: center; }
+.ms-phase-row label { display: flex; flex-direction: column; font-size: 11.5px; color: var(--text-muted); gap: 2px; }
+.ms-phase-name { display: flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; }
+@media (max-width: 600px) { .ms-phase-row { grid-template-columns: 1fr 1fr; } .ms-phase-name { grid-column: 1 / -1; } }
+.gantt-row, .gantt-header { grid-template-columns: 250px 1fr; }
+.gantt-row { min-height: 46px; }
+.gantt-row-label { flex-wrap: nowrap; align-items: center; }
+.gantt-row-label > span { flex: 1; min-width: 0; }
+.gantt-row-label b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
+.ms-edit-ic { flex: none; width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-secondary); cursor: pointer; font-size: 15px; }
+.ms-edit-ic:hover { border-color: var(--accent, #f2a60d); color: var(--text-primary); }
+.ms-phase-row { grid-template-columns: 96px minmax(0, 1fr) minmax(0, 1fr); }
+.ms-phase-row input { width: 100%; min-width: 0; box-sizing: border-box; }
