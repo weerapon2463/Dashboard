@@ -215,7 +215,7 @@ function esStartSign(type, index) {
     <p class="card-sub">${escapeHtml(String(doc.title || ""))}</p>
     <div class="form-field"><label for="esSlot">ลงนามในฐานะ</label><select id="esSlot">${slots.map((s) => `<option value="${s}">${escapeHtml(labels[s])}</option>`).join("")}</select></div>
     <div class="es-preview"><img src="${me.signature}" alt="ลายเซ็นของฉัน"><div>(${escapeHtml(me.name)})${me.position ? ` · ${escapeHtml(me.position)}` : ""}</div></div>
-    <div class="form-field"><label for="esPin">ยืนยันด้วย PIN</label><input type="password" id="esPin" inputmode="numeric" autocomplete="current-password" maxlength="6"></div>
+    <div class="form-field"><label for="esPin">ยืนยันด้วยรหัสผ่าน</label><input type="password" id="esPin" autocomplete="current-password" maxlength="32"></div>
     <p class="muted-note">การลงนามบันทึกชื่อ วันเวลา และลายนิ้วมือของเนื้อหาเอกสาร — ถ้ามีการแก้ไขเนื้อหาภายหลัง ลายเซ็นจะแสดงว่า "ถูกแก้ไขหลังลงนาม"</p>
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="esChange">เปลี่ยนลายเซ็น</button>
@@ -231,13 +231,13 @@ function esStartSign(type, index) {
   setTimeout(() => document.getElementById("esPin").focus(), 0);
 }
 
-function esConfirmSign() {
+async function esConfirmSign() {
   if (!esPending) return;
   const { type, index } = esPending;
   const doc = DEPT_DOCS[type][index];
   const me = authCurrentUser();
-  const pin = document.getElementById("esPin").value.trim();
-  if (pinHash(pin, me.id) !== me.pin) { showToast("PIN ไม่ถูกต้อง", "warn"); document.getElementById("esPin").select(); return; }
+  const pin = document.getElementById("esPin").value;
+  if (!(await authCheckSecret(me, pin))) { showToast("รหัสผ่านไม่ถูกต้อง", "warn"); document.getElementById("esPin").select(); return; }
   const slot = Number(document.getElementById("esSlot").value);
   if (!esCanSign(type, doc, slot)) { showToast("ลงนามช่องนี้ไม่ได้", "warn"); return; }
   doc.signatures = doc.signatures || {};

@@ -101,6 +101,56 @@ function pinHash(pin, salt) {
   return (h >>> 0).toString(16);
 }
 
+// Passwords: PBKDF2-SHA256 via WebCrypto, stored as user.pw = "p2$<iterations>$<hex>". The old short
+// PIN hash (user.pin) is still accepted until the person sets a password. mustChange = the admin gave a
+// temporary password (or it is still the default 1234) — asked to set their own at the next sign-in.
+const PW_ITER = 120000;
+async function pwDerive(secret, salt, iter) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({ name: "PBKDF2", hash: "SHA-256", salt: enc.encode(`forge:${salt}`), iterations: iter }, key, 256);
+  return [...new Uint8Array(bits)].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+async function authCheckSecret(user, secret) {
+  if (!user || !secret) return false;
+  if (user.pw) {
+    const [, iter, hex] = String(user.pw).split("$");
+    return (await pwDerive(secret, user.id, Number(iter) || PW_ITER)) === hex;
+  }
+  return pinHash(secret, user.id) === user.pin;
+}
+async function authSetSecret(user, secret) {
+  user.pw = `p2$${PW_ITER}$${await pwDerive(secret, user.id, PW_ITER)}`;
+  user.pin = "";
+  user.pwAt = new Date().toISOString();
+  delete user.mustChange;
+}
+function authSecretProblem(s) {
+  if (typeof s !== "string" || s.length < 4) return "รหัสผ่านต้องยาวอย่างน้อย 4 ตัว";
+  if (s.length > 32) return "รหัสผ่านยาวได้ไม่เกิน 32 ตัว";
+  if (s === DEMO_PIN) return "ห้ามใช้ 1234 — ตั้งรหัสของตัวเอง";
+  return "";
+}
+function authNeedsNewSecret(user) {
+  const demo = typeof Y2JStore !== "undefined" && Y2JStore.config().demo;
+  return !demo && (user.mustChange || (!user.pw && user.pin === pinHash(DEMO_PIN, user.id)));
+}
+// ask twice with prompt(); resolves true once a new password is stored on the user
+async function authPromptNewSecret(user, title) {
+  for (;;) {
+    const a = prompt(`${title}
+ตั้งรหัสผ่านใหม่ (4–32 ตัว ตัวอักษรหรือตัวเลขก็ได้)`);
+    if (a === null) return false;
+    const bad = authSecretProblem(a);
+    if (bad) { alert(bad); continue; }
+    const b = prompt("พิมพ์รหัสผ่านใหม่อีกครั้ง");
+    if (b === null) return false;
+    if (a !== b) { alert("รหัสผ่านสองครั้งไม่ตรงกัน"); continue; }
+    await authSetSecret(user, a);
+    return true;
+  }
+}
+
 /* ---- store --------------------------------------------------------------- */
 
 function authSeed() {
@@ -525,19 +575,50 @@ function renderLoginScreen() {
     pinBox.scrollIntoView({ block: "nearest", behavior: "smooth" });
     (isDemo ? document.getElementById("loginSubmit") : pinInput).focus();
   }));
-  const submit = () => {
+  const submit = async () => {
     if (!picked) return;
-    if (pinHash(pinInput.value.trim(), picked.id) !== picked.pin) {
+    if (!(await authCheckSecret(picked, pinInput.value))) {
       document.getElementById("loginError").hidden = false;
       pinInput.select();
       return;
     }
+    await loginFinish(picked);
+  };
+  const loginFinish = async (user) => {
+    if (authNeedsNewSecret(user)) {
+      if (!(await authPromptNewSecret(user, `สวัสดี ${user.name} — ใช้รหัสผ่านชั่วคราวอยู่`))) return;
+      authSave();
+      auditLog("ตั้งรหัสผ่านใหม่", user.username, "ตอนเข้าสู่ระบบครั้งแรก");
+    }
+    picked = user;
     try {
       const prev = JSON.parse(localStorage.getItem(LOGIN_RECENT_KEY) || "[]");
       localStorage.setItem(LOGIN_RECENT_KEY, JSON.stringify([picked.id, ...prev.filter((id) => id !== picked.id)].slice(0, 4)));
     } catch (e) { /* per-device convenience only */ }
     authSignIn(picked, "login");
   };
+  // company data: sign in with employee number (or username) + password
+  const empForm = document.getElementById("loginEmpForm");
+  if (empForm) {
+    empForm.hidden = isDemo;
+    document.getElementById("loginPickToggle").hidden = isDemo;
+    list.hidden = !isDemo;
+    document.getElementById("loginStepPick").hidden = !isDemo;
+    document.getElementById("loginPickToggle").onclick = () => { list.hidden = !list.hidden; document.getElementById("loginStepPick").hidden = list.hidden; };
+    const empGo = async () => {
+      const id = document.getElementById("loginEmpNo").value.trim().toLowerCase();
+      const pw = document.getElementById("loginEmpPw").value;
+      const u = users.find((x) => (x.empNo && x.empNo.toLowerCase() === id) || x.username === id);
+      const err = document.getElementById("loginEmpErr");
+      if (!u || !(await authCheckSecret(u, pw))) { err.hidden = false; document.getElementById("loginEmpPw").select(); return; }
+      err.hidden = true;
+      await loginFinish(u);
+    };
+    document.getElementById("loginEmpBtn").onclick = empGo;
+    document.getElementById("loginEmpPw").onkeydown = (e) => { if (e.key === "Enter") empGo(); };
+    document.getElementById("loginEmpNo").onkeydown = (e) => { if (e.key === "Enter") document.getElementById("loginEmpPw").focus(); };
+    if (!isDemo) setTimeout(() => document.getElementById("loginEmpNo").focus(), 0);
+  }
   document.getElementById("loginSubmit").onclick = submit;
   pinInput.onkeydown = (e) => { if (e.key === "Enter") submit(); };
 }
@@ -550,20 +631,17 @@ function renderUserChip() {
     <span class="login-avatar small">${escapeHtml(AUTH_USER.name.slice(0, 1))}</span>
     <span class="user-chip-text"><strong>${escapeHtml(AUTH_USER.name)}</strong><span>${escapeHtml(authRoleLabel(AUTH_USER.role))}</span></span>
     <button type="button" class="btn-chip" id="mySignBtn" title="ลายเซ็นสำหรับลงนามเอกสาร">✍ ลายเซ็น${AUTH_USER.signature ? "" : " (ยังไม่ตั้ง)"}</button>
-    <button type="button" class="btn-chip" id="changePinBtn">เปลี่ยน PIN</button>
+    <button type="button" class="btn-chip" id="changePinBtn">เปลี่ยนรหัสผ่าน</button>
     <button type="button" class="btn-chip" id="logoutBtn">ออกจากระบบ</button>`;
   document.getElementById("logoutBtn").addEventListener("click", authSignOut);
   document.getElementById("mySignBtn").addEventListener("click", () => { if (typeof esOpenPad === "function") esOpenPad(renderUserChip); });
-  document.getElementById("changePinBtn").addEventListener("click", () => {
-    const oldPin = prompt("PIN ปัจจุบัน");
-    if (oldPin === null) return;
-    if (pinHash(oldPin.trim(), AUTH_USER.id) !== AUTH_USER.pin) { showToast("PIN ปัจจุบันไม่ถูกต้อง", "warn"); return; }
-    const next = prompt("PIN ใหม่ (ตัวเลข 4–6 หลัก)");
-    if (next === null) return;
-    if (!/^\d{4,6}$/.test(next.trim())) { showToast("PIN ต้องเป็นตัวเลข 4–6 หลัก", "warn"); return; }
-    AUTH_USER.pin = pinHash(next.trim(), AUTH_USER.id);
+  document.getElementById("changePinBtn").addEventListener("click", async () => {
+    const cur = prompt("รหัสผ่าน (หรือ PIN) ปัจจุบัน");
+    if (cur === null) return;
+    if (!(await authCheckSecret(AUTH_USER, cur))) { showToast("รหัสผ่านปัจจุบันไม่ถูกต้อง", "warn"); return; }
+    if (!(await authPromptNewSecret(AUTH_USER, "เปลี่ยนรหัสผ่าน"))) return;
     authSave();
-    auditLog("เปลี่ยน PIN", AUTH_USER.username, "");
-    showToast("เปลี่ยน PIN แล้ว", "good");
+    auditLog("เปลี่ยนรหัสผ่าน", AUTH_USER.username, "");
+    showToast("เปลี่ยนรหัสผ่านแล้ว", "good");
   });
 }

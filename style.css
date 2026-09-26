@@ -1442,3 +1442,7 @@ html[data-density="compact"] body { zoom: 0.9; }
 
 .footer-dev { color: var(--sidebar-fg-muted); margin-top: 4px; font-size: 11px; }
 .login-emp { font-weight: 700; color: var(--sec, var(--series-1)); font-variant-numeric: tabular-nums; }
+.login-emp-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.login-emp-row input { flex: 1 1 160px; min-width: 0; font: inherit; font-size: 15px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-primary); }
+.login-emp .btn-chip { margin-top: 10px; }
+.login-users[hidden], .login-step[hidden], .login-emp[hidden] { display: none; }

@@ -118,7 +118,7 @@ function openUserEditor(id) {
     + (typeof orgCompanies === "function" ? orgCompanies() : []).map((c) => `<option value="${escapeHtml(c.id)}"${c.id === (isNew ? orgCurrentId() : u.company) ? " selected" : ""}>${escapeHtml(c.short)} — ${escapeHtml(c.name)}</option>`).join("");
   document.getElementById("ue_dept").innerHTML = `<option value="">ส่วนกลาง (ไม่สังกัดแผนก)</option>` + DEPT_WORKSPACES.map((w) => `<option value="${w.id}"${w.id === u.dept ? " selected" : ""}>${escapeHtml(w.name)}</option>`).join("");
   document.getElementById("ue_pin").value = "";
-  document.getElementById("ue_pin").placeholder = isNew ? `ไม่กรอก = ${DEMO_PIN}` : "ไม่กรอก = ใช้ PIN เดิม";
+  document.getElementById("ue_pin").placeholder = isNew ? `ไม่กรอก = ${DEMO_PIN} (ต้องเปลี่ยนตอนเข้าครั้งแรก)` : "ไม่กรอก = ใช้รหัสเดิม · กรอก = รีเซ็ต";
   document.getElementById("ue_active").checked = u.active !== false;
   document.getElementById("ue_active").disabled = !isNew && u.id === AUTH_USER.id;
   document.getElementById("ue_groups").innerHTML = (AUTH.groups || []).map((g) => `<label class="vis-opt" title="${escapeHtml(g.desc || "")}"><input type="checkbox" value="${g.id}"${(u.groups || []).includes(g.id) ? " checked" : ""}> ${escapeHtml(g.name)}</label>`).join("") || '<span class="muted-inline">ยังไม่มีกลุ่ม — สร้างได้ที่แท็บ "กลุ่มผู้ใช้"</span>';
@@ -163,7 +163,7 @@ function readUserEditor() {
   if (empNo && !/^[A-Z0-9-]{2,16}$/.test(empNo)) { showToast("รหัสพนักงาน: ตัวเลข/ตัวอักษรอังกฤษ ยาว 2–16 ตัว", "warn"); document.getElementById("ue_empno").focus(); return null; }
   if (empNo && AUTH.users.some((x) => x.empNo === empNo && x !== u)) { showToast("รหัสพนักงานนี้ถูกใช้แล้ว", "warn"); return null; }
   const pin = document.getElementById("ue_pin").value.trim();
-  if (pin && !/^\d{4,6}$/.test(pin)) { showToast("PIN ต้องเป็นตัวเลข 4–6 หลัก", "warn"); return null; }
+  if (pin && (pin.length < 4 || pin.length > 32)) { showToast("รหัสผ่านชั่วคราวต้องยาว 4–32 ตัว", "warn"); return null; }
   const docPerms = {};
   document.querySelectorAll("#ue_perms [data-perm]").forEach((s) => { if (s.value) docPerms[s.dataset.perm] = s.value; });
   const modules = document.getElementById("ue_modCustom").checked
@@ -191,6 +191,7 @@ function saveUserEditor() {
     const id = "u-" + Date.now().toString(36);
     const u = Object.assign({ id, createdAt: new Date().toISOString(), lastLogin: "" }, data);
     u.pin = pinHash(pinPlain || DEMO_PIN, id);
+    u.mustChange = true; // temporary password: the person sets their own at first sign-in
     AUTH.users.push(u);
     auditLog("เพิ่มผู้ใช้", u.username, `${u.name} · ${authRoleLabel(u.role)} · ${authDeptName(u.dept)}`);
   } else {
@@ -201,14 +202,14 @@ function saveUserEditor() {
     ];
     const before = Object.assign({}, u, { teams: (u.teams || []).join(","), groups: (u.groups || []).join(","), modules: JSON.stringify(u.modules), docPerms: JSON.stringify(u.docPerms || {}) });
     Object.assign(u, data);
-    if (pinPlain) u.pin = pinHash(pinPlain, u.id);
+    if (pinPlain) { u.pin = pinHash(pinPlain, u.id); u.pw = ""; u.mustChange = true; }
     const after = Object.assign({}, u, { teams: (u.teams || []).join(","), groups: (u.groups || []).join(","), modules: JSON.stringify(u.modules), docPerms: JSON.stringify(u.docPerms || {}) });
     const changes = [auditDiff(before, after, fields)];
     if (before.teams !== after.teams) changes.push("ทีม: เปลี่ยน");
     if (before.groups !== after.groups) changes.push(`กลุ่ม: ${authUserGroups(u).map((g) => g.name).join(", ") || "ไม่มี"}`);
     if (before.modules !== after.modules) changes.push("สิทธิ์เข้าหน้า: เปลี่ยน");
     if (before.docPerms !== after.docPerms) changes.push("สิทธิ์เอกสาร: เปลี่ยน");
-    if (pinPlain) changes.push("รีเซ็ต PIN");
+    if (pinPlain) changes.push("รีเซ็ตรหัสผ่าน (ชั่วคราว)");
     auditLog("แก้ไขผู้ใช้", u.username, changes.filter(Boolean).join(" · ") || "ไม่มีการเปลี่ยนแปลง");
   }
   authSave();

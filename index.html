@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=20260928i">
-<link rel="stylesheet" href="theme.css?v=20260928i">
-<link rel="stylesheet" href="tv.css?v=20260928i">
+<link rel="stylesheet" href="style.css?v=20260928j">
+<link rel="stylesheet" href="theme.css?v=20260928j">
+<link rel="stylesheet" href="tv.css?v=20260928j">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -25,17 +25,27 @@
         </div>
       </div>
       <div class="login-conn" id="loginConn"></div>
-      <div class="login-step">1. เลือกผู้ใช้</div>
+      <div class="login-emp" id="loginEmpForm" hidden>
+        <div class="login-step">เข้าสู่ระบบด้วยรหัสพนักงาน</div>
+        <div class="login-emp-row">
+          <input id="loginEmpNo" autocomplete="username" autocapitalize="characters" placeholder="รหัสพนักงาน เช่น 301025" aria-label="รหัสพนักงาน">
+          <input id="loginEmpPw" type="password" autocomplete="current-password" placeholder="รหัสผ่าน" aria-label="รหัสผ่าน">
+          <button type="button" class="btn-primary" id="loginEmpBtn">เข้าสู่ระบบ</button>
+        </div>
+        <p class="login-error" id="loginEmpErr" hidden>รหัสพนักงานหรือรหัสผ่านไม่ถูกต้อง</p>
+        <button type="button" class="btn-chip" id="loginPickToggle">หรือเลือกจากรายชื่อ</button>
+      </div>
+      <div class="login-step" id="loginStepPick">1. เลือกผู้ใช้</div>
       <div class="login-users" id="loginUsers"></div>
       <div class="login-pin" id="loginPinBox" hidden>
-        <div class="login-step">2. ใส่ PIN ของ <strong id="loginPickedName"></strong></div>
+        <div class="login-step">2. ใส่รหัสผ่านของ <strong id="loginPickedName"></strong></div>
         <div class="login-pin-row">
-          <input type="password" id="loginPin" inputmode="numeric" autocomplete="current-password" maxlength="6" aria-label="PIN">
+          <input type="password" id="loginPin" autocomplete="current-password" maxlength="32" aria-label="รหัสผ่าน">
           <button type="button" class="btn-primary" id="loginSubmit">เข้าสู่ระบบ</button>
         </div>
-        <p class="login-error" id="loginError" hidden>PIN ไม่ถูกต้อง</p>
+        <p class="login-error" id="loginError" hidden>รหัสผ่านไม่ถูกต้อง</p>
       </div>
-      <p class="login-hint">บัญชีทดลองทุกบัญชีใช้ PIN <strong>1234</strong> — ผู้ดูแลระบบ (admin) เพิ่มผู้ใช้ กำหนดสิทธิ์ และเปลี่ยน PIN ได้</p>
+      <p class="login-hint">ระบบทดลอง: ทุกบัญชีใช้รหัส <strong>1234</strong> · ข้อมูลบริษัท: เข้าด้วย<strong>รหัสพนักงาน + รหัสผ่านของตัวเอง</strong> — ครั้งแรกใช้รหัสชั่วคราวจากผู้ดูแลระบบ แล้วระบบจะให้ตั้งรหัสใหม่</p>
     </div>
   </div>
 
@@ -1413,7 +1423,7 @@
         <div class="form-field"><label for="ue_username">ชื่อผู้ใช้ (ภาษาอังกฤษ) *</label><input id="ue_username" autocomplete="off" placeholder="เช่น line2"></div>
         <div class="form-field"><label for="ue_empno">รหัสพนักงาน</label><input id="ue_empno" autocomplete="off" inputmode="numeric" placeholder="เช่น 301025"></div>
         <div class="form-field"><label for="ue_position">ตำแหน่ง</label><input id="ue_position"></div>
-        <div class="form-field"><label for="ue_pin">PIN (ตัวเลข 4–6 หลัก)</label><input id="ue_pin" inputmode="numeric" autocomplete="new-password"></div>
+        <div class="form-field"><label for="ue_pin">รหัสผ่านชั่วคราว (4–32 ตัว)</label><input id="ue_pin" autocomplete="new-password"></div>
         <div class="form-field"><label for="ue_role">บทบาท</label><select id="ue_role"></select></div>
         <div class="form-field"><label for="ue_dept">แผนก</label><select id="ue_dept"></select></div>
         <div class="form-field"><label for="ue_company">บริษัท</label><select id="ue_company"></select></div>
@@ -1688,46 +1698,46 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260928i"></script>
-  <script src="data.js?v=20260928i"></script>
-  <script src="partcode.js?v=20260928i"></script>
-  <script src="priority-matrix.js?v=20260928i"></script>
-  <script src="capacity-planning.js?v=20260928i"></script>
-  <script src="master-schedule.js?v=20260928i"></script>
-  <script src="make-or-buy.js?v=20260928i"></script>
-  <script src="resource.js?v=20260928i"></script>
-  <script src="procurement.js?v=20260928i"></script>
-  <script src="workorder.js?v=20260928i"></script>
-  <script src="jobcard.js?v=20260928i"></script>
-  <script src="alerts.js?v=20260928i"></script>
-  <script src="overview-charts.js?v=20260928i"></script>
-  <script src="pilot.js?v=20260928i"></script>
-  <script src="pilot-measure.js?v=20260928i"></script>
-  <script src="dept-data.js?v=20260928i"></script>
-  <script src="dept-samples.js?v=20260928i"></script>
-  <script src="org.js?v=20260928i"></script>
-  <script src="dept.js?v=20260928i"></script>
-  <script src="bom.js?v=20260928i"></script>
-  <script src="bomx.js?v=20260928i"></script>
-  <script src="stockx.js?v=20260928i"></script>
-  <script src="naming.js?v=20260928i"></script>
-  <script src="tv.js?v=20260928i"></script>
-  <script src="serial.js?v=20260928i"></script>
-  <script src="mytasks.js?v=20260928i"></script>
-  <script src="bomsheet.js?v=20260928i"></script>
-  <script src="service.js?v=20260928i"></script>
-  <script src="reports.js?v=20260928i"></script>
-  <script src="integrity.js?v=20260928i"></script>
-  <script src="overview.js?v=20260928i"></script>
-  <script src="rnd.js?v=20260928i"></script>
-  <script src="docview.js?v=20260928i"></script>
-  <script src="esign.js?v=20260928i"></script>
-  <script src="p2p-data.js?v=20260928i"></script>
-  <script src="p2p.js?v=20260928i"></script>
-  <script src="suppliers.js?v=20260928i"></script>
-  <script src="auth.js?v=20260928i"></script>
-  <script src="admin.js?v=20260928i"></script>
-  <script src="plans.js?v=20260928i"></script>
-  <script src="app.js?v=20260928i"></script>
+  <script src="storage.js?v=20260928j"></script>
+  <script src="data.js?v=20260928j"></script>
+  <script src="partcode.js?v=20260928j"></script>
+  <script src="priority-matrix.js?v=20260928j"></script>
+  <script src="capacity-planning.js?v=20260928j"></script>
+  <script src="master-schedule.js?v=20260928j"></script>
+  <script src="make-or-buy.js?v=20260928j"></script>
+  <script src="resource.js?v=20260928j"></script>
+  <script src="procurement.js?v=20260928j"></script>
+  <script src="workorder.js?v=20260928j"></script>
+  <script src="jobcard.js?v=20260928j"></script>
+  <script src="alerts.js?v=20260928j"></script>
+  <script src="overview-charts.js?v=20260928j"></script>
+  <script src="pilot.js?v=20260928j"></script>
+  <script src="pilot-measure.js?v=20260928j"></script>
+  <script src="dept-data.js?v=20260928j"></script>
+  <script src="dept-samples.js?v=20260928j"></script>
+  <script src="org.js?v=20260928j"></script>
+  <script src="dept.js?v=20260928j"></script>
+  <script src="bom.js?v=20260928j"></script>
+  <script src="bomx.js?v=20260928j"></script>
+  <script src="stockx.js?v=20260928j"></script>
+  <script src="naming.js?v=20260928j"></script>
+  <script src="tv.js?v=20260928j"></script>
+  <script src="serial.js?v=20260928j"></script>
+  <script src="mytasks.js?v=20260928j"></script>
+  <script src="bomsheet.js?v=20260928j"></script>
+  <script src="service.js?v=20260928j"></script>
+  <script src="reports.js?v=20260928j"></script>
+  <script src="integrity.js?v=20260928j"></script>
+  <script src="overview.js?v=20260928j"></script>
+  <script src="rnd.js?v=20260928j"></script>
+  <script src="docview.js?v=20260928j"></script>
+  <script src="esign.js?v=20260928j"></script>
+  <script src="p2p-data.js?v=20260928j"></script>
+  <script src="p2p.js?v=20260928j"></script>
+  <script src="suppliers.js?v=20260928j"></script>
+  <script src="auth.js?v=20260928j"></script>
+  <script src="admin.js?v=20260928j"></script>
+  <script src="plans.js?v=20260928j"></script>
+  <script src="app.js?v=20260928j"></script>
 </body>
 </html>
