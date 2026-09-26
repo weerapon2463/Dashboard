@@ -43,10 +43,14 @@ const Y2JStore = (() => {
 
   // ?reset=1 — start this browser from scratch (stale data, a test device, a shared tablet)
   try {
-    if (new URLSearchParams(location.search).get("reset") === "1") {
+    const rq = new URLSearchParams(location.search);
+    if (rq.get("reset") === "1") {
       ls.clear();
       try { sessionStorage.clear(); } catch (e) { /* ignore */ }
-      history.replaceState(null, "", location.pathname + location.hash);
+      // keep the rest of the link (e.g. ?reset=1&sheet=…&key=… sets the device up fresh)
+      rq.delete("reset");
+      const rest = rq.toString();
+      history.replaceState(null, "", location.pathname + (rest ? `?${rest}` : "") + location.hash);
     }
   } catch (e) { /* ignore */ }
   let cfg = readJson(CONFIG_KEY, { mode: "local", url: "", token: "" });

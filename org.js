@@ -113,7 +113,18 @@ function orgEmptyDatasets() {
     "y2j-priority-jobs-v1": [],
     "y2j-resource-v1": { labor: [], machine: [], tool: [] },
     "y2j-bom-v1": { models: [], bom: {}, meta: {} },
+    "y2j-stock-v1": { items: {}, settings: { requesters: [], issuers: [] }, ledger: [], entries: [] },
   };
+}
+
+// Simulated data belongs to the DEMO only. On company data (shared Sheet, not the demo), a dataset that
+// does not exist yet starts empty — otherwise each module would fill it with built-in samples and the
+// first sync would upload them into the company's Sheet.
+function orgSeedEmptyDatasets() {
+  if (typeof Y2JStore === "undefined" || !Y2JStore.isRemote() || Y2JStore.config().demo) return;
+  Object.entries(orgEmptyDatasets()).forEach(([k, v]) => {
+    try { if (localStorage.getItem(k) === null) localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* storage full — module falls back */ }
+  });
 }
 
 /* ---- admin: organisation tab --------------------------------------------------------- */

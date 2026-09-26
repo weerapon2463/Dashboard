@@ -290,12 +290,13 @@ function appStart() {
       return;
     }
     renderUserChip();
-    if (typeof wfApply === "function") wfApply(); // company workflows over the built-in document flows
     if (typeof applyOrgSettings === "function") {
       if (!orgEnsureCompany()) return; // reloading into a company this user may open
       applyOrgSettings();
       initOrg();
     }
+    if (typeof orgSeedEmptyDatasets === "function") orgSeedEmptyDatasets(); // company data never starts from samples
+    if (typeof wfApply === "function") wfApply(); // company workflows over the built-in document flows
     const picker = document.querySelector(".role-picker");
     if (picker) picker.hidden = true;
   }
