@@ -122,7 +122,7 @@ function tvFloorStations() {
   const ws = typeof jcWorkstations === "function" ? jcWorkstations() : TV_STATIONS_FALLBACK.map((id) => ({ id, name: id }));
   const stations = ws.filter((s) => live.some((x) => x.j.station === s.id) || queue[s.id]);
   if (!stations.length) return `<p class="tv-empty">ยังไม่มี Job Card ที่เปิดอยู่ — สร้างได้ที่หน้าใบสั่งผลิต</p>`;
-  const today0 = new Date(); today0.setHours(0, 0, 0, 0);
+  const today0 = new Date(); today0.setHours(8, 0, 0, 0); // shift start — nights are not downtime
   const downToday = Object.values(tvDownIn(today0.getTime())).reduce((s, v) => s + v, 0);
   const waitIssue = typeof bxReqs === "function" ? bxReqs().filter((d) => d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน").length : 0;
   const card = ({ w, j }) => {
@@ -130,7 +130,7 @@ function tvFloorStations() {
     const pct = j.planMins ? Math.min(100, Math.round(mins / j.planMins * 100)) : 0;
     const down = (j.downs || []).find((d) => !d.to);
     return `<div class="tv-job tv-job-${j.status}">
-      <div class="tv-job-top"><b>${tvEsc(w.wo)}</b><span>${tvEsc(w.model)} × ${tvEsc(w.qty)}</span></div>
+      <div class="tv-job-top"><b>${tvEsc(w.serial || w.wo)}</b><span>${tvEsc(w.serial ? w.wo : `${w.model} × ${w.qty}`)}</span></div>
       <div class="tv-job-op">${tvEsc(j.op)}</div>
       <div class="tv-job-who">${tvEsc(j.assignee || "ยังไม่มีคนรับ")}</div>
       ${down ? `<div class="tv-job-stop">⏸ ${tvEsc(down.reason)} · ${jcFmtMins(jcDownMins(down))}</div>` : `<div class="tv-bar"><i style="width:${pct}%"></i></div><div class="tv-job-time">${jcFmtMins(mins)}${j.planMins ? ` / ${jcFmtMins(j.planMins)}` : ""}</div>`}
@@ -139,7 +139,7 @@ function tvFloorStations() {
   return `<div class="tv-strip">
       <div class="tv-chip">กำลังทำ <b>${live.filter((x) => x.j.status === "wip").length}</b></div>
       <div class="tv-chip tv-chip-bad">หยุดอยู่ <b>${live.filter((x) => x.j.status === "hold").length}</b></div>
-      <div class="tv-chip">หยุดวันนี้รวม <b>${jcFmtMins(downToday)}</b></div>
+      <div class="tv-chip">หยุดวันนี้ (ตั้งแต่ 08:00) <b>${jcFmtMins(downToday)}</b></div>
       <div class="tv-chip">ใบเบิกรอคลังจ่าย <b>${waitIssue}</b></div></div>
     <div class="tv-stations" style="--cols:${Math.min(stations.length, 6)}">${stations.map((s) => {
       const here = live.filter((x) => x.j.station === s.id).sort((a, b) => (a.j.status === "hold") - (b.j.status === "hold"));
@@ -159,7 +159,7 @@ function tvFloorOrders() {
     const jobs = w.jobs || [];
     const late = w.status === "ล่าช้า" || (left !== null && left < 0);
     return `<div class="tv-order${late ? " tv-late" : ""}">
-      <div class="tv-order-id"><b>${tvEsc(w.wo)}</b><span>${tvEsc(w.model)} × ${tvEsc(w.qty)} · ${tvEsc(w.department || "")}</span></div>
+      <div class="tv-order-id"><b>${tvEsc(w.serial || w.wo)}</b><span>${tvEsc(w.wo)} · ${tvEsc(w.customer || w.model)} · ${tvEsc(w.department || "")}</span></div>
       <div class="tv-steps">${jobs.length ? jobs.map((j) => `<span class="tv-step tv-step-${j.status}" title="${tvEsc(j.op)}">${tvEsc(j.station || j.seq)}</span>`).join("") : `<span class="tv-nosteps">ยังไม่มี Job Card · เบิกวัสดุ ${tvN(w.issuedPct)}%</span>`}</div>
       <div class="tv-order-due">${left === null ? tvEsc(w.dueDate || "") : late ? `<b>ล่าช้า ${Math.abs(left)} วัน</b>` : `ส่งใน <b>${left}</b> วัน`}<span>ผลิตเสร็จ ${tvN(w.produced)}/${tvN(w.qty)}</span></div>
     </div>`;
