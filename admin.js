@@ -75,7 +75,7 @@ function renderAdminUsers() {
     const custom = Object.keys(u.docPerms || {}).length || Array.isArray(u.modules);
     return `<tr class="${u.active ? "" : "row-muted"}">
       <td><strong>${escapeHtml(u.name)}</strong><div class="pilot-kpi-method">${escapeHtml(u.position || "")}</div></td>
-      <td class="mono-cell">${escapeHtml(u.username)}</td>
+      <td class="mono-cell">${escapeHtml(u.username)}${u.empNo ? `<div class="pilot-kpi-method">รหัส ${escapeHtml(u.empNo)}</div>` : ""}</td>
       <td>${escapeHtml(authRoleLabel(u.role))}</td>
       <td>${escapeHtml(authDeptName(u.dept))}<div class="pilot-kpi-method">${u.company ? escapeHtml((typeof orgCompany === "function" && orgCompany(u.company) || {}).short || u.company) : "ทุกบริษัท (กลุ่ม)"}</div></td>
       <td>${authUserGroups(u).map((g) => `<span class="pill pill-schedule">${escapeHtml(g.name)}</span>`).join(" ")} ${(u.teams || []).map((t) => (authTeamById(t) || {}).name).filter(Boolean).map((n) => `<span class="pill pill-eliminate">${escapeHtml(n)}</span>`).join(" ") || (authUserGroups(u).length ? "" : "—")}</td>
@@ -112,6 +112,7 @@ function openUserEditor(id) {
   document.getElementById("ue_name").value = u.name;
   document.getElementById("ue_username").value = u.username;
   document.getElementById("ue_position").value = u.position || "";
+  document.getElementById("ue_empno").value = u.empNo || "";
   document.getElementById("ue_role").innerHTML = AUTH_ROLES.map((r) => `<option value="${r.id}"${r.id === u.role ? " selected" : ""}>${escapeHtml(r.label)}</option>`).join("");
   document.getElementById("ue_company").innerHTML = `<option value="">ทุกบริษัท (ระดับกลุ่ม)</option>`
     + (typeof orgCompanies === "function" ? orgCompanies() : []).map((c) => `<option value="${escapeHtml(c.id)}"${c.id === (isNew ? orgCurrentId() : u.company) ? " selected" : ""}>${escapeHtml(c.short)} — ${escapeHtml(c.name)}</option>`).join("");
@@ -158,6 +159,9 @@ function readUserEditor() {
   if (!name) { document.getElementById("ue_name").focus(); return null; }
   if (!/^[a-z0-9._-]{2,20}$/.test(username)) { showToast("ชื่อผู้ใช้: a-z, 0-9, . _ - ยาว 2–20 ตัว", "warn"); document.getElementById("ue_username").focus(); return null; }
   if (AUTH.users.some((x) => x.username === username && x !== u)) { showToast("ชื่อผู้ใช้นี้ถูกใช้แล้ว", "warn"); return null; }
+  const empNo = document.getElementById("ue_empno").value.trim().toUpperCase();
+  if (empNo && !/^[A-Z0-9-]{2,16}$/.test(empNo)) { showToast("รหัสพนักงาน: ตัวเลข/ตัวอักษรอังกฤษ ยาว 2–16 ตัว", "warn"); document.getElementById("ue_empno").focus(); return null; }
+  if (empNo && AUTH.users.some((x) => x.empNo === empNo && x !== u)) { showToast("รหัสพนักงานนี้ถูกใช้แล้ว", "warn"); return null; }
   const pin = document.getElementById("ue_pin").value.trim();
   if (pin && !/^\d{4,6}$/.test(pin)) { showToast("PIN ต้องเป็นตัวเลข 4–6 หลัก", "warn"); return null; }
   const docPerms = {};
@@ -168,6 +172,7 @@ function readUserEditor() {
   return {
     name, username, pinPlain: pin,
     position: document.getElementById("ue_position").value.trim(),
+    empNo,
     role: document.getElementById("ue_role").value,
     dept: document.getElementById("ue_dept").value,
     company: document.getElementById("ue_company").value,
@@ -191,7 +196,7 @@ function saveUserEditor() {
   } else {
     const u = authUserById(adminEditingUser);
     const fields = [
-      { key: "name", label: "ชื่อ" }, { key: "username", label: "ชื่อผู้ใช้" }, { key: "position", label: "ตำแหน่ง" },
+      { key: "name", label: "ชื่อ" }, { key: "username", label: "ชื่อผู้ใช้" }, { key: "position", label: "ตำแหน่ง" }, { key: "empNo", label: "รหัสพนักงาน" },
       { key: "role", label: "บทบาท" }, { key: "dept", label: "แผนก" }, { key: "company", label: "บริษัท" }, { key: "active", label: "สถานะ" },
     ];
     const before = Object.assign({}, u, { teams: (u.teams || []).join(","), groups: (u.groups || []).join(","), modules: JSON.stringify(u.modules), docPerms: JSON.stringify(u.docPerms || {}) });

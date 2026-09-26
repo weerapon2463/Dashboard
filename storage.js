@@ -109,7 +109,19 @@ const Y2JStore = (() => {
   } catch (e) { /* ignore */ }
 
   const isRemote = () => cfg.mode === "sheets" && !!cfg.url && !!cfg.token;
-  const saveMeta = () => { meta.pending = [...dirty]; rawSet(META_KEY, JSON.stringify(meta)); };
+  // The base copies double what a big dataset (full BOMs, stock ledger) costs in storage and pushed the
+  // meta key past the browser quota, so it silently never saved. Persist bases only for small keys; big
+  // ones keep theirs in memory for this session (after a reload their offline edits merge record-wise).
+  const META_BASE_MAX = 200000;
+  const saveMeta = () => {
+    meta.pending = [...dirty];
+    const keys = {};
+    Object.keys(meta.keys).forEach((k) => {
+      const m = meta.keys[k];
+      keys[k] = m && m.base != null && String(m.base).length > META_BASE_MAX ? { version: m.version, base: null } : m;
+    });
+    rawSet(META_KEY, JSON.stringify({ keys, pending: meta.pending }));
+  };
   const who = () => {
     try {
       const auth = JSON.parse(rawGet("y2j-auth-v1") || "{}");

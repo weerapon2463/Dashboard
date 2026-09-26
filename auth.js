@@ -478,13 +478,13 @@ function renderLoginScreen() {
     .map((id) => users.find((u) => u.id === id)).filter(Boolean).slice(0, 4);
   const card = (u, sec) => `
     <button type="button" class="login-user" data-uid="${escapeHtml(u.id)}" data-sec="${secIds.indexOf(sec) % 8 + 1}"
-      data-q="${escapeHtml([u.name, u.position, authRoleLabel(u.role), secName(sec)].join(" ").toLowerCase())}">
+      data-q="${escapeHtml([u.name, u.empNo, u.position, authRoleLabel(u.role), secName(sec)].join(" ").toLowerCase())}">
       <span class="login-avatar">${escapeHtml(u.name.slice(0, 1))}</span>
-      <span class="login-user-text"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.position || authRoleLabel(u.role))}</span></span>
+      <span class="login-user-text"><strong>${escapeHtml(u.name)}</strong><span>${u.empNo ? `<b class="login-emp">${escapeHtml(u.empNo)}</b> · ` : ""}${escapeHtml(u.position || authRoleLabel(u.role))}</span></span>
       ${u.role === "depthead" ? '<span class="login-tag">หัวหน้า</span>' : ""}
     </button>`;
   list.innerHTML = `
-    ${users.length > 6 ? `<input type="search" class="login-search" id="loginSearch" placeholder="ค้นหาชื่อ ตำแหน่ง หรือแผนก…" aria-label="ค้นหาผู้ใช้">` : ""}
+    ${users.length > 1 ? `<input type="search" class="login-search" id="loginSearch" placeholder="พิมพ์รหัสพนักงาน ชื่อ ตำแหน่ง หรือแผนก…" aria-label="ค้นหาผู้ใช้ หรือใส่รหัสพนักงาน" autocomplete="off">` : ""}
     ${recent.length ? `<section class="login-sec login-sec-recent"><h4>ใช้ล่าสุดในเครื่องนี้</h4><div class="login-grid">${recent.map((u) => card(u, secOf(u))).join("")}</div></section>` : ""}
     ${secIds.map((id) => {
       const us = users.filter((u) => secOf(u) === id).sort((a, b) => (rank[a.role] ?? 9) - (rank[b.role] ?? 9) || a.name.localeCompare(b.name, "th"));
@@ -505,6 +505,14 @@ function renderLoginScreen() {
   });
   let picked = null;
   const pinBox = document.getElementById("loginPinBox");
+  // exact employee number + Enter picks that person straight away
+  if (search) search.addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    const q = search.value.trim().toUpperCase();
+    const vis = [...list.querySelectorAll(".login-sec:not(.login-sec-recent) .login-user:not([hidden])")];
+    const hit = users.find((u) => u.empNo && u.empNo === q) ? list.querySelector(`.login-sec:not(.login-sec-recent) [data-uid="${CSS.escape(users.find((u) => u.empNo === q).id)}"]`) : vis.length === 1 ? vis[0] : null;
+    if (hit) { e.preventDefault(); hit.click(); }
+  });
   const pinInput = document.getElementById("loginPin");
   list.querySelectorAll("[data-uid]").forEach((b) => b.addEventListener("click", () => {
     list.querySelectorAll(".login-user").forEach((x) => x.classList.toggle("active", x.dataset.uid === b.dataset.uid));
