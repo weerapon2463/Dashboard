@@ -26,7 +26,18 @@ const Y2JStore = (() => {
   const origSet = Storage.prototype.setItem;
   const origGet = Storage.prototype.getItem;
   const ls = window.localStorage;
-  const rawSet = (k, v) => { try { origSet.call(ls, k, v); } catch (e) { /* quota */ } };
+  let quotaWarned = 0;
+  const rawSet = (k, v) => {
+    try { origSet.call(ls, k, v); return true; } catch (e) {
+      // the browser's storage is full: say so loudly instead of dropping the change
+      if (Date.now() - quotaWarned > 15000) {
+        quotaWarned = Date.now();
+        try { if (typeof showToast === "function") showToast("⚠ บันทึกไม่สำเร็จ: พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — แจ้งผู้ดูแลระบบ (ข้อมูลล่าสุดยังไม่ถูกบันทึก)", "warn"); } catch (err) { /* ignore */ }
+        try { console.error("[FORGE] storage full while saving", k, (v || "").length); } catch (err) { /* ignore */ }
+      }
+      return false;
+    }
+  };
   const rawGet = (k) => { try { return origGet.call(ls, k); } catch (e) { return null; } };
   const readJson = (k, dflt) => { try { return JSON.parse(rawGet(k) || "null") || dflt; } catch (e) { return dflt; } };
 
@@ -119,7 +130,13 @@ const Y2JStore = (() => {
   };
   Storage.prototype.setItem = function (k, v) {
     const pk = this === ls ? phys(k) : k;
-    origSet.call(this, pk, v);
+    try { origSet.call(this, pk, v); } catch (e) {
+      if (this === ls && Date.now() - quotaWarned > 15000) {
+        quotaWarned = Date.now();
+        try { if (typeof showToast === "function") showToast("⚠ บันทึกไม่สำเร็จ: พื้นที่เก็บข้อมูลในเบราว์เซอร์เต็ม — แจ้งผู้ดูแลระบบ (ข้อมูลล่าสุดยังไม่ถูกบันทึก)", "warn"); } catch (err) { /* ignore */ }
+      }
+      throw e;
+    }
     if (this === ls && isRemote() && isShared(pk)) {
       dirty.add(pk);
       saveMeta();

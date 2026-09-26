@@ -62,6 +62,13 @@ function esOpenPad(after) {
     if (!esPadDirty) { showToast("ยังไม่ได้เซ็น", "warn"); return; }
     const data = esTrim(cv);
     if (!data) { showToast("ยังไม่ได้เซ็น", "warn"); return; }
+    // keep the previous image so documents already signed with it still show it
+    if (me.signature && me.signature !== data) {
+      me.sigHistory = me.sigHistory || {};
+      me.sigHistory[esSigKey(me.signature)] = me.signature;
+      const keys = Object.keys(me.sigHistory);
+      if (keys.length > 6) delete me.sigHistory[keys[0]];
+    }
     me.signature = data;
     me.signatureAt = new Date().toISOString();
     authSave();
@@ -133,6 +140,23 @@ function esPolicy() {
   return { multiSign: s.multiSign !== false, selfApprove: s.selfApprove !== false };
 }
 
+// Signature images live once on the user (current + history); a signed box stores only a short key.
+// Storing the picture in every signed document filled the browser's storage.
+function esSigKey(img) {
+  const s = String(img || "");
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i += 7) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(36) + "-" + s.length.toString(36);
+}
+function esSigImg(s) {
+  if (!s) return "";
+  if (s.img) return s.img;   // documents signed before this change
+  const u = typeof authUserById === "function" ? authUserById(s.uid) : null;
+  if (!u) return "";
+  if (u.signature && esSigKey(u.signature) === s.sig) return u.signature;
+  return (u.sigHistory && u.sigHistory[s.sig]) || u.signature || "";
+}
+
 function esWhyNot(type, doc, slot) {
   const me = authCurrentUser();
   if (!me) return "ยังไม่ได้เข้าระบบ";
@@ -140,7 +164,7 @@ function esWhyNot(type, doc, slot) {
   if (sigs[slot]) return "ช่องนี้ลงนามแล้ว";
   const pol = esPolicy();
   if (!pol.multiSign && Object.values(sigs).some((s) => s && s.uid === me.id)) return "คุณลงนามในเอกสารนี้แล้ว — นโยบายบริษัท: หนึ่งคนลงนามได้หนึ่งช่อง";
-  if (me.signature && Object.values(sigs).some((s) => s && s.img && s.img === me.signature && s.uid !== me.id)) return "ลายเซ็นนี้ถูกใช้ในเอกสารนี้แล้ว (บัญชีอื่น)";
+  if (me.signature && Object.values(sigs).some((s) => s && s.uid !== me.id && (s.sig ? s.sig === esSigKey(me.signature) : s.img === me.signature))) return "ลายเซ็นนี้ถูกใช้ในเอกสารนี้แล้ว (บัญชีอื่น)";
   if (slot > 0 && !sigs[slot - 1]) return `ต้องรอ "${esSlots()[slot - 1]}" ลงนามก่อน`;
   const role = currentRole();
   if (slot === 0) {
@@ -167,7 +191,7 @@ function esPaperBoxes(type, doc) {
     }
     const changed = s.hash && s.hash !== hash;
     return `<div class="sig-box sig-signed${changed ? " sig-changed" : ""}">
-      <div class="sig-line"><img class="sig-img" src="${s.img}" alt="ลายเซ็น ${escapeHtml(s.name)}"></div>
+      <div class="sig-line"><img class="sig-img" src="${esSigImg(s)}" alt="ลายเซ็น ${escapeHtml(s.name)}"></div>
       <div class="sig-name">(${escapeHtml(s.name)})</div>
       <div class="sig-label">${escapeHtml(slots[i])}${s.position ? ` · ${escapeHtml(s.position)}` : ""}</div>
       <div class="sig-date">ลงนาม ${fmtDateTime(s.at)}</div>
@@ -217,7 +241,7 @@ function esConfirmSign() {
   const slot = Number(document.getElementById("esSlot").value);
   if (!esCanSign(type, doc, slot)) { showToast("ลงนามช่องนี้ไม่ได้", "warn"); return; }
   doc.signatures = doc.signatures || {};
-  doc.signatures[slot] = { uid: me.id, name: me.name, position: me.position || "", at: new Date().toISOString(), img: me.signature, hash: esDocHash(type, doc) };
+  doc.signatures[slot] = { uid: me.id, name: me.name, position: me.position || "", at: new Date().toISOString(), sig: esSigKey(me.signature), hash: esDocHash(type, doc) };
   saveDeptDocs();
   auditLog("ลงนามเอกสาร", doc.no, `${esSlots()[slot]} · ${me.name}`);
   document.getElementById("esBackdrop").classList.remove("open");
