@@ -76,6 +76,7 @@ function p2pPromised(c) {
 function p2pDeadline(c, stage) {
   if (!stage) return null;
   if (stage.id === "ship") return p2pPromised(c) || null;
+  if (stage.sla === null || stage.sla === undefined) return null; // no SLA set for this step (Admin › Workflow)
   const since = p2pEnteredAt(c);
   return since ? p2pAddDays(since, stage.sla || 0) : null;
 }

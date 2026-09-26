@@ -52,6 +52,7 @@ function wfApply() {
     def.flow = states.filter((s) => s.inFlow).map((s) => s.name);
     def.closed = states.filter((s) => s.closed).map((s) => s.name);
   });
+  wfApplySystems();
 }
 
 // May the signed-in user move a document of this type into this state?
@@ -79,7 +80,8 @@ function wfTypeOptions() {
     return types.length ? `<optgroup label="${escapeHtml(w.name)}">${types.map((t) => `<option value="${t}"${t === wfType ? " selected" : ""}>${escapeHtml(DOC_TYPES[t].name || t)}</option>`).join("")}</optgroup>` : "";
   }).join("");
   const rest = Object.keys(WF_DEFAULTS).filter((t) => !seen.has(t));
-  return groups + (rest.length ? `<optgroup label="อื่น ๆ">${rest.map((t) => `<option value="${t}"${t === wfType ? " selected" : ""}>${escapeHtml(DOC_TYPES[t].name || t)}</option>`).join("")}</optgroup>` : "");
+  const sys = `<optgroup label="ระบบงาน">${Object.keys(WF_SYS).map((k) => `<option value="${k}"${k === wfType ? " selected" : ""}>${escapeHtml(WF_SYS[k])}</option>`).join("")}</optgroup>`;
+  return sys + groups + (rest.length ? `<optgroup label="อื่น ๆ">${rest.map((t) => `<option value="${t}"${t === wfType ? " selected" : ""}>${escapeHtml(DOC_TYPES[t].name || t)}</option>`).join("")}</optgroup>` : "");
 }
 
 function wfWhoOptions() {
@@ -95,7 +97,8 @@ function wfDocCount(type, name) {
 function renderAdminWorkflow() {
   const el = document.getElementById("workflowPanel");
   if (!el) return;
-  if (!wfType || !WF_DEFAULTS[wfType]) wfType = WF_DEFAULTS.svc ? "svc" : Object.keys(WF_DEFAULTS)[0];
+  if (WF_SYS[wfType]) { renderWfSystem(el); return; }
+  if (!wfType || !WF_DEFAULTS[wfType]) wfType =WF_DEFAULTS.svc ? "svc" : Object.keys(WF_DEFAULTS)[0];
   if (!wfDraft || wfDraft.type !== wfType) wfDraft = { type: wfType, states: JSON.parse(JSON.stringify(wfStates(wfType))).map((x) => Object.assign(x, { orig: x.name })) };
   const custom = !!wfStored()[wfType];
   const who = wfWhoOptions();
@@ -194,4 +197,152 @@ function wfSaveDraft() {
   wfDraft = null;
   renderAdminWorkflow();
   showToast("บันทึก Workflow แล้ว — ทุกหน้าใช้ขั้นตอนใหม่", "good");
+}
+
+/* ---- other processes: purchasing (P2P), job cards, work orders ------------------------- */
+// Stored in the same key under "_p2p" / "_jc" / "_wo". Stage and status ids never change (other
+// modules and saved records use them) — names, owners, SLA, colours and optional stages do.
+
+const WF_P2P_CORE = new Set(["pr", "po", "grn", "iqc"]); // stock and cost follow these steps
+const WF_SYS = {
+  _p2p: "ติดตามจัดซื้อ (PR → PO → รับของ)",
+  _jc: "Job Card — สถานะ & สาเหตุที่หยุดงาน",
+  _wo: "ใบสั่งผลิต — สีของสถานะ",
+};
+const WF_WO_TONES = [["pill-schedule", "ฟ้า (วางแผน)"], ["pill-good", "เขียว"], ["pill-warning", "เหลือง"], ["pill-critical", "แดง"], ["pill-neutral", "เทา"]];
+let WF_SYS_DEFAULTS = null;
+
+function wfSysDefaults() {
+  if (WF_SYS_DEFAULTS) return WF_SYS_DEFAULTS;
+  WF_SYS_DEFAULTS = {
+    p2p: typeof P2P_STAGES !== "undefined" ? P2P_STAGES.map((s) => Object.assign({}, s)) : [],
+    jc: typeof JC_STATUS !== "undefined" ? JSON.parse(JSON.stringify(JC_STATUS)) : {},
+    stops: typeof JC_STOP_REASONS !== "undefined" ? JC_STOP_REASONS.slice() : [],
+    wo: typeof WO_STATUS_META !== "undefined" ? Object.assign({}, WO_STATUS_META) : {},
+  };
+  return WF_SYS_DEFAULTS;
+}
+
+function wfApplySystems() {
+  const d = wfSysDefaults();
+  const all = wfStored();
+  if (typeof P2P_STAGES !== "undefined") {
+    const o = (all._p2p && all._p2p.stages) || {};
+    const next = d.p2p.filter((s) => WF_P2P_CORE.has(s.id) || !(o[s.id] && o[s.id].off)).map((s) => Object.assign({}, s, o[s.id] ? {
+      label: o[s.id].label || s.label, short: o[s.id].short || s.short, holder: o[s.id].holder || s.holder,
+      control: o[s.id].control != null ? o[s.id].control : s.control, sla: o[s.id].sla === undefined ? s.sla : o[s.id].sla,
+    } : {}));
+    P2P_STAGES.splice(0, P2P_STAGES.length, ...next);
+  }
+  if (typeof JC_STATUS !== "undefined") {
+    const o = (all._jc && all._jc.status) || {};
+    Object.keys(d.jc).forEach((k) => { JC_STATUS[k] = o[k] ? [o[k][0] || d.jc[k][0], o[k][1] || d.jc[k][1]] : d.jc[k].slice(); });
+  }
+  if (typeof JC_STOP_REASONS !== "undefined") {
+    const o = all._jc && Array.isArray(all._jc.stops) && all._jc.stops.length ? all._jc.stops : d.stops;
+    JC_STOP_REASONS.splice(0, JC_STOP_REASONS.length, ...o);
+  }
+  if (typeof WO_STATUS_META !== "undefined") {
+    const o = (all._wo && all._wo.tone) || {};
+    Object.keys(d.wo).forEach((k) => { WO_STATUS_META[k] = o[k] || d.wo[k]; });
+  }
+}
+
+function wfSaveSys(key, value, note) {
+  const all = wfStored();
+  if (value) all[key] = Object.assign({}, value, { updatedAt: new Date().toISOString() }); else delete all[key];
+  try { localStorage.setItem(WF_KEY, JSON.stringify(all)); } catch (e) { showToast("บันทึกไม่สำเร็จ", "warn"); return false; }
+  if (typeof auditLog === "function") auditLog("ตั้ง Workflow", WF_SYS[key], note);
+  wfApplySystems();
+  showToast(value ? "บันทึกแล้ว — ทุกหน้าใช้ค่าใหม่" : "กลับเป็นค่าเริ่มต้นแล้ว", "good");
+  return true;
+}
+
+function renderWfSystem(el) {
+  const d = wfSysDefaults();
+  const all = wfStored();
+  const custom = !!all[wfType];
+  const head = `<div class="filter-row"><label for="wfTypeSel">เอกสาร / ระบบงาน:</label><select id="wfTypeSel">${wfTypeOptions()}</select>
+    ${custom ? '<span class="pill pill-info">ปรับแต่งแล้ว</span>' : '<span class="pill pill-neutral">ค่าเริ่มต้น</span>'}</div>`;
+  const foot = `<div class="filter-row wf-actions"><button type="button" class="btn-primary" id="wfSysSave">บันทึก</button>${custom ? '<button type="button" class="btn-link" id="wfSysReset">กลับเป็นค่าเริ่มต้น</button>' : ""}</div>`;
+  let body = "";
+  if (wfType === "_p2p") {
+    const o = (all._p2p && all._p2p.stages) || {};
+    body = `<p class="card-sub">ปรับชื่อขั้น ผู้รับผิดชอบ SLA (วันทำการ) และข้อควบคุม — ปิดขั้นที่บริษัทไม่ใช้ได้ (ระบบข้ามไปขั้นถัดไป) · ขั้น 🔒 เชื่อมกับคลัง/ต้นทุน จึงปิดไม่ได้ · ลำดับขั้นคงที่ตามกระบวนการจัดซื้อ</p>
+      <div class="table-scroll"><table class="data-table wf-table"><thead><tr><th>#</th><th>ใช้</th><th>ชื่อขั้น</th><th>ชื่อย่อ</th><th>ผู้รับผิดชอบ</th><th>SLA (วัน)</th><th>ข้อควบคุม</th></tr></thead><tbody>
+      ${d.p2p.map((s, i) => {
+        const x = o[s.id] || {};
+        const core = WF_P2P_CORE.has(s.id);
+        const sla = x.sla === undefined ? s.sla : x.sla;
+        return `<tr data-id="${s.id}">
+        <td>${i + 1}</td>
+        <td>${core ? "🔒" : `<input type="checkbox" class="wfp-on" ${x.off ? "" : "checked"} aria-label="ใช้ขั้นนี้">`}</td>
+        <td><input class="bom-inline wfp-label" value="${escapeHtml(x.label || s.label)}" aria-label="ชื่อขั้น"></td>
+        <td><input class="bom-inline wfp-short" value="${escapeHtml(x.short || s.short)}" size="7" aria-label="ชื่อย่อ"></td>
+        <td><input class="bom-inline wfp-holder" value="${escapeHtml(x.holder || s.holder)}" aria-label="ผู้รับผิดชอบ"></td>
+        <td><input class="bom-inline wfp-sla" type="number" min="0" step="1" value="${sla === null || sla === undefined ? "" : sla}" placeholder="ตามผู้ขาย" style="width:80px" aria-label="SLA"></td>
+        <td><input class="bom-inline wfp-control" value="${escapeHtml(x.control != null ? x.control : s.control)}" aria-label="ข้อควบคุม"></td></tr>`;
+      }).join("")}
+      </tbody></table></div>`;
+  } else if (wfType === "_jc") {
+    const o = (all._jc && all._jc.status) || {};
+    const stops = all._jc && Array.isArray(all._jc.stops) && all._jc.stops.length ? all._jc.stops : d.stops;
+    body = `<p class="card-sub">ชื่อและสีของสถานะ Job Card (ลำดับ รอเริ่ม → กำลังทำ → หยุด → เสร็จ คงที่) และรายการ "สาเหตุที่หยุดงาน" ที่ช่างเลือกตอนกดพัก — ใช้วิเคราะห์ Downtime</p>
+      <div class="table-scroll"><table class="data-table wf-table"><thead><tr><th>รหัส</th><th>ชื่อที่แสดง</th><th>สี</th></tr></thead><tbody>
+      ${Object.keys(d.jc).map((k) => {
+        const cur = o[k] || d.jc[k];
+        return `<tr data-k="${k}"><td class="mono-cell">${k}</td>
+        <td><input class="bom-inline wfj-label" value="${escapeHtml(cur[0])}" aria-label="ชื่อสถานะ ${k}"></td>
+        <td><select class="wfj-tone" aria-label="สี">${WF_TONES.map(([v, l]) => `<option value="${v}"${v === cur[1] ? " selected" : ""}>${l}</option>`).join("")}</select></td></tr>`;
+      }).join("")}
+      </tbody></table></div>
+      <div class="form-field"><label for="wfjStops">สาเหตุที่หยุดงาน (บรรทัดละ 1 รายการ)</label><textarea id="wfjStops" rows="8">${escapeHtml(stops.join("\n"))}</textarea></div>`;
+  } else {
+    const o = (all._wo && all._wo.tone) || {};
+    body = `<p class="card-sub">สถานะใบสั่งผลิตคำนวณอัตโนมัติจากความคืบหน้าและวันกำหนดส่ง จึงเปลี่ยนชื่อไม่ได้ — ปรับสีที่แสดงได้</p>
+      <div class="table-scroll"><table class="data-table wf-table"><thead><tr><th>สถานะ</th><th>สี</th></tr></thead><tbody>
+      ${Object.keys(d.wo).map((k) => `<tr data-k="${escapeHtml(k)}"><td>${escapeHtml(k)} 🔒</td>
+        <td><select class="wfw-tone" aria-label="สี">${WF_WO_TONES.map(([v, l]) => `<option value="${v}"${v === (o[k] || d.wo[k]) ? " selected" : ""}>${l}</option>`).join("")}</select></td></tr>`).join("")}
+      </tbody></table></div>`;
+  }
+  el.innerHTML = head + body + foot;
+  document.getElementById("wfTypeSel").addEventListener("change", (e) => { wfType = e.target.value; wfDraft = null; renderAdminWorkflow(); });
+  const reset = document.getElementById("wfSysReset");
+  if (reset) reset.addEventListener("click", () => { if (wfSaveSys(wfType, null, "กลับเป็นค่าเริ่มต้น")) renderAdminWorkflow(); });
+  document.getElementById("wfSysSave").addEventListener("click", () => {
+    if (wfType === "_p2p") {
+      const stages = {};
+      const notes = [];
+      el.querySelectorAll("tbody tr[data-id]").forEach((tr) => {
+        const def = d.p2p.find((s) => s.id === tr.dataset.id);
+        const on = tr.querySelector(".wfp-on");
+        const slaRaw = tr.querySelector(".wfp-sla").value.trim();
+        const x = {
+          label: tr.querySelector(".wfp-label").value.trim() || def.label,
+          short: tr.querySelector(".wfp-short").value.trim() || def.short,
+          holder: tr.querySelector(".wfp-holder").value.trim() || def.holder,
+          control: tr.querySelector(".wfp-control").value.trim(),
+          sla: slaRaw === "" ? null : Math.max(0, Math.round(Number(slaRaw) || 0)),
+          off: on ? !on.checked : false,
+        };
+        stages[def.id] = x;
+        if (x.off) notes.push(`ปิด ${def.label}`);
+      });
+      if (wfSaveSys("_p2p", { stages }, notes.join(", ") || "ปรับชื่อ/SLA/ข้อควบคุม")) renderAdminWorkflow();
+    } else if (wfType === "_jc") {
+      const status = {};
+      el.querySelectorAll("tbody tr[data-k]").forEach((tr) => {
+        status[tr.dataset.k] = [tr.querySelector(".wfj-label").value.trim() || d.jc[tr.dataset.k][0], tr.querySelector(".wfj-tone").value];
+      });
+      const labels = Object.values(status).map((s) => s[0]);
+      if (new Set(labels).size !== labels.length) { showToast("ชื่อสถานะซ้ำกัน", "warn"); return; }
+      const stops = document.getElementById("wfjStops").value.split("\n").map((s) => s.trim()).filter((s, i, a) => s && a.indexOf(s) === i);
+      if (!stops.length) { showToast("ต้องมีสาเหตุที่หยุดงานอย่างน้อย 1 รายการ", "warn"); return; }
+      if (wfSaveSys("_jc", { status, stops }, `สาเหตุหยุดงาน ${stops.length} รายการ`)) renderAdminWorkflow();
+    } else {
+      const tone = {};
+      el.querySelectorAll("tbody tr[data-k]").forEach((tr) => { tone[tr.dataset.k] = tr.querySelector(".wfw-tone").value; });
+      if (wfSaveSys("_wo", { tone }, "ปรับสีสถานะ")) renderAdminWorkflow();
+    }
+  });
 }
