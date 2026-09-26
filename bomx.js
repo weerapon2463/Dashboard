@@ -26,6 +26,9 @@ let bxOpen = (() => { try { return new Set(JSON.parse(localStorage.getItem(BX_OP
 function bxSaveOpen() { try { localStorage.setItem(BX_OPEN_KEY, JSON.stringify([...bxOpen].slice(-500))); } catch (e) { /* per-device only */ } }
 function bxIsOpen(model, id) { return bxOpen.has(`${model}|${id}`); }
 let bxPickSearch = "";
+let bxPickLevel = "kit";     // "kit" = sub-assemblies (ERPNext material transfer of sub-assemblies) · "leaf" = single parts
+let bxPickStation = "";      // BOM "ใช้ที่" filter, set from a job card
+const bxPicked = {};         // req no -> Set of item indexes confirmed by scanning (pick list)
 let bxReqFilter = "open";
 let bxReqSearch = "";
 let bxMrpModel = "";
@@ -188,6 +191,44 @@ function bxRequirement(model, qty) {
   return out;
 }
 
+// How far each BOM line is covered for one job, ERPNext-style: issuing (or requesting) a sub-assembly
+// covers everything beneath it, and a sub-assembly counts as covered when all its parts are.
+// Returns Map lineId -> { iss, reqd } as fractions 0..1 of what the job needs.
+function bxCoverage(model, qty, use) {
+  const rows = bxTree(model).filter((r) => r.line);
+  const byId = new Map(rows.map((r) => [r.line.id, r]));
+  const kids = {};
+  rows.forEach((r) => { if (r.line.parent) (kids[r.line.parent] = kids[r.line.parent] || []).push(r); });
+  const own = (r, f) => { const u = use[bxKey(r.line)]; return u && r.per ? Math.min(1, Math.max(0, u[f]) / (r.per * qty)) : 0; };
+  const anc = new Map();
+  const ancOf = (r, f) => {
+    const key = r.line.id + f;
+    if (anc.has(key)) return anc.get(key);
+    const p = byId.get(r.line.parent);
+    const v = Math.max(own(r, f), p ? ancOf(p, f) : 0);
+    anc.set(key, v); return v;
+  };
+  const out = new Map();
+  const full = (r) => {
+    if (out.has(r.line.id)) return out.get(r.line.id);
+    const ks = kids[r.line.id] || [];
+    const sub = ks.map(full);
+    const v = {
+      iss: Math.max(ancOf(r, "issued"), ks.length ? Math.min(...sub.map((x) => x.iss)) : 0),
+      reqd: Math.max(ancOf(r, "requested"), ks.length ? Math.min(...sub.map((x) => x.reqd)) : 0),
+    };
+    out.set(r.line.id, v); return v;
+  };
+  rows.forEach(full);
+  return { rows, cov: out };
+}
+function bxSxAvail(key) {
+  const st = bxStock(key);
+  if (!st) return null;
+  if (!st.wh) return bxNum(st.qty);
+  return Object.keys(st.wh).filter((w) => w !== "QI" && w !== "SCRAP").reduce((s, w) => s + bxNum(st.wh[w]), 0);
+}
+
 function bxWhereUsed(key) {
   const out = [];
   MACHINE_MODELS.forEach((m) => bxTree(m).forEach((r) => {
@@ -241,29 +282,23 @@ function bxRefInfo(ref) { return bxRefs().find((r) => r.ref === ref) || null; }
 function bxReqHolder(d) {
   if (d.status === "รออนุมัติ") return "หัวหน้าแผนกผู้เบิก";
   if (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") {
-    const short = d.items.some((it) => { const s = bxStock(it.key); return s && bxNum(s.qty) < bxItemOutstanding(d, it); });
+    const short = d.items.some((it) => { const a = bxSxAvail(it.key); return a !== null && a < bxItemOutstanding(d, it); });
     return short ? "คลังสินค้า (ของไม่พอ)" : "คลังสินค้า";
   }
+  if (d.status === "จ่ายของแล้ว" && bxNeedsAck(d)) return `ผู้รับของยืนยันรับ (${d.owner || "ช่าง"})`;
   return "—";
 }
+
+function bxIssuedTotal(d) { return d.items.reduce((s, it) => s + bxNum(it.issued), 0); }
+function bxNeedsAck(d) { return bxIssuedTotal(d) > 0 && bxNum(d.ackIssued) < bxIssuedTotal(d); }
 
 function bxUpdateWoProgress(ref) {
   const wo = WORK_ORDERS.find((w) => w.wo === ref);
   if (!wo) return;
   const qty = bxNum(wo.qty) || 1;
-  const use = bxRefUsage(ref);
-  // ERPNext-style: issuing a sub-assembly covers every part beneath it, so progress counts each
-  // leaf as covered by itself or by its nearest issued parent (fraction issued / required)
-  const rows = bxTree(wo.model).filter((r) => r.line);
-  const byId = new Map(rows.map((r) => [r.line.id, r]));
-  const frac = (r) => { const u = use[bxKey(r.line)]; return u && r.per ? Math.min(1, Math.max(0, u.issued) / (r.per * qty)) : 0; };
+  const { rows, cov } = bxCoverage(wo.model, qty, bxRefUsage(ref));
   let tot = 0, got = 0;
-  rows.filter((r) => !r.hasKids && bxKey(r.line)).forEach((r) => {
-    const req = r.per * qty;
-    let f = frac(r);
-    for (let p = byId.get(r.line.parent); p && f < 1; p = byId.get(p.line.parent)) f = Math.max(f, frac(p));
-    tot += req; got += req * f;
-  });
+  rows.filter((r) => !r.hasKids && bxKey(r.line)).forEach((r) => { const req = r.per * qty; tot += req; got += req * cov.get(r.line.id).iss; });
   if (!tot) return;
   wo.issuedPct = got >= tot - 1e-9 ? 100 : Math.min(99, Math.floor((got / tot) * 100));
   if (typeof afterWOMutation === "function") afterWOMutation(); else if (typeof saveWorkOrders === "function") saveWorkOrders();
@@ -778,8 +813,14 @@ function renderBxPick(pane) {
     const use = bxRefUsage(ctx.ref);
     const need = isService ? {} : bxRequirement(ctx.model, ctx.qty);
     const q = bxPickSearch.trim().toLowerCase();
-    const rows = bxTree(ctx.model).filter((r) => r.isGroup || isService || !r.hasKids);
-    const match = (r) => !q || [r.line.code, r.line.part, r.line.station, r.no].some((v) => String(v || "").toLowerCase().includes(q));
+    const cv = isService ? null : bxCoverage(ctx.model, ctx.qty || 1, use);
+    const all = bxTree(ctx.model);
+    const byIdP = new Map(all.filter((r) => r.line).map((r) => [r.line.id, r]));
+    const isKit = (r) => r.line && r.line.parent && byIdP.get(r.line.parent) && !byIdP.get(r.line.parent).line.parent;
+    const stations = [...new Set(all.filter((r) => r.line && r.line.station).map((r) => r.line.station))].sort();
+    const stationOk = (r) => !bxPickStation || !stations.includes(bxPickStation) || (r.line && r.line.station === bxPickStation);
+    const rows = all.filter((r) => r.isGroup || isService || (bxPickLevel === "kit" ? isKit(r) : !r.hasKids));
+    const match = (r) => stationOk(r) && (!q || [r.line.code, r.line.part, r.line.station, r.no].some((v) => String(v || "").toLowerCase().includes(q)));
     const vis = rows.filter((r) => r.isGroup ? rows.some((x) => x.line && x.group === r.group && match(x)) : match(r));
     const reqs = bxReqs().filter((d) => d.wo === ctx.ref && bxReqVisible(d));
     body = `
@@ -795,10 +836,11 @@ function renderBxPick(pane) {
               const l = r.line;
               const k = bxKey(l);
               const u = use[k] || { issued: 0, pending: 0, requested: 0 };
-              const req = need[k] ? need[k].req : 0;
-              const notAsked = Math.max(0, req - u.requested);
+              const c = cv ? cv.cov.get(l.id) : null;
+              const req = isService ? 0 : r.per * (ctx.qty || 1);
+              const notAsked = c ? Math.max(0, Math.round(req * (1 - c.reqd) * 1000) / 1000) : Math.max(0, req - u.requested);
               const def = isService ? 1 : notAsked;
-              const done = !isService && req > 0 && u.issued >= req;
+              const done = !isService && req > 0 && c && c.iss >= 1;
               return `<tr class="${done ? "bx-done-row" : ""}">
                 <td><input type="checkbox" class="bx-pick-chk" data-key="${bxEsc(k)}" data-def="${def}" aria-label="เลือก ${bxEsc(l.part)}"${!canReq ? " disabled" : ""}></td>
                 <td class="bx-itemno">${bxEsc(r.no)}</td>
@@ -831,7 +873,7 @@ function renderBxPick(pane) {
     <div class="card">
       <div class="card-header">
         <h3>เลือกเบิกวัสดุตามรายการ BOM</h3>
-        <p class="card-sub">ช่าง/หัวหน้าเลือกงาน → ระบบคำนวณ BOM × จำนวนคัน แสดงที่เบิกแล้ว รอจ่าย และที่ยังไม่ได้ขอ → ติ๊กรายการ ใส่จำนวน เลือกผู้รับของ แล้วส่งใบเบิกให้หัวหน้าอนุมัติและคลังจ่ายของ · งานผลิตเบิกระดับชิ้นย่อย งานบริการเบิกได้ทั้งชุด</p>
+        <p class="card-sub">ช่าง/หัวหน้าเลือกงาน → ระบบคำนวณ BOM × จำนวนคัน แสดงที่เบิกแล้ว รอจ่าย และที่ยังไม่ได้ขอ → ติ๊กรายการ ใส่จำนวน เลือกผู้รับของ แล้วส่งใบเบิกให้หัวหน้าอนุมัติและคลังจ่ายของ · เบิกเป็น "ชุดประกอบย่อย" (ค่าเริ่มต้น เหมือน ERPNext) หรือ "ชิ้นย่อย" ก็ได้ ระบบนับให้ไม่ซ้ำ · จาก Job Card กด "📦 เบิกของขั้นนี้" จะกรองตามสถานีให้</p>
       </div>
       <div class="card-body">
         <div class="filter-row">
@@ -841,11 +883,17 @@ function renderBxPick(pane) {
             <optgroup label="งานบริการหลังการขาย (ยังไม่ปิด)">${refs.filter((r) => r.kind === "บริการ").map((r) => `<option value="${bxEsc(r.ref)}"${r.ref === bxRef ? " selected" : ""}>${bxEsc(r.label)}</option>`).join("")}</optgroup>
           </select>
           ${ctx ? `<label for="bxPickSearch">ค้นหา:</label><input type="text" id="bxPickSearch" class="wo-search" placeholder="รหัส / ชื่อ / สถานี" value="${bxEsc(bxPickSearch)}">` : ""}
+          ${ctx && ctx.kind !== "บริการ" ? `<label for="bxPickLevel">เบิกระดับ:</label><select id="bxPickLevel"><option value="kit"${bxPickLevel === "kit" ? " selected" : ""}>ชุดประกอบย่อย (ทั้งชุด)</option><option value="leaf"${bxPickLevel === "leaf" ? " selected" : ""}>ชิ้นย่อย (ทีละชิ้น)</option></select>` : ""}
+          ${ctx && MASTER_BOM[ctx.model] ? (() => { const st = [...new Set(bxTree(ctx.model).filter((r) => r.line && r.line.station).map((r) => r.line.station))].sort(); return st.length ? `<label for="bxPickStation">ใช้ที่:</label><select id="bxPickStation"><option value="">ทุกสถานี</option>${st.map((s) => `<option${s === bxPickStation ? " selected" : ""}>${bxEsc(s)}</option>`).join("")}</select>` : ""; })() : ""}
         </div>
         ${body}
       </div>
     </div>`;
   document.getElementById("bxRefSel").addEventListener("change", (e) => { bxRef = e.target.value; bxPickSearch = ""; renderBomx(); });
+  const lvl = document.getElementById("bxPickLevel");
+  if (lvl) lvl.addEventListener("change", (e) => { bxPickLevel = e.target.value; renderBomx(); });
+  const stSel = document.getElementById("bxPickStation");
+  if (stSel) stSel.addEventListener("change", (e) => { bxPickStation = e.target.value; renderBomx(); });
   const search = document.getElementById("bxPickSearch");
   if (search) search.addEventListener("input", (e) => {
     bxPickSearch = e.target.value;
@@ -963,14 +1011,16 @@ function bxRenderReqModal() {
         <tbody>${d.items.map((it, k) => {
           const out = bxItemOutstanding(d, it);
           const s = bxStock(it.key);
-          const defIssue = s ? Math.max(0, Math.min(out, bxNum(s.qty))) : out;
-          return `<tr>
+          const avail = bxSxAvail(it.key);
+          const defIssue = avail !== null ? Math.max(0, Math.min(out, avail)) : out;
+          const picked = bxPicked[d.no] && bxPicked[d.no].has(k);
+          return `<tr class="${picked ? "bx-picked" : ""}">
             <td class="bx-itemno">${bxEsc(it.item || "")}</td>
             <td class="mono-cell"><button type="button" class="bx-link" data-detail="${bxEsc(it.key)}">${bxEsc(it.code || "—")}</button></td>
             <td>${bxEsc(it.part)}</td><td>${bxEsc(it.unit)}</td>
             <td class="num">${bxFmt(it.req)}</td><td class="num">${bxFmt(it.issued)}</td><td class="num">${bxFmt(it.ret)}</td>
             <td class="num">${out ? `<strong class="bx-low">${bxFmt(out)}</strong>` : "0"}</td>
-            <td>${bxStockCell(it.key)}${s && out > bxNum(s.qty) ? ` <span class="pill pill-critical">ไม่พอ</span>` : ""}</td>
+            <td>${bxStockCell(it.key)}${avail !== null && out > avail ? ` <span class="pill pill-critical">ไม่พอ${s && s.wh && s.wh.QI ? " (บางส่วนรอ IQC)" : ""}</span>` : ""}${picked ? ` <span class="pill pill-good">✓ หยิบแล้ว</span>` : ""}</td>
             ${canIssue ? `<td class="num"><input type="number" min="0" step="any" class="bx-issue" data-k="${k}" value="${out ? defIssue : ""}" aria-label="จ่ายครั้งนี้"${out ? "" : " disabled"}></td>` : ""}
             ${canReturn ? `<td class="num"><input type="number" min="0" step="any" class="bx-return" data-k="${k}" value="" placeholder="0" aria-label="คืนคลัง"${bxNum(it.issued) - bxNum(it.ret) > 0 ? "" : " disabled"}></td>` : ""}
           </tr>`;
@@ -988,6 +1038,8 @@ function bxRenderReqModal() {
       ${canIssue ? `<button type="button" class="btn-primary" id="bxIssue">บันทึกจ่ายของ</button>` : ""}
       ${canIssue && d.status === "จ่ายบางส่วน" ? `<button type="button" class="btn-secondary" id="bxCloseShort">ปิดใบเบิก (ไม่จ่ายส่วนที่เหลือ)</button>` : ""}
       ${canReturn ? `<button type="button" class="btn-secondary" id="bxReturn">บันทึกคืนคลัง</button>` : ""}
+      ${canIssue ? `<button type="button" class="btn-secondary" id="bxPickList">🧾 ใบหยิบของ (เรียงตามที่เก็บ)</button><button type="button" class="btn-secondary" id="bxScanPick">📷 สแกนยืนยันหยิบ</button>` : ""}
+      ${isReceiver && bxNeedsAck(d) ? `<button type="button" class="btn-primary" id="bxAck">✔ ยืนยันรับของครบ (${bxFmt(bxIssuedTotal(d) - bxNum(d.ackIssued))} ชิ้น)</button>` : ""}
       <button type="button" class="btn-secondary" id="bxReqPaper">📄 ใบเบิก / PDF</button>
       <button type="button" class="btn-secondary" id="bxReqClose">ปิด</button>
     </div>`;
@@ -1006,7 +1058,44 @@ function bxRenderReqModal() {
     bxReqAction(d, "จ่ายของแล้ว", note() || "ปิดยอดค้าง");
   });
   if ($("bxReturn")) $("bxReturn").addEventListener("click", () => bxReturn(d, note()));
+  if ($("bxAck")) $("bxAck").addEventListener("click", () => {
+    const n = bxIssuedTotal(d) - bxNum(d.ackIssued);
+    d.ackIssued = bxIssuedTotal(d); d.ackAt = new Date().toISOString(); d.ackBy = bxUserName();
+    d.log = d.log || []; d.log.push({ at: d.ackAt, by: d.ackBy, kind: "ผู้รับยืนยันรับของ", qty: n, note: note() });
+    if (typeof auditLog === "function") auditLog("ยืนยันรับของ", d.no, `${n} ชิ้น${note() ? ` · ${note()}` : ""}`);
+    bxAfterReqChange(d);
+    showToast("ยืนยันรับของแล้ว", "good");
+  });
+  if ($("bxPickList")) $("bxPickList").addEventListener("click", () => bxPrintPickList(d));
+  if ($("bxScanPick")) $("bxScanPick").addEventListener("click", () => snScan(`สแกนชิ้นที่หยิบ — ${d.no}`, (raw) => {
+    let v = String(raw).trim();
+    try { const u = new URL(v); v = u.searchParams.get("item") || v; } catch (e) { /* plain */ }
+    const k = d.items.findIndex((it) => it.key === v || it.code === v);
+    if (k < 0) { showToast(`${v} ไม่อยู่ในใบเบิกนี้ — ตรวจว่าหยิบถูกชิ้นไหม`, "warn"); return true; }
+    (bxPicked[d.no] = bxPicked[d.no] || new Set()).add(k);
+    const left = d.items.filter((it, i) => bxItemOutstanding(d, it) > 0 && !bxPicked[d.no].has(i)).length;
+    showToast(`✓ ${d.items[k].part} — เหลือ ${left} รายการ`, "good");
+    bxRenderReqModal();
+    return left > 0;
+  }));
   bxWireCommon(box);
+}
+
+// ERPNext Pick List: what to fetch, sorted by storage location, with a tick box per line
+function bxPrintPickList(d) {
+  const rows = d.items.map((it) => ({ it, out: bxItemOutstanding(d, it), st: bxStock(it.key) || {} })).filter((r) => r.out > 0)
+    .sort((a, b) => String(a.st.loc || "~").localeCompare(String(b.st.loc || "~")));
+  const w = window.open("", "_blank");
+  if (!w) { showToast("เบราว์เซอร์บล็อกหน้าต่างพิมพ์ — อนุญาต pop-up ก่อน", "warn"); return; }
+  w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>ใบหยิบของ ${bxEsc(d.no)}</title>
+    <style>body{font-family:"IBM Plex Sans Thai","Leelawadee UI",sans-serif;margin:12mm;font-size:11pt}h1{font-size:15pt;margin:0}table{width:100%;border-collapse:collapse;margin-top:8px}
+    th,td{border:1px solid #999;padding:4px 6px;text-align:left}th{background:#eee}.n{text-align:right}.b{width:18px;height:18px;border:1.5px solid #333;display:inline-block}code{font-family:"IBM Plex Mono",monospace}</style></head><body>
+    <h1>ใบหยิบของ (Pick List) — ${bxEsc(d.no)}</h1><div>งาน ${bxEsc(d.wo || "")} · รุ่น ${bxEsc(d.model || "")} · ผู้รับของ ${bxEsc(d.owner || "")} · พิมพ์ ${new Date().toLocaleString("th-TH")}</div>
+    <table><thead><tr><th>ที่เก็บ</th><th>รหัส</th><th>ชื่อ</th><th class="n">หยิบ</th><th>หน่วย</th><th>✓</th></tr></thead><tbody>
+    ${rows.map((r) => `<tr><td><b>${bxEsc(r.st.loc || "—")}</b></td><td><code>${bxEsc(r.it.code || r.it.key)}</code></td><td>${bxEsc(r.it.part)}</td><td class="n"><b>${bxFmt(r.out)}</b></td><td>${bxEsc(r.it.unit || "")}</td><td><span class="b"></span></td></tr>`).join("")}
+    </tbody></table><p>ผู้หยิบ ____________________ &nbsp; ผู้ตรวจ ____________________ &nbsp; ผู้รับของ ____________________</p>
+    <script>setTimeout(function(){window.print()},300)<\/script></body></html>`);
+  w.document.close();
 }
 
 function bxAfterReqChange(d) {
@@ -1040,7 +1129,8 @@ function bxIssue(d, note) {
     const out = bxItemOutstanding(d, it);
     if (n > out) { showToast(`${it.part}: จ่ายได้ไม่เกิน ${bxFmt(out)}`, "warn"); inp.focus(); return; }
     const s = bxStock(it.key);
-    if (s && n > bxNum(s.qty)) { showToast(`${it.part}: คงคลังมีแค่ ${bxFmt(s.qty)}`, "warn"); inp.focus(); return; }
+    const avail = bxSxAvail(it.key);
+    if (s && n > avail) { showToast(`${it.part}: จ่ายได้แค่ ${bxFmt(avail)}${s.wh && s.wh.QI ? ` (อีก ${bxFmt(s.wh.QI)} รอ IQC)` : ""}`, "warn"); inp.focus(); return; }
     plan.push({ it, n, s });
   }
   if (!plan.length) { showToast("ใส่จำนวนที่จ่ายครั้งนี้ก่อน", "warn"); return; }
@@ -1099,12 +1189,12 @@ function renderBxTrack(pane) {
 
   const refsWithReq = new Set(s.reqs.map((d) => d.wo));
   const woRows = WORK_ORDERS.filter((w) => w.status !== "เสร็จสมบูรณ์").map((w) => {
-    const need = Object.values(bxRequirement(w.model, bxNum(w.qty) || 1));
-    const use = bxRefUsage(w.wo);
-    const full = need.filter((n) => (use[n.key] || {}).issued >= n.req).length;
-    const notAsked = need.filter((n) => ((use[n.key] || {}).requested || 0) < n.req).length;
-    const pending = need.filter((n) => (use[n.key] || {}).pending > 0).length;
-    return { w, need: need.length, full, notAsked, pending, tracked: refsWithReq.has(w.wo) };
+    const { rows, cov } = bxCoverage(w.model, bxNum(w.qty) || 1, bxRefUsage(w.wo));
+    const leaves = rows.filter((r) => !r.hasKids && bxKey(r.line)).map((r) => cov.get(r.line.id));
+    const full = leaves.filter((c) => c.iss >= 1).length;
+    const notAsked = leaves.filter((c) => c.reqd < 1).length;
+    const pending = leaves.filter((c) => c.reqd > c.iss).length;
+    return { w, need: leaves.length, full, notAsked, pending, tracked: refsWithReq.has(w.wo) };
   });
   const shortRows = Object.keys(s.demand).map((k) => {
     const st = bxStock(k);
@@ -1155,7 +1245,7 @@ function renderBxTrack(pane) {
       <div class="card">
         <div class="card-header">
           <h3>ค้างเบิกตามใบสั่งผลิต</h3>
-          <p class="card-sub">นับเฉพาะชิ้นที่เบิกได้ (ชิ้นย่อย) × จำนวนคัน · กด "เลือกเบิก" เพื่อเบิกส่วนที่ยังไม่ได้ขอ</p>
+          <p class="card-sub">นับเป็นชิ้นย่อยทั้งคัน — เบิกชุดประกอบย่อยแล้ว ชิ้นใต้ชุดนั้นนับว่าเบิกแล้วด้วย (แบบ ERPNext) · กด "เลือกเบิก" เพื่อเบิกส่วนที่ยังไม่ได้ขอ</p>
         </div>
         <div class="card-body table-scroll">
           <table class="data-table">

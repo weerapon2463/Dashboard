@@ -136,10 +136,25 @@ function jcButtons(wo, i, big) {
   const hold = j.status === "wip"
     ? `<select class="bom-inline jc-reason" ${at} aria-label="เหตุผลที่หยุด"><option value="">— สาเหตุที่หยุด —</option>${JC_STOP_REASONS.map((r) => `<option>${jcEsc(r)}</option>`).join("")}</select><button type="button" class="${cls2}" data-jc="hold" ${at}>⏸ พัก</button>`
     : `<button type="button" class="${cls}" data-jc="start" ${at}>▶ ${j.status === "hold" ? "ทำต่อ" : "เริ่ม"}</button>`;
-  return `${hold} <label class="jc-qtylab">จำนวนเสร็จ <input type="number" class="bom-inline jc-qty" ${at} min="0" step="1" value="${jcEsc(wo.qty)}" aria-label="จำนวนที่เสร็จ"></label> <button type="button" class="${cls2}" data-jc="done" ${at}>✔ เสร็จ</button>`;
+  const req = `<button type="button" class="${big ? "btn-secondary jc-big" : "btn-link"}" data-jcreq="${jcEsc(wo.wo)}" data-i="${i}" title="เบิกของสำหรับขั้นตอนนี้">📦 เบิกของ</button>`;
+  return `${hold} ${req} <label class="jc-qtylab">จำนวนเสร็จ <input type="number" class="bom-inline jc-qty" ${at} min="0" step="1" value="${jcEsc(wo.qty)}" aria-label="จำนวนที่เสร็จ"></label> <button type="button" class="${cls2}" data-jc="done" ${at}>✔ เสร็จ</button>`;
+}
+
+// BOM "ใช้ที่" names for each workstation, so a job card opens the requisition page filtered to its station
+const JC_BOM_STATION = { CUT: "ไลน์เชื่อม", WELD: "ไลน์เชื่อม", MC: "ไลน์กลึง", PAINT: "ไลน์พ่นสี", QC: "ไลน์ทดสอบ" };
+function jcRequestFor(wo, j) {
+  if (typeof bxRef === "undefined") return;
+  bxRef = wo.wo; bxPickLevel = "kit"; bxPickSearch = "";
+  bxPickStation = j.station === "ASSY" ? (wo.department || "") : (JC_BOM_STATION[j.station] || "");
+  bxTab = "pick";
+  switchView("bomx");
 }
 
 function jcWireButtons(root) {
+  root.querySelectorAll("[data-jcreq]").forEach((b) => b.addEventListener("click", () => {
+    const wo = WORK_ORDERS.find((w) => w.wo === b.dataset.jcreq);
+    if (wo) jcRequestFor(wo, wo.jobs[+b.dataset.i]);
+  }));
   root.querySelectorAll("[data-jc]").forEach((b) => b.addEventListener("click", () => {
     const wo = WORK_ORDERS.find((w) => w.wo === b.dataset.jcwo);
     if (!wo) return;

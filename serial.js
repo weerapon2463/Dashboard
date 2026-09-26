@@ -67,7 +67,14 @@ function snHistory(key) {
     add(wo.createdAt || (wo.jobs && wo.jobs[0] && wo.jobs[0].logs && wo.jobs[0].logs[0] && wo.jobs[0].logs[0].from), "ผลิต", `ใบสั่งผลิต ${wo.wo}`, `${wo.model} · ${wo.department || ""} · กำหนดส่ง ${wo.dueDate || "-"}`, wo.wo);
     (DEPT_DOCS.mreq || []).filter((d) => d.wo === wo.wo && Array.isArray(d.items)).forEach((d) => {
       add(d.date, "เบิก", `ใบเบิก ${d.no} (${d.status})`, `${d.items.length} รายการ · ผู้ขอ ${d.owner || d.requester || "-"}`, d.no);
-      d.items.forEach((it) => (it.log || []).forEach((g) => add(g.at, g.kind === "คืนคลัง" ? "คืน" : "จ่าย", `${g.kind} ${it.code || it.key} ${it.part || ""}`, `× ${g.qty} · โดย ${g.by || "-"}${g.note ? ` · ${g.note}` : ""}`, d.no)));
+      const batches = {};
+      d.items.forEach((it) => (it.log || []).forEach((g) => {
+        const k = `${String(g.at).slice(0, 16)}|${g.kind}`;
+        const b = batches[k] = batches[k] || { at: g.at, kind: g.kind, by: g.by, n: 0, qty: 0, names: [] };
+        b.n++; b.qty += Number(g.qty) || 0; if (b.names.length < 4) b.names.push(it.part || it.code);
+      }));
+      Object.values(batches).forEach((b) => add(b.at, b.kind === "คืนคลัง" ? "คืน" : "จ่าย", `${b.kind} ${b.n} รายการ ตาม ${d.no}`, `${b.names.join(", ")}${b.n > b.names.length ? ` และอีก ${b.n - b.names.length} รายการ` : ""} · โดย ${b.by || "-"}`, d.no));
+      if (d.ackAt) add(d.ackAt, "จ่าย", `ผู้รับยืนยันรับของ ${d.no}`, d.ackBy || "", d.no);
     });
     (wo.jobs || []).forEach((j) => {
       (j.logs || []).forEach((l) => add(l.from, "Job Card", `${j.op} (${j.station})`, `${l.by || j.assignee || "-"} · ${l.to ? `ถึง ${new Date(l.to).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}` : "กำลังทำ"}`, j.no));
