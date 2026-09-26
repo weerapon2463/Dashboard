@@ -110,7 +110,7 @@ function capacityStatus(utilPct) {
 // batches for the higher-demand models (YT3000, YT6500).
 // Product name — the company name and logo come from each company's settings (org.js)
 const APP_NAME = "FORGE";
-const APP_TAGLINE = "ระบบบริหารโรงงานครบวงจร";
+const APP_TAGLINE = "ทุบเพื่อสร้างใหม่ — ระบบบริหารโรงงานครบวงจร";
 
 const SCHEDULE_PHASES = ["ออกแบบ", "จัดซื้อ", "ประกอบ", "ทดสอบ", "ส่งมอบ"];
 const PHASE_COLORS = {
