@@ -1402,3 +1402,12 @@ html[data-density="compact"] body { zoom: 0.9; }
 .ov-ec-r { display: flex; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--gridline); font-size: 13px; }
 .ov-ec-tv { margin-top: 12px; width: 100%; }
 @media (max-width: 800px) { .ov-ec-grid { grid-template-columns: 1fr; } }
+.ms-phase-row { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto; }
+.ms-phase-name { gap: 6px; }
+.ms-phase-name .ms-name { flex: 1; min-width: 0; }
+.ms-color { width: 34px; height: 34px; padding: 0; border: 1px solid var(--border-hairline); border-radius: 8px; background: none; flex: none; cursor: pointer; }
+.ms-phase-tools { display: inline-flex; gap: 3px; align-self: end; padding-bottom: 4px; }
+@media (max-width: 600px) { .ms-phase-row { grid-template-columns: 1fr 1fr; } .ms-phase-name, .ms-phase-tools { grid-column: 1 / -1; } }
+.ms-phase-row .ms-phase-name { display: flex; align-items: center; }
+.ms-phase-row .ms-phase-name .ms-color { width: 36px !important; min-width: 36px; max-width: 36px; flex: 0 0 36px; height: 36px; }
+.ms-phase-row .ms-phase-name .ms-name { flex: 1 1 auto; width: auto !important; min-width: 0; }

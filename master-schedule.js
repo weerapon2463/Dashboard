@@ -14,6 +14,15 @@ const MS_STATION_COLOR = { CUT: "#8d99ae", WELD: "#e07b00", MC: "#6c5ce7", PAINT
 const MS_DAY = 86400000;
 
 let msPendingIndex = null;
+let msDraft = [];   // phases being edited in the modal: [{ phase, from, to, color }]
+const MS_PHASE_HEX = { "ออกแบบ": "#6c5ce7", "จัดซื้อ": "#e0a100", "ประกอบ": "#2a78d6", "ทดสอบ": "#1baf7a", "ส่งมอบ": "#138a13" };
+const MS_EXTRA_HEX = ["#e07b00", "#d55181", "#00a3a3", "#8d6e63", "#7a8b99", "#c0392b", "#5e8f00"];
+function msColor(p) {
+  if (p.color) return p.color;
+  if (MS_PHASE_HEX[p.phase]) return MS_PHASE_HEX[p.phase];
+  let h = 0; for (const c of String(p.phase || "")) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return MS_EXTRA_HEX[h % MS_EXTRA_HEX.length];
+}
 let msView = (() => { try { return JSON.parse(localStorage.getItem(MS_VIEW_KEY) || "null") || {}; } catch (e) { return {}; } })();
 
 function scheduleCanEdit(role) { return role === "depthead" || role === "plant" || role === "admin"; }
@@ -175,7 +184,7 @@ function renderMasterSchedule() {
   if (sortMode === "start") planned.sort((a, b) => first(a.row) - first(b.row));
   if (sortMode === "end") planned.sort((a, b) => last(a.row) - last(b.row));
   html += planned.map(({ row, index }, pos) => {
-    const bars = (row.phases || []).map((p) => msBar(msParse(p.from), msParse(p.to) + MS_DAY, r, "", `background:${PHASE_COLORS[p.phase] || "#888"}`, p.phase, `${row.model} — ${p.phase}: ${msThai(msParse(p.from), true)} – ${msThai(msParse(p.to), true)}`)).join("");
+    const bars = (row.phases || []).map((p) => msBar(msParse(p.from), msParse(p.to) + MS_DAY, r, "", `background:${msColor(p)}`, p.phase, `${row.model} — ${p.phase}: ${msThai(msParse(p.from), true)} – ${msThai(msParse(p.to), true)}`)).join("");
     const first = Math.min(...(row.phases || []).map((p) => msParse(p.from)));
     const last = Math.max(...(row.phases || []).map((p) => msParse(p.to)));
     const cur = (row.phases || []).find((p) => today >= msParse(p.from) && today < msParse(p.to) + MS_DAY);
@@ -225,7 +234,9 @@ function renderMasterSchedule() {
 function renderGanttLegend() {
   const legend = document.getElementById("ganttLegend");
   if (!legend) return;
-  legend.innerHTML = SCHEDULE_PHASES.map((p) => `<span><span class="legend-swatch" style="background:${PHASE_COLORS[p]}"></span>${escapeHtml(p)}</span>`).join("")
+  const used = [];
+  MASTER_SCHEDULE.forEach((row) => (row.phases || []).forEach((p) => { if (!used.some((u) => u.phase === p.phase && msColor(u) === msColor(p))) used.push(p); }));
+  legend.innerHTML = (used.length ? used : SCHEDULE_PHASES.map((phase) => ({ phase }))).map((p) => `<span><span class="legend-swatch" style="background:${msColor(p)}"></span>${escapeHtml(p.phase)}</span>`).join("")
     + ` · ขั้นตอนจริง: ${Object.keys(MS_STATION_COLOR).map((k) => `<span><span class="legend-swatch" style="background:${MS_STATION_COLOR[k]}"></span>${k}</span>`).join("")}`
     + `<span>— เส้นแดง = วันนี้ (${msThai(Date.now(), true)})</span>`;
 }
@@ -240,11 +251,41 @@ function updateScheduleStat() {
 /* ---- add / edit / delete: real dates per phase ------------------------------------- */
 
 function msFormPhasesHtml(phases) {
-  return phases.map((p, i) => `<div class="ms-phase-row">
-      <span class="ms-phase-name"><span class="legend-swatch" style="background:${PHASE_COLORS[p.phase]}"></span>${escapeHtml(p.phase)}</span>
+  const names = [...new Set(SCHEDULE_PHASES.concat(...MASTER_SCHEDULE.map((r) => (r.phases || []).map((p) => p.phase))))];
+  return `<datalist id="msPhaseNames">${names.map((n) => `<option value="${escapeHtml(n)}">`).join("")}</datalist>` + phases.map((p, i) => `<div class="ms-phase-row">
+      <span class="ms-phase-name"><input type="color" class="ms-color" data-i="${i}" value="${escapeHtml(msColor(p))}" aria-label="สีขั้นตอน"><input class="ms-name" data-i="${i}" list="msPhaseNames" value="${escapeHtml(p.phase || "")}" placeholder="ชื่อขั้นตอน" aria-label="ชื่อขั้นตอน"></span>
       <label>ตั้งแต่ <input type="date" class="ms-from" data-i="${i}" value="${escapeHtml(p.from || "")}"></label>
       <label>ถึง <input type="date" class="ms-to" data-i="${i}" value="${escapeHtml(p.to || "")}"></label>
-    </div>`).join("");
+      <span class="ms-phase-tools"><button type="button" class="ord-btn" data-msph="up" data-i="${i}"${i === 0 ? " disabled" : ""} aria-label="เลื่อนขึ้น">▲</button><button type="button" class="ord-btn" data-msph="down" data-i="${i}"${i === phases.length - 1 ? " disabled" : ""} aria-label="เลื่อนลง">▼</button><button type="button" class="ord-btn" data-msph="del" data-i="${i}" aria-label="ลบขั้นตอน">✕</button></span>
+    </div>`).join("") + `<button type="button" class="btn-secondary" id="msPhaseAdd">+ เพิ่มขั้นตอน</button>`;
+}
+// read what is typed in the modal back into the draft
+function msReadForm() {
+  const box = document.getElementById("msFormPhases");
+  msDraft = [...box.querySelectorAll(".ms-phase-row")].map((row, i) => ({
+    phase: row.querySelector(".ms-name").value.trim(), from: row.querySelector(".ms-from").value, to: row.querySelector(".ms-to").value, color: row.querySelector(".ms-color").value,
+  }));
+  return msDraft;
+}
+function msRenderForm() {
+  const box = document.getElementById("msFormPhases");
+  box.innerHTML = msFormPhasesHtml(msDraft);
+  box.querySelectorAll("[data-msph]").forEach((b) => b.addEventListener("click", () => {
+    msReadForm();
+    const i = Number(b.dataset.i);
+    if (b.dataset.msph === "del") msDraft.splice(i, 1);
+    else { const j = b.dataset.msph === "up" ? i - 1 : i + 1; [msDraft[i], msDraft[j]] = [msDraft[j], msDraft[i]]; }
+    msRenderForm();
+  }));
+  document.getElementById("msPhaseAdd").addEventListener("click", () => {
+    msReadForm();
+    const last = msDraft[msDraft.length - 1];
+    const from = last && last.to ? msIso(msParse(last.to) + MS_DAY) : msIso(msMonday(Date.now()));
+    msDraft.push({ phase: "", from, to: msIso(msParse(from) + 6 * MS_DAY), color: MS_EXTRA_HEX[msDraft.length % MS_EXTRA_HEX.length] });
+    msRenderForm();
+    const names = document.querySelectorAll("#msFormPhases .ms-name");
+    if (names.length) names[names.length - 1].focus();
+  });
 }
 
 function msChain(startIso) {
@@ -262,9 +303,10 @@ function openScheduleModal(index) {
   const row = isEdit ? MASTER_SCHEDULE[index] : null;
   document.getElementById("msFormTitle").textContent = isEdit ? `แก้ไขแผน — ${row.model}` : "เพิ่มแผนการผลิตใหม่";
   document.getElementById("msFormModel").value = row ? row.model : "";
-  const phases = row ? SCHEDULE_PHASES.map((ph) => (row.phases || []).find((p) => p.phase === ph) || { phase: ph, from: "", to: "" }) : msChain(msIso(msMonday(Date.now()) + 7 * MS_DAY));
+  const phases = row ? JSON.parse(JSON.stringify(row.phases || [])) : msChain(msIso(msMonday(Date.now()) + 7 * MS_DAY));
   document.getElementById("msFormStart").value = phases[0].from || "";
-  document.getElementById("msFormPhases").innerHTML = msFormPhasesHtml(phases);
+  msDraft = phases.map((p) => Object.assign({ color: msColor(p) }, p));
+  msRenderForm();
   document.getElementById("msDeleteBtn").hidden = !isEdit;
   document.getElementById("msFormBackdrop").classList.add("open");
 }
@@ -282,7 +324,7 @@ function initScheduleInteractions() {
     const old = msParse(froms[0].value);
     const nu = msParse(e.target.value);
     if (isNaN(nu)) return;
-    if (isNaN(old)) { box.innerHTML = msFormPhasesHtml(msChain(e.target.value)); return; }
+    if (isNaN(old)) { msDraft = msChain(e.target.value); msRenderForm(); return; }
     const shift = nu - old;
     froms.forEach((f) => { if (f.value) f.value = msIso(msParse(f.value) + shift); });
     tos.forEach((f) => { if (f.value) f.value = msIso(msParse(f.value) + shift); });
@@ -291,15 +333,15 @@ function initScheduleInteractions() {
   document.getElementById("msFormSaveBtn").addEventListener("click", () => {
     const model = document.getElementById("msFormModel").value.trim();
     if (!model) { document.getElementById("msFormModel").focus(); showToast("ใส่ชื่อรุ่น / ล็อต", "warn"); return; }
-    const box = document.getElementById("msFormPhases");
     const phases = [];
-    for (let i = 0; i < SCHEDULE_PHASES.length; i++) {
-      const from = box.querySelector(`.ms-from[data-i="${i}"]`).value;
-      const to = box.querySelector(`.ms-to[data-i="${i}"]`).value;
-      if (!from && !to) continue;
-      if (!from || !to) { showToast(`${SCHEDULE_PHASES[i]}: ใส่ทั้งวันเริ่มและวันจบ`, "warn"); return; }
-      if (msParse(to) < msParse(from)) { showToast(`${SCHEDULE_PHASES[i]}: วันจบต้องไม่ก่อนวันเริ่ม`, "warn"); return; }
-      phases.push({ phase: SCHEDULE_PHASES[i], from, to });
+    for (const p of msReadForm()) {
+      if (!p.phase && !p.from && !p.to) continue;
+      if (!p.phase) { showToast("ตั้งชื่อขั้นตอนให้ครบ", "warn"); return; }
+      if (!p.from || !p.to) { showToast(`${p.phase}: ใส่ทั้งวันเริ่มและวันจบ`, "warn"); return; }
+      if (msParse(p.to) < msParse(p.from)) { showToast(`${p.phase}: วันจบต้องไม่ก่อนวันเริ่ม`, "warn"); return; }
+      const rec = { phase: p.phase, from: p.from, to: p.to };
+      if (p.color && p.color.toLowerCase() !== String(MS_PHASE_HEX[p.phase] || "").toLowerCase()) rec.color = p.color;
+      phases.push(rec);
     }
     if (!phases.length) { showToast("ใส่วันที่อย่างน้อย 1 ขั้นตอน", "warn"); return; }
     const isEdit = msPendingIndex !== null && msPendingIndex !== undefined;
