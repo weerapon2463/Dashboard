@@ -1446,3 +1446,7 @@ html[data-density="compact"] body { zoom: 0.9; }
 .login-emp-row input { flex: 1 1 160px; min-width: 0; font: inherit; font-size: 15px; padding: 9px 12px; border-radius: 8px; border: 1px solid var(--border-hairline); background: var(--surface-1); color: var(--text-primary); }
 .login-emp .btn-chip { margin-top: 10px; }
 .login-users[hidden], .login-step[hidden], .login-emp[hidden] { display: none; }
+.login-modes { display: flex; gap: 4px; padding: 4px; border-radius: 12px; background: var(--surface-1); border: 1px solid var(--border-hairline); margin: 4px 0 10px; }
+.login-mode { flex: 1; font: inherit; font-size: 13.5px; font-weight: 600; padding: 8px 10px; border: 0; border-radius: 9px; background: transparent; color: var(--text-secondary); cursor: pointer; }
+.login-mode:hover { color: var(--text-primary); }
+.login-mode.active { background: var(--surface-card); color: var(--text-primary); box-shadow: 0 1px 4px rgba(0,0,0,.25), inset 0 0 0 1px var(--accent, var(--series-1)); }

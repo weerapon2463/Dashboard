@@ -600,12 +600,20 @@ function renderLoginScreen() {
   // sign in with employee number or username + password
   const empForm = document.getElementById("loginEmpForm");
   if (empForm) {
-    // user + password everywhere; the demo also keeps the one-click list below it
-    empForm.hidden = false;
-    document.getElementById("loginPickToggle").hidden = isDemo;
-    list.hidden = !isDemo;
-    document.getElementById("loginStepPick").hidden = !isDemo;
-    document.getElementById("loginPickToggle").onclick = () => { list.hidden = !list.hidden; document.getElementById("loginStepPick").hidden = list.hidden; };
+    // two ways in, picked by tab and remembered per device: username/employee no. + password, or the people list
+    const MODE_KEY = "y2j-login-mode-v1";
+    const setMode = (mode) => {
+      empForm.hidden = mode !== "pass";
+      list.hidden = mode !== "pick";
+      if (mode === "pass") pinBox.hidden = true;
+      document.querySelectorAll(".login-mode").forEach((b) => { const on = b.dataset.mode === mode; b.classList.toggle("active", on); b.setAttribute("aria-selected", on); });
+      try { localStorage.setItem(MODE_KEY, mode); } catch (e) { /* per-device preference only */ }
+      if (mode === "pass") setTimeout(() => document.getElementById("loginEmpNo").focus(), 0);
+    };
+    document.querySelectorAll(".login-mode").forEach((b) => { b.onclick = () => setMode(b.dataset.mode); });
+    let saved = "";
+    try { saved = localStorage.getItem(MODE_KEY) || ""; } catch (e) { /* ignore */ }
+    setMode(saved === "pick" || saved === "pass" ? saved : isDemo ? "pick" : "pass");
     const empGo = async () => {
       const id = document.getElementById("loginEmpNo").value.trim().toLowerCase();
       const pw = document.getElementById("loginEmpPw").value;
@@ -618,7 +626,6 @@ function renderLoginScreen() {
     document.getElementById("loginEmpBtn").onclick = empGo;
     document.getElementById("loginEmpPw").onkeydown = (e) => { if (e.key === "Enter") empGo(); };
     document.getElementById("loginEmpNo").onkeydown = (e) => { if (e.key === "Enter") document.getElementById("loginEmpPw").focus(); };
-    if (!isDemo) setTimeout(() => document.getElementById("loginEmpNo").focus(), 0);
   }
   document.getElementById("loginSubmit").onclick = submit;
   pinInput.onkeydown = (e) => { if (e.key === "Enter") submit(); };

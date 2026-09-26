@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=20260928k">
-<link rel="stylesheet" href="theme.css?v=20260928k">
-<link rel="stylesheet" href="tv.css?v=20260928k">
+<link rel="stylesheet" href="style.css?v=20260928l">
+<link rel="stylesheet" href="theme.css?v=20260928l">
+<link rel="stylesheet" href="tv.css?v=20260928l">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -25,20 +25,21 @@
         </div>
       </div>
       <div class="login-conn" id="loginConn"></div>
+      <div class="login-modes" role="tablist" aria-label="วิธีเข้าสู่ระบบ">
+        <button type="button" role="tab" class="login-mode" data-mode="pass">🔑 ชื่อผู้ใช้ / รหัสพนักงาน</button>
+        <button type="button" role="tab" class="login-mode" data-mode="pick">👥 เลือกจากรายชื่อ</button>
+      </div>
       <div class="login-emp" id="loginEmpForm" hidden>
-        <div class="login-step">เข้าสู่ระบบ</div>
         <div class="login-emp-row">
           <input id="loginEmpNo" autocomplete="username" autocapitalize="characters" placeholder="รหัสพนักงาน หรือ ชื่อผู้ใช้ (username)" aria-label="รหัสพนักงาน หรือชื่อผู้ใช้">
           <input id="loginEmpPw" type="password" autocomplete="current-password" placeholder="รหัสผ่าน" aria-label="รหัสผ่าน">
           <button type="button" class="btn-primary" id="loginEmpBtn">เข้าสู่ระบบ</button>
         </div>
         <p class="login-error" id="loginEmpErr" hidden>ชื่อผู้ใช้/รหัสพนักงาน หรือรหัสผ่านไม่ถูกต้อง</p>
-        <button type="button" class="btn-chip" id="loginPickToggle">หรือเลือกจากรายชื่อ</button>
       </div>
-      <div class="login-step" id="loginStepPick">หรือเลือกจากรายชื่อ</div>
       <div class="login-users" id="loginUsers"></div>
       <div class="login-pin" id="loginPinBox" hidden>
-        <div class="login-step">2. ใส่รหัสผ่านของ <strong id="loginPickedName"></strong></div>
+        <div class="login-step">ใส่รหัสผ่านของ <strong id="loginPickedName"></strong></div>
         <div class="login-pin-row">
           <input type="password" id="loginPin" autocomplete="current-password" maxlength="32" aria-label="รหัสผ่าน">
           <button type="button" class="btn-primary" id="loginSubmit">เข้าสู่ระบบ</button>
@@ -1698,46 +1699,46 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260928k"></script>
-  <script src="data.js?v=20260928k"></script>
-  <script src="partcode.js?v=20260928k"></script>
-  <script src="priority-matrix.js?v=20260928k"></script>
-  <script src="capacity-planning.js?v=20260928k"></script>
-  <script src="master-schedule.js?v=20260928k"></script>
-  <script src="make-or-buy.js?v=20260928k"></script>
-  <script src="resource.js?v=20260928k"></script>
-  <script src="procurement.js?v=20260928k"></script>
-  <script src="workorder.js?v=20260928k"></script>
-  <script src="jobcard.js?v=20260928k"></script>
-  <script src="alerts.js?v=20260928k"></script>
-  <script src="overview-charts.js?v=20260928k"></script>
-  <script src="pilot.js?v=20260928k"></script>
-  <script src="pilot-measure.js?v=20260928k"></script>
-  <script src="dept-data.js?v=20260928k"></script>
-  <script src="dept-samples.js?v=20260928k"></script>
-  <script src="org.js?v=20260928k"></script>
-  <script src="dept.js?v=20260928k"></script>
-  <script src="bom.js?v=20260928k"></script>
-  <script src="bomx.js?v=20260928k"></script>
-  <script src="stockx.js?v=20260928k"></script>
-  <script src="naming.js?v=20260928k"></script>
-  <script src="tv.js?v=20260928k"></script>
-  <script src="serial.js?v=20260928k"></script>
-  <script src="mytasks.js?v=20260928k"></script>
-  <script src="bomsheet.js?v=20260928k"></script>
-  <script src="service.js?v=20260928k"></script>
-  <script src="reports.js?v=20260928k"></script>
-  <script src="integrity.js?v=20260928k"></script>
-  <script src="overview.js?v=20260928k"></script>
-  <script src="rnd.js?v=20260928k"></script>
-  <script src="docview.js?v=20260928k"></script>
-  <script src="esign.js?v=20260928k"></script>
-  <script src="p2p-data.js?v=20260928k"></script>
-  <script src="p2p.js?v=20260928k"></script>
-  <script src="suppliers.js?v=20260928k"></script>
-  <script src="auth.js?v=20260928k"></script>
-  <script src="admin.js?v=20260928k"></script>
-  <script src="plans.js?v=20260928k"></script>
-  <script src="app.js?v=20260928k"></script>
+  <script src="storage.js?v=20260928l"></script>
+  <script src="data.js?v=20260928l"></script>
+  <script src="partcode.js?v=20260928l"></script>
+  <script src="priority-matrix.js?v=20260928l"></script>
+  <script src="capacity-planning.js?v=20260928l"></script>
+  <script src="master-schedule.js?v=20260928l"></script>
+  <script src="make-or-buy.js?v=20260928l"></script>
+  <script src="resource.js?v=20260928l"></script>
+  <script src="procurement.js?v=20260928l"></script>
+  <script src="workorder.js?v=20260928l"></script>
+  <script src="jobcard.js?v=20260928l"></script>
+  <script src="alerts.js?v=20260928l"></script>
+  <script src="overview-charts.js?v=20260928l"></script>
+  <script src="pilot.js?v=20260928l"></script>
+  <script src="pilot-measure.js?v=20260928l"></script>
+  <script src="dept-data.js?v=20260928l"></script>
+  <script src="dept-samples.js?v=20260928l"></script>
+  <script src="org.js?v=20260928l"></script>
+  <script src="dept.js?v=20260928l"></script>
+  <script src="bom.js?v=20260928l"></script>
+  <script src="bomx.js?v=20260928l"></script>
+  <script src="stockx.js?v=20260928l"></script>
+  <script src="naming.js?v=20260928l"></script>
+  <script src="tv.js?v=20260928l"></script>
+  <script src="serial.js?v=20260928l"></script>
+  <script src="mytasks.js?v=20260928l"></script>
+  <script src="bomsheet.js?v=20260928l"></script>
+  <script src="service.js?v=20260928l"></script>
+  <script src="reports.js?v=20260928l"></script>
+  <script src="integrity.js?v=20260928l"></script>
+  <script src="overview.js?v=20260928l"></script>
+  <script src="rnd.js?v=20260928l"></script>
+  <script src="docview.js?v=20260928l"></script>
+  <script src="esign.js?v=20260928l"></script>
+  <script src="p2p-data.js?v=20260928l"></script>
+  <script src="p2p.js?v=20260928l"></script>
+  <script src="suppliers.js?v=20260928l"></script>
+  <script src="auth.js?v=20260928l"></script>
+  <script src="admin.js?v=20260928l"></script>
+  <script src="plans.js?v=20260928l"></script>
+  <script src="app.js?v=20260928l"></script>
 </body>
 </html>
