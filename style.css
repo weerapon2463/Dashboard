@@ -1372,3 +1372,17 @@ html[data-density="compact"] body { zoom: 0.9; }
 .plan-move { margin-left: auto; }
 .plan-sortbar { display: flex; align-items: center; gap: 6px; margin: 4px 0 8px; }
 .plan-sortbar select[hidden] { display: none; }
+
+/* ---- never wider than the screen (phones) ---- */
+.card select, .card input:not([type="checkbox"]):not([type="radio"]), .modal select, .modal input:not([type="checkbox"]):not([type="radio"]) { max-width: 100%; }
+.filter-row { flex-wrap: wrap; min-width: 0; }
+.filter-row > * { min-width: 0; }
+.btn-chip { white-space: normal; max-width: 100%; text-align: left; }
+.jc-cost { grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr)); }
+.jc-cost > div { min-width: 0; }
+@media (max-width: 700px) {
+  .tv-head { flex-wrap: wrap; }
+  .tv-right { flex-wrap: wrap; gap: 0.5em; }
+  .tv-clock { font-size: 1.1em; }
+  .tv-kpis { grid-template-columns: 1fr 1fr; }
+}

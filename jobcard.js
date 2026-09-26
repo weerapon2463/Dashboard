@@ -243,13 +243,13 @@ function jcCostHtml(wo, c) {
   const downRows = Object.keys(c.down).sort((a, b) => c.down[b] - c.down[a]);
   return `<div class="jc-cost">
     <div><div class="vis-group-title">ต้นทุนใบสั่งผลิต (Cost sheet)</div>
-      <table class="data-table jc-cost-t"><tbody>
+      <div class="table-scroll"><table class="data-table jc-cost-t"><tbody>
         <tr><td>ค่าดำเนินการตามแผน (เวลาแผน × ค่าสถานี)</td><td class="num">${c.rated ? jcBaht(c.planOp) : "—"}</td></tr>
         <tr><td>ค่าดำเนินการจริง (เวลาจริง × ค่าสถานี)</td><td class="num">${c.rated ? jcBaht(c.actOp) : "—"}</td></tr>
         <tr><td>ค่าวัสดุที่เบิกไปใช้ (มูลค่าตามคลัง)</td><td class="num">${jcBaht(c.mat)}</td></tr>
         <tr><th>รวมต้นทุนจริงถึงตอนนี้</th><th class="num">${jcBaht(c.total)}</th></tr>
         <tr><td>เฉลี่ยต่อคัน (÷ ${n})</td><td class="num">${jcBaht(c.total / n)}</td></tr>
-      </tbody></table>
+      </tbody></table></div>
       ${c.rated ? "" : `<p class="muted-inline">ยังไม่ได้ตั้งค่าใช้จ่ายต่อชั่วโมงของสถานีงาน — ตั้งได้ที่ "สถานีงาน" ด้านล่าง</p>`}</div>
     <div><div class="vis-group-title">เวลาหยุดตามสาเหตุ (Downtime)</div>
       ${downRows.length ? `<table class="data-table"><tbody>${downRows.map((r) => `<tr><td>${jcEsc(r)}</td><td class="num">${jcFmtMins(c.down[r])}</td></tr>`).join("")}</tbody></table>` : `<p class="muted-inline">ยังไม่มีการหยุดงาน</p>`}</div>
@@ -263,13 +263,13 @@ function jcRoutingEditor(model) {
   const open = jcRDraftModel === model && jcRDraft ? " open" : "";
   return `<details class="jc-routing"${open}><summary>Routing ของ ${jcEsc(model)} — ${r ? `${r.length} ขั้นตอน` : "ยังไม่ตั้ง (ใช้แม่แบบเริ่มต้น)"}</summary>
     <p class="card-sub">ลำดับขั้นตอนการผลิตของรุ่นนี้ · เวลาแผนเป็นนาทีต่อ 1 คัน (Job Card คูณจำนวนในใบสั่งผลิตให้) · ใช้กับใบสั่งผลิตที่สร้าง Job Card หลังจากนี้</p>
-    <table class="data-table"><thead><tr><th>#</th><th>ขั้นตอน (Operation)</th><th>สถานี (Workstation)</th><th class="num">นาที/คัน</th><th></th></tr></thead><tbody>
+    <div class="table-scroll"><table class="data-table"><thead><tr><th>#</th><th>ขั้นตอน (Operation)</th><th>สถานี (Workstation)</th><th class="num">นาที/คัน</th><th></th></tr></thead><tbody>
     ${rows.map((s, i) => `<tr><td>${i + 1}</td>
       <td>${can ? `<input class="bom-inline jc-r" data-i="${i}" data-f="op" value="${jcEsc(s.op)}">` : jcEsc(s.op)}</td>
       <td>${can ? `<input class="bom-inline jc-r" data-i="${i}" data-f="station" value="${jcEsc(s.station)}" list="jcWsList">` : jcEsc(s.station)}</td>
       <td class="num">${can ? `<input class="bom-inline jc-r" type="number" min="0" data-i="${i}" data-f="mins" value="${jcEsc(s.mins)}">` : jcEsc(s.mins)}</td>
       <td>${can ? `<button type="button" class="btn-link" data-jcrdel="${i}" aria-label="ลบขั้นตอน">✕</button>` : ""}</td></tr>`).join("")}
-    </tbody></table>
+    </tbody></table></div>
     <datalist id="jcWsList">${jcWorkstations().map((w) => `<option value="${jcEsc(w.id)}">${jcEsc(w.name)}</option>`).join("")}</datalist>
     ${can ? `<button type="button" class="btn-secondary" id="jcRAdd">+ เพิ่มขั้นตอน</button> <button type="button" class="btn-primary" id="jcRSave">บันทึก Routing</button>` : ""}
   </details>`;
@@ -279,11 +279,11 @@ function jcWsEditor() {
   const can = jcCanPlan();
   return `<details class="jc-routing"><summary>สถานีงาน (Workstation) — ค่าใช้จ่ายต่อชั่วโมง</summary>
     <p class="card-sub">ค่าแรง + ค่าเครื่องจักร + ค่าไฟ ต่อชั่วโมงของแต่ละสถานี (แบบ Workstation hour rate ของ ERPNext) ใช้คิดต้นทุนดำเนินการของใบสั่งผลิต · ใส่ตัวเลขจริงของบริษัท ถ้ายังไม่ทราบให้เว้นว่างไว้</p>
-    <table class="data-table"><thead><tr><th>รหัส</th><th>ชื่อสถานี</th><th class="num">บาท/ชั่วโมง</th></tr></thead><tbody>
+    <div class="table-scroll"><table class="data-table"><thead><tr><th>รหัส</th><th>ชื่อสถานี</th><th class="num">บาท/ชั่วโมง</th></tr></thead><tbody>
     ${jcWorkstations().map((w, i) => `<tr><td class="mono-cell">${jcEsc(w.id)}</td>
       <td>${can ? `<input class="bom-inline jc-ws" data-i="${i}" data-f="name" value="${jcEsc(w.name)}">` : jcEsc(w.name)}</td>
       <td class="num">${can ? `<input class="bom-inline jc-ws" type="number" min="0" data-i="${i}" data-f="rate" value="${jcEsc(w.rate)}">` : jcEsc(w.rate || "—")}</td></tr>`).join("")}
-    </tbody></table></details>`;
+    </tbody></table></div></details>`;
 }
 
 function jcWire(el, wo) {

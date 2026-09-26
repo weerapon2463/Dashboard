@@ -179,7 +179,7 @@ function sxRenderEntry(p) {
       <label class="sx-wide">หมายเหตุ<input id="sxNote" value="${bxEsc(d.note)}"></label>
     </div>
     ${P.wo ? `<p class="card-sub">รับ "สินค้าสำเร็จรูป ${bxEsc((WORK_ORDERS.find((w) => w.wo === d.wo) || {}).model || "")}" เข้าคลัง และเพิ่มยอดผลิตเสร็จของใบสั่งผลิต · วัตถุดิบถูกตัดคลังไปแล้วตอนจ่ายตามใบเบิก จึงไม่ตัดซ้ำ</p>` : `
-    <table class="data-table sx-items"><thead><tr><th>รหัสชิ้นส่วน</th><th>ชื่อ</th><th class="num">${P.count ? "ยอดในระบบ" : P.from ? "คงเหลือในคลังต้นทาง" : "คงคลังรวม"}</th><th class="num">${P.count ? "นับได้จริง" : "จำนวน"}</th>${P.count ? `<th class="num">ต่าง</th>` : ""}${d.purpose === "receipt" ? `<th class="num">ราคา/หน่วย (฿)</th>` : ""}<th></th></tr></thead>
+    <div class="table-scroll"><table class="data-table sx-items"><thead><tr><th>รหัสชิ้นส่วน</th><th>ชื่อ</th><th class="num">${P.count ? "ยอดในระบบ" : P.from ? "คงเหลือในคลังต้นทาง" : "คงคลังรวม"}</th><th class="num">${P.count ? "นับได้จริง" : "จำนวน"}</th>${P.count ? `<th class="num">ต่าง</th>` : ""}${d.purpose === "receipt" ? `<th class="num">ราคา/หน่วย (฿)</th>` : ""}<th></th></tr></thead>
       <tbody>${d.items.map((it, i) => {
         const cur = P.count ? sxBal(it.key, d.to) : P.from ? sxBal(it.key, d.from) : bxNum((bxStock(it.key) || {}).qty);
         const diff = P.count && it.qty !== "" ? bxNum(it.qty) - cur : null;
@@ -189,7 +189,7 @@ function sxRenderEntry(p) {
           ${P.count ? `<td class="num">${diff === null ? "" : `<span class="${diff < 0 ? "bx-neg" : ""}">${diff > 0 ? "+" : ""}${bxFmt(diff)}</span>`}</td>` : ""}
           ${d.purpose === "receipt" ? `<td class="num"><input class="bom-inline sx-rate" type="number" min="0" step="any" data-i="${i}" value="${bxEsc(it.rate || "")}" placeholder="${it.key ? bxEsc(sxR2(sxRate(it.key)) || "") : ""}"></td>` : ""}
           <td><button type="button" class="btn-link sx-del" data-i="${i}" aria-label="ลบแถว">✕</button></td></tr>`;
-      }).join("")}</tbody></table>
+      }).join("")}</tbody></table></div>
     <datalist id="sxPartList">${bxAllParts().map((x) => `<option value="${bxEsc(x.key)}">${bxEsc(x.line.part)}</option>`).join("")}</datalist>
     <button type="button" class="btn-secondary" id="sxAddRow">+ เพิ่มรายการ</button> <button type="button" class="btn-secondary" id="sxScan">📷 สแกนเพิ่มรายการ</button>`}
     <div class="sx-actions"><button type="button" class="btn-primary" id="sxSubmit">บันทึก ${bxEsc(sxNextNo())}</button> <button type="button" class="btn-secondary" id="sxReset">ล้างฟอร์ม</button></div>`;
