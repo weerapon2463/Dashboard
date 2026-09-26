@@ -428,7 +428,7 @@ function renderLoginConn() {
   if (card && !document.getElementById("loginBuild")) {
     const src = (document.querySelector('script[src*="storage.js"]') || {}).src || "";
     const v = (src.match(/[?&]v=([^&]+)/) || [])[1] || "";
-    card.insertAdjacentHTML("beforeend", `<div class="login-build" id="loginBuild">เวอร์ชัน ${escapeHtml(v)} · ${Y2JStore.config().demo ? "ระบบทดลอง" : Y2JStore.isRemote() ? "ข้อมูลบริษัท" : "เฉพาะเครื่องนี้"} · <a href="./?reset=1">ล้างข้อมูลในเครื่องนี้</a></div>`);
+    card.insertAdjacentHTML("beforeend", `<div class="login-build" id="loginBuild">เวอร์ชัน ${escapeHtml(v)} · ${Y2JStore.config().demo ? "ระบบทดลอง" : Y2JStore.isRemote() ? "ข้อมูลบริษัท" : "เฉพาะเครื่องนี้"} · <a href="./?reset=1">ล้างข้อมูลในเครื่องนี้</a><br>${typeof APP_NAME !== "undefined" ? APP_NAME : "FORGE"} พัฒนาโดย ${typeof APP_DEVELOPER !== "undefined" ? APP_DEVELOPER : ""}</div>`);
   }
   if (Y2JStore.isRemote() && Y2JStore.config().demo) {
     box.className = "login-conn login-conn-demo";

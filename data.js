@@ -111,6 +111,7 @@ function capacityStatus(utilPct) {
 // Product name — the company name and logo come from each company's settings (org.js)
 const APP_NAME = "FORGE";
 const APP_TAGLINE = "ทุบเพื่อสร้างใหม่";
+const APP_DEVELOPER = "วีระพล จุ้ยม่วง";
 const APP_PROMISE = "หลอมทุกแผนกให้เป็นหนึ่งเดียว — ข้อมูลชุดเดียว ตั้งแต่ออกแบบจนถึงหลังการขาย";
 
 const SCHEDULE_PHASES = ["ออกแบบ", "จัดซื้อ", "ประกอบ", "ทดสอบ", "ส่งมอบ"];

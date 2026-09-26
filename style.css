@@ -1411,3 +1411,5 @@ html[data-density="compact"] body { zoom: 0.9; }
 .ms-phase-row .ms-phase-name { display: flex; align-items: center; }
 .ms-phase-row .ms-phase-name .ms-color { width: 36px !important; min-width: 36px; max-width: 36px; flex: 0 0 36px; height: 36px; }
 .ms-phase-row .ms-phase-name .ms-name { flex: 1 1 auto; width: auto !important; min-width: 0; }
+
+.footer-dev { color: var(--sidebar-fg-muted); margin-top: 4px; font-size: 11px; }
