@@ -345,6 +345,10 @@ function renderJcOperator() {
     if (j.assignee === me) mine.push({ w, j, i });
     else if (!j.assignee && !(w.jobs.slice(0, i).some((p) => p.status === "open" && !p.assignee))) free.push({ w, j, i });
   }));
+  // only people who work on the shop floor (or already have job cards) see this panel
+  const meU = typeof authCurrentUser === "function" ? authCurrentUser() : null;
+  const floor = !meU || meU.dept === "prod" || meU.role === "admin";
+  if (!mine.length && !floor) { box.innerHTML = ""; return; }
   const order = { wip: 0, hold: 1, open: 2 };
   mine.sort((a, b) => order[a.j.status] - order[b.j.status]);
   const card = ({ w, j, i }) => {

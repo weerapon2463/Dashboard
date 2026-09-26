@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=20260927o">
-<link rel="stylesheet" href="theme.css?v=20260927o">
-<link rel="stylesheet" href="tv.css?v=20260927o">
+<link rel="stylesheet" href="style.css?v=20260927p">
+<link rel="stylesheet" href="theme.css?v=20260927p">
+<link rel="stylesheet" href="tv.css?v=20260927p">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -715,56 +715,8 @@
 
       <!-- My Tasks (per-person workspace, filtered to what this person claimed) -->
       <section class="view" id="view-mytasks">
+        <div id="myInbox"></div>
         <div id="jcOpBox"></div>
-        <div class="card">
-          <div class="card-header card-header-actions">
-            <div>
-              <h3>งานของฉัน</h3>
-              <p class="card-sub" id="myTasksIdentityLabel">ยังไม่ได้ระบุชื่อ</p>
-            </div>
-            <button id="myTasksIdentityBtn" class="btn-secondary" type="button">ระบุชื่อ / เปลี่ยนชื่อ</button>
-          </div>
-          <div class="card-body">
-            <div class="stat-grid">
-              <div class="stat-tile">
-                <div class="stat-label">งานที่รับผิดชอบ</div>
-                <div class="stat-value" id="myTasksStatTotal">-</div>
-                <div class="stat-note">ทั้งหมดที่รับไว้</div>
-              </div>
-              <div class="stat-tile">
-                <div class="stat-label">กำลังทำ</div>
-                <div class="stat-value" id="myTasksStatActive">-</div>
-                <div class="stat-note">ยังไม่เสร็จ</div>
-              </div>
-              <div class="stat-tile">
-                <div class="stat-label">เสร็จแล้ว</div>
-                <div class="stat-value" id="myTasksStatDone">-</div>
-                <div class="stat-note">ทำเครื่องหมายเสร็จสมบูรณ์แล้ว</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="card">
-          <div class="card-header"><h3>รายการงานที่ฉันรับผิดชอบ</h3></div>
-          <div class="card-body table-scroll">
-            <table class="data-table" id="myTasksTable">
-              <thead>
-                <tr>
-                  <th>เลขที่ใบสั่งผลิต</th>
-                  <th>รุ่นเครื่องจักร</th>
-                  <th>แผนก/ไลน์ผลิต</th>
-                  <th>เบิกวัสดุแล้ว</th>
-                  <th>กำหนดส่งมอบ</th>
-                  <th>สถานะ</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-            <p class="muted-note" id="myTasksEmptyNote" style="display:none;">ยังไม่มีงานที่รับไว้ — ไปที่ "ใบสั่งผลิต &amp; BOM" แล้วกด "รับงาน" ได้เลย</p>
-          </div>
-        </div>
       </section>
 
       <!-- Priority Matrix -->
@@ -1750,45 +1702,46 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260927o"></script>
-  <script src="data.js?v=20260927o"></script>
-  <script src="partcode.js?v=20260927o"></script>
-  <script src="priority-matrix.js?v=20260927o"></script>
-  <script src="capacity-planning.js?v=20260927o"></script>
-  <script src="master-schedule.js?v=20260927o"></script>
-  <script src="make-or-buy.js?v=20260927o"></script>
-  <script src="resource.js?v=20260927o"></script>
-  <script src="procurement.js?v=20260927o"></script>
-  <script src="workorder.js?v=20260927o"></script>
-  <script src="jobcard.js?v=20260927o"></script>
-  <script src="alerts.js?v=20260927o"></script>
-  <script src="overview-charts.js?v=20260927o"></script>
-  <script src="pilot.js?v=20260927o"></script>
-  <script src="pilot-measure.js?v=20260927o"></script>
-  <script src="dept-data.js?v=20260927o"></script>
-  <script src="dept-samples.js?v=20260927o"></script>
-  <script src="org.js?v=20260927o"></script>
-  <script src="dept.js?v=20260927o"></script>
-  <script src="bom.js?v=20260927o"></script>
-  <script src="bomx.js?v=20260927o"></script>
-  <script src="stockx.js?v=20260927o"></script>
-  <script src="naming.js?v=20260927o"></script>
-  <script src="tv.js?v=20260927o"></script>
-  <script src="serial.js?v=20260927o"></script>
-  <script src="bomsheet.js?v=20260927o"></script>
-  <script src="service.js?v=20260927o"></script>
-  <script src="reports.js?v=20260927o"></script>
-  <script src="integrity.js?v=20260927o"></script>
-  <script src="overview.js?v=20260927o"></script>
-  <script src="rnd.js?v=20260927o"></script>
-  <script src="docview.js?v=20260927o"></script>
-  <script src="esign.js?v=20260927o"></script>
-  <script src="p2p-data.js?v=20260927o"></script>
-  <script src="p2p.js?v=20260927o"></script>
-  <script src="suppliers.js?v=20260927o"></script>
-  <script src="auth.js?v=20260927o"></script>
-  <script src="admin.js?v=20260927o"></script>
-  <script src="plans.js?v=20260927o"></script>
-  <script src="app.js?v=20260927o"></script>
+  <script src="storage.js?v=20260927p"></script>
+  <script src="data.js?v=20260927p"></script>
+  <script src="partcode.js?v=20260927p"></script>
+  <script src="priority-matrix.js?v=20260927p"></script>
+  <script src="capacity-planning.js?v=20260927p"></script>
+  <script src="master-schedule.js?v=20260927p"></script>
+  <script src="make-or-buy.js?v=20260927p"></script>
+  <script src="resource.js?v=20260927p"></script>
+  <script src="procurement.js?v=20260927p"></script>
+  <script src="workorder.js?v=20260927p"></script>
+  <script src="jobcard.js?v=20260927p"></script>
+  <script src="alerts.js?v=20260927p"></script>
+  <script src="overview-charts.js?v=20260927p"></script>
+  <script src="pilot.js?v=20260927p"></script>
+  <script src="pilot-measure.js?v=20260927p"></script>
+  <script src="dept-data.js?v=20260927p"></script>
+  <script src="dept-samples.js?v=20260927p"></script>
+  <script src="org.js?v=20260927p"></script>
+  <script src="dept.js?v=20260927p"></script>
+  <script src="bom.js?v=20260927p"></script>
+  <script src="bomx.js?v=20260927p"></script>
+  <script src="stockx.js?v=20260927p"></script>
+  <script src="naming.js?v=20260927p"></script>
+  <script src="tv.js?v=20260927p"></script>
+  <script src="serial.js?v=20260927p"></script>
+  <script src="mytasks.js?v=20260927p"></script>
+  <script src="bomsheet.js?v=20260927p"></script>
+  <script src="service.js?v=20260927p"></script>
+  <script src="reports.js?v=20260927p"></script>
+  <script src="integrity.js?v=20260927p"></script>
+  <script src="overview.js?v=20260927p"></script>
+  <script src="rnd.js?v=20260927p"></script>
+  <script src="docview.js?v=20260927p"></script>
+  <script src="esign.js?v=20260927p"></script>
+  <script src="p2p-data.js?v=20260927p"></script>
+  <script src="p2p.js?v=20260927p"></script>
+  <script src="suppliers.js?v=20260927p"></script>
+  <script src="auth.js?v=20260927p"></script>
+  <script src="admin.js?v=20260927p"></script>
+  <script src="plans.js?v=20260927p"></script>
+  <script src="app.js?v=20260927p"></script>
 </body>
 </html>

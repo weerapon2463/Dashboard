@@ -98,58 +98,15 @@ function setMyName(name) {
 }
 
 function renderMyTasks() {
-  const label = document.getElementById("myTasksIdentityLabel");
-  const tbody = document.querySelector("#myTasksTable tbody");
-  if (!label || !tbody) return; // view not present (shouldn't happen, but keep this file usable standalone)
-
-  const name = getMyName();
-  label.textContent = name ? `คุณคือ: ${name}` : `ยังไม่ได้ระบุชื่อ — กด "ระบุชื่อ / เปลี่ยนชื่อ" เพื่อดูงานของคุณ`;
-
-  const mine = name
-    ? WORK_ORDERS.filter((w) => (w.assignee || "").trim().toLowerCase() === name.trim().toLowerCase())
-    : [];
-  const done = mine.filter((w) => w.status === "เสร็จสมบูรณ์").length;
+  // Signed-in people get their inbox (mytasks.js) + job cards; the old "type your name" list is gone
+  if (typeof renderMyInbox === "function") renderMyInbox();
   if (typeof renderJcOperator === "function") renderJcOperator();
-
-  const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
-  set("myTasksStatTotal", mine.length);
-  set("myTasksStatActive", mine.length - done);
-  set("myTasksStatDone", done);
-
-  tbody.innerHTML = "";
-  const emptyNote = document.getElementById("myTasksEmptyNote");
-  if (!name) {
-    if (emptyNote) { emptyNote.style.display = "block"; emptyNote.textContent = "ระบุชื่อก่อนเพื่อดูงานของคุณ"; }
-    return;
-  }
-  if (mine.length === 0) {
-    if (emptyNote) {
-      emptyNote.style.display = "block";
-      emptyNote.textContent = 'ยังไม่มีงานที่รับไว้ — ไปที่ "ใบสั่งผลิต & BOM" แล้วกด "รับงาน" ได้เลย';
-    }
-    return;
-  }
-  if (emptyNote) emptyNote.style.display = "none";
-
-  mine.forEach((wo) => {
-    const pillClass = WO_STATUS_META[wo.status] || "pill-good";
-    const canUpdate = wo.status !== "เสร็จสมบูรณ์";
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(wo.wo)}</td>
-      <td>${escapeHtml(wo.model)}</td>
-      <td>${escapeHtml(wo.department)}</td>
-      <td>${wo.issuedPct}%</td>
-      <td>${escapeHtml(wo.dueDate)}</td>
-      <td><span class="pill ${pillClass}">${escapeHtml(wo.status)}</span></td>
-      <td>${canUpdate ? `<button class="btn-chip" data-action="update" data-wo="${escapeHtml(wo.wo)}">อัปเดต</button>` : "—"}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  tbody.querySelectorAll("[data-action='update']").forEach((btn) => {
-    btn.addEventListener("click", () => openUpdateModal(btn.getAttribute("data-wo")));
-  });
+  const u = typeof authCurrentUser === "function" ? authCurrentUser() : null;
+  const shop = u && (u.role === "operator" && u.dept === "prod");
+  const inbox = document.getElementById("myInbox");
+  const jc = document.getElementById("jcOpBox");
+  if (inbox) inbox.style.order = shop ? 2 : 1;
+  if (jc) jc.style.order = shop ? 1 : 2;
 }
 
 function initMyTasksIdentity() {
