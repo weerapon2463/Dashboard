@@ -13,6 +13,7 @@ const AUTH_STORAGE_KEY = "y2j-auth-v1";
 const SESSION_STORAGE_KEY = "y2j-session-v1";
 const AUDIT_STORAGE_KEY = "y2j-audit-v1";
 const AUDIT_MAX = 3000;
+const LOGIN_RECENT_KEY = "y2j-login-recent-v1"; // per device, not synced: last users who signed in here
 const DEMO_PIN = "1234";
 
 const AUTH_ROLES = [
@@ -465,22 +466,56 @@ function renderLoginScreen() {
   document.querySelector(".app-shell").hidden = true;
   renderLoginConn();
   const list = document.getElementById("loginUsers");
-  list.innerHTML = AUTH.users.filter((u) => u.active).map((u) => `
-    <button type="button" class="login-user" data-uid="${escapeHtml(u.id)}">
+  const isDemo = typeof Y2JStore !== "undefined" && Y2JStore.config().demo;
+  const users = AUTH.users.filter((u) => u.active);
+  // sections: executives first, then departments in workspace order, then everyone else
+  const deptOrder = (typeof DEPT_WORKSPACES !== "undefined" ? DEPT_WORKSPACES : []).map((w) => w.id);
+  const rank = { group: 0, plant: 1, admin: 2, depthead: 3, operator: 4 };
+  const secOf = (u) => (["group", "plant", "admin"].includes(u.role) || !u.dept ? "exec" : u.dept);
+  const secIds = ["exec", ...deptOrder, ...new Set(users.map(secOf))].filter((id, i, a) => a.indexOf(id) === i && users.some((u) => secOf(u) === id));
+  const secName = (id) => (id === "exec" ? "ผู้บริหาร & ดูแลระบบ" : authDeptName(id));
+  const recent = (() => { try { return JSON.parse(localStorage.getItem(LOGIN_RECENT_KEY) || "[]"); } catch (e) { return []; } })()
+    .map((id) => users.find((u) => u.id === id)).filter(Boolean).slice(0, 4);
+  const card = (u, sec) => `
+    <button type="button" class="login-user" data-uid="${escapeHtml(u.id)}" data-sec="${secIds.indexOf(sec) % 8 + 1}"
+      data-q="${escapeHtml([u.name, u.position, authRoleLabel(u.role), secName(sec)].join(" ").toLowerCase())}">
       <span class="login-avatar">${escapeHtml(u.name.slice(0, 1))}</span>
-      <span class="login-user-text"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(authRoleLabel(u.role))} · ${escapeHtml(authDeptName(u.dept))}</span></span>
-    </button>`).join("");
+      <span class="login-user-text"><strong>${escapeHtml(u.name)}</strong><span>${escapeHtml(u.position || authRoleLabel(u.role))}</span></span>
+      ${u.role === "depthead" ? '<span class="login-tag">หัวหน้า</span>' : ""}
+    </button>`;
+  list.innerHTML = `
+    ${users.length > 6 ? `<input type="search" class="login-search" id="loginSearch" placeholder="ค้นหาชื่อ ตำแหน่ง หรือแผนก…" aria-label="ค้นหาผู้ใช้">` : ""}
+    ${recent.length ? `<section class="login-sec login-sec-recent"><h4>ใช้ล่าสุดในเครื่องนี้</h4><div class="login-grid">${recent.map((u) => card(u, secOf(u))).join("")}</div></section>` : ""}
+    ${secIds.map((id) => {
+      const us = users.filter((u) => secOf(u) === id).sort((a, b) => (rank[a.role] ?? 9) - (rank[b.role] ?? 9) || a.name.localeCompare(b.name, "th"));
+      return `<section class="login-sec" data-secid="${escapeHtml(id)}"><h4>${escapeHtml(secName(id))} <span>${us.length}</span></h4><div class="login-grid">${us.map((u) => card(u, id)).join("")}</div></section>`;
+    }).join("")}
+    <p class="login-empty" id="loginEmpty" hidden>ไม่พบผู้ใช้ที่ค้นหา</p>`;
+  const search = document.getElementById("loginSearch");
+  if (search) search.addEventListener("input", () => {
+    const q = search.value.trim().toLowerCase();
+    let any = false;
+    list.querySelectorAll(".login-sec").forEach((sec) => {
+      let n = 0;
+      sec.querySelectorAll(".login-user").forEach((b) => { const hit = !q || b.dataset.q.includes(q); b.hidden = !hit; if (hit) n++; });
+      sec.hidden = !n || (q && sec.classList.contains("login-sec-recent"));
+      if (!sec.hidden) any = true;
+    });
+    document.getElementById("loginEmpty").hidden = any;
+  });
   let picked = null;
   const pinBox = document.getElementById("loginPinBox");
   const pinInput = document.getElementById("loginPin");
   list.querySelectorAll("[data-uid]").forEach((b) => b.addEventListener("click", () => {
-    list.querySelectorAll(".login-user").forEach((x) => x.classList.toggle("active", x === b));
+    list.querySelectorAll(".login-user").forEach((x) => x.classList.toggle("active", x.dataset.uid === b.dataset.uid));
     picked = authUserById(b.dataset.uid);
-    document.getElementById("loginPickedName").textContent = picked.name;
+    document.getElementById("loginPickedName").textContent = `${picked.name}${picked.position ? ` (${picked.position})` : ""}`;
     pinBox.hidden = false;
-    pinInput.value = "";
+    // demo accounts all share the published PIN — fill it so visitors can hop between roles quickly
+    pinInput.value = isDemo ? "1234" : "";
     document.getElementById("loginError").hidden = true;
-    pinInput.focus();
+    pinBox.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    (isDemo ? document.getElementById("loginSubmit") : pinInput).focus();
   }));
   const submit = () => {
     if (!picked) return;
@@ -489,6 +524,10 @@ function renderLoginScreen() {
       pinInput.select();
       return;
     }
+    try {
+      const prev = JSON.parse(localStorage.getItem(LOGIN_RECENT_KEY) || "[]");
+      localStorage.setItem(LOGIN_RECENT_KEY, JSON.stringify([picked.id, ...prev.filter((id) => id !== picked.id)].slice(0, 4)));
+    } catch (e) { /* per-device convenience only */ }
     authSignIn(picked, "login");
   };
   document.getElementById("loginSubmit").onclick = submit;
