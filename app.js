@@ -381,6 +381,8 @@ function appStart() {
   const activeNav = document.querySelector(".nav-item.active");
   updateDataBadge(activeNav ? activeNav.dataset.view : "overview");
   renderBottomBar();
+  if (typeof initGlossary === "function") initGlossary();
+  if (typeof initFloor === "function") initFloor();
   // Shared link to one BOM item (?bom=<model>&item=<part code>)
   if (hasDept && typeof bxHandleDeepLink === "function") bxHandleDeepLink();
 }

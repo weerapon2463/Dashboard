@@ -157,6 +157,7 @@ function renderPilot() {
   renderPilotChart();
   renderPilotFeedback(canEdit);
   if (typeof renderPilotMeasured === "function") renderPilotMeasured();
+  if (typeof renderPilotTimer === "function") renderPilotTimer();
 
   document.querySelectorAll(".pilot-edit-only").forEach((el) => { el.hidden = !canEdit; });
 }

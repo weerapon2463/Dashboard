@@ -186,8 +186,16 @@ function authLoad() {
     const parsed = JSON.parse(localStorage.getItem(AUTH_STORAGE_KEY) || "null");
     if (parsed && Array.isArray(parsed.users) && parsed.users.length) {
       AUTH = parsed;
+      // The public DEMO holds demo-company users only. A company account that reached it (a device that
+      // switched between the two) is dropped here, and the cleaned list syncs back to the demo sheet.
+      let leaked = false;
+      if (typeof Y2JStore !== "undefined" && Y2JStore.config().demo) {
+        const keep = AUTH.users.filter((u) => u.company === "demo");
+        leaked = keep.length && keep.length < AUTH.users.length;
+        if (leaked) AUTH.users = keep;
+      }
       // users created before companies existed belong to the original company (admins/executives: group level)
-      let migrated = false;
+      let migrated = leaked;
       AUTH.users.forEach((u) => {
         if (u.company === undefined) { u.company = u.role === "admin" || u.role === "group" ? "" : "y2j"; migrated = true; }
       });
