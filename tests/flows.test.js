@@ -84,8 +84,9 @@ async function run(ctx) {
   o.push(`PR 50,000 from production → inbox ${route(small).join(",")} · may approve ${may(small).join(",")}`);
   o.push(`PR 250,000 from production → inbox ${route(big).join(",")} · may approve ${may(big).join(",")}`);
   o.push(`PR 20,000 opened by the planning head → may approve ${may(own).join(",")}`);
+  // default approval mode "by right": any head may approve up to the limit, but the inbox goes to the requesting department's head
   assert(route(small).includes("demo-prod") && !route(small).includes("demo-qc"), "small PR not routed to the requesting department's head only");
-  assert(!may(small).includes("demo-qc") && !may(small).includes("demo-rnd"), "another department's head may approve");
+  assert(may(small).includes("demo-prod") && !may(small).some((x) => /weld|store|pur|sales/.test(x)), "people without the right may approve");
   assert(route(big).includes("demo-exec") && !may(big).includes("demo-prod"), "large PR not routed to the manager");
   assert(!may(own).includes("demo-plan"), "the person who opened a PR may approve it");
   P2P_CASES.splice(P2P_CASES.indexOf(small), 3);

@@ -513,6 +513,8 @@ function openFormDesigner() {
   const pol = typeof esPolicy === "function" ? esPolicy() : { multiSign: true, selfApprove: true };
   document.getElementById("fs_multiSign").checked = pol.multiSign;
   document.getElementById("fs_selfApprove").checked = pol.selfApprove;
+  const apv = document.getElementById("fs_approvalMode");
+  if (apv && typeof APV_MODES !== "undefined") apv.innerHTML = APV_MODES.map((m) => `<option value="${m[0]}"${m[0] === apvMode() ? " selected" : ""}>${escapeHtml(m[1])}</option>`).join("");
   formDesignerLogo = fs.logo || "";
   renderFormLogoPreview();
   document.getElementById("formSetBackdrop").classList.add("open");
@@ -548,7 +550,8 @@ function saveFormDesigner() {
   let prevFs = {};
   try { prevFs = JSON.parse(localStorage.getItem(FORM_SETTINGS_KEY) || "{}") || {}; } catch (e) { /* none */ }
   const next = Object.assign({}, prevFs, { logo: formDesignerLogo, showFlow: document.getElementById("fs_showFlow").checked,
-    multiSign: document.getElementById("fs_multiSign").checked, selfApprove: document.getElementById("fs_selfApprove").checked });
+    multiSign: document.getElementById("fs_multiSign").checked, selfApprove: document.getElementById("fs_selfApprove").checked,
+    approvalMode: (document.getElementById("fs_approvalMode") || {}).value || "rights" });
   ["companyTh", "companyEn", "address", "sig1", "sig2", "sig3", "footer"].forEach((k) => {
     next[k] = document.getElementById(`fs_${k}`).value.trim();
   });

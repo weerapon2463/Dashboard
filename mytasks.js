@@ -39,7 +39,8 @@ function mtCollect() {
   if (typeof bxReqs === "function") bxReqs().filter((d) => typeof bxReqVisible !== "function" || bxReqVisible(d)).forEach((d) => {
     const age = mtDays(d.date);
     const mineReq = d.createdBy === u.id || d.receiver === u.id;
-    if (typeof bxMayDecide === "function" ? bxMayDecide(d) : d.status === "รออนุมัติ" && bxCanApprove() && (d.createdBy !== u.id || selfOk || u.role === "admin"))
+    // those who may decide get it; managers only when nobody else qualifies (they can still approve from the list)
+    if (typeof bxMayDecide === "function" ? bxMayDecide(d) && (typeof apvRoutesTo !== "function" || apvRoutesTo(u, "mreq", d.createdBy)) : d.status === "รออนุมัติ" && bxCanApprove() && (d.createdBy !== u.id || selfOk || u.role === "admin"))
       add({ group: "อนุมัติ", icon: "✍", title: `อนุมัติใบเบิก ${d.no}`, detail: `${d.wo} · ${d.items.length} รายการ · ขอโดย ${d.owner || "-"}`, tone: age >= 1 ? "warning" : "neutral", score: 70 + age, age, act: () => { switchView("bomx"); bxOpenReq(d.no); } });
     const storeMan = u.dept === "wh" || (BX_SETTINGS.issuers || []).includes(u.id) || (typeof authHasAbility === "function" && authHasAbility("issue"));
     if ((d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && storeMan && bxCanIssue() && !(d.receiver === u.id && !selfOk && u.role !== "admin")) {
@@ -69,8 +70,7 @@ function mtCollect() {
     if (!st || st.id === "ship" || st.id === "pr") return;
     // same rule as recording the step (p2pMayApprove); managers get only what is above the heads' limit
     const may = st.who === "approver"
-      ? st.id === "approve" && typeof p2pMayApprove === "function" && p2pMayApprove(c, u) && (u.role !== "plant" || (Number(c.value) || 0) > P2P_HEAD_LIMIT
-        || !AUTH.users.some((x) => x.active && x.role === "depthead" && authDeptName(x.dept) === c.requester)) // no head to ask: the manager
+      ? st.id === "approve" && typeof p2pInboxTo === "function" && p2pInboxTo(c, u)
       : st.who !== "any" && u.dept === st.who;
     if (!may) return;
     const state = p2pState(c);
@@ -84,7 +84,7 @@ function mtCollect() {
     (DEPT_DOCS[t] || []).forEach((d) => {
       if (typeof authCanSeeDoc === "function" && !authCanSeeDoc(t, d)) return;
       if (!deptIsOpen(t, d)) return;
-      const waiting = /^รอ/.test(d.status || "") && d.createdBy !== u.id && deptCanManage(u.role, t);
+      const waiting = /^รอ/.test(d.status || "") && d.createdBy !== u.id && deptCanManage(u.role, t) && (typeof apvRoutesTo !== "function" || apvRoutesTo(u, t, d.createdBy));
       // a status that waits on another department ("รอ QC ตรวจ", "รออะไหล่") goes to that department too
       const handoff = !waiting && d.createdBy !== u.id && mtWaitsOn(t, d.status).includes(u.dept);
       const mine = d.createdBy === u.id || d.owner === u.name || d.tech === u.name;

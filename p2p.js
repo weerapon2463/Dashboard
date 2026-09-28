@@ -392,13 +392,28 @@ function renderP2PCaseTable() {
 // Who approves a purchase request (one rule for the inbox and for recording it):
 // up to 100,000 ฿ the head of the department that asked; above that the plant manager; never the person who opened it.
 const P2P_HEAD_LIMIT = 100000;
+// (with the company's approval mode — approval.js: by right / by department / by chain of command)
+function p2pOpener(c) { const by = (p2pEvent(c, "pr") || {}).by; return by && typeof AUTH !== "undefined" ? AUTH.users.find((x) => x.name === by) || null : null; }
 function p2pMayApprove(c, u) {
   if (!u || !c) return false;
   const opener = (p2pEvent(c, "pr") || {}).by;
   if (opener && opener === u.name && u.role !== "admin") return false;
-  if (u.role === "admin") return true;
-  if (u.role === "plant") return true;
-  return u.role === "depthead" && (Number(c.value) || 0) <= P2P_HEAD_LIMIT && (!c.requester || c.requester === authDeptName(u.dept));
+  if (u.role === "admin" || u.role === "plant") return true;
+  if (u.role !== "depthead" || (Number(c.value) || 0) > P2P_HEAD_LIMIT) return false;
+  const mode = typeof apvMode === "function" ? apvMode() : "dept";
+  if (mode === "rights") return true;
+  if (mode === "dept") return !c.requester || c.requester === authDeptName(u.dept);
+  const o = p2pOpener(c);
+  return !!o && apvChain(o.id).some((s) => s.id === u.id);
+}
+// whose inbox: the requesting department's head first (any head in "by right" mode when that department
+// has none); managers when it is above the heads' limit or nobody else may approve
+function p2pInboxTo(c, u) {
+  if (!p2pMayApprove(c, u)) return false;
+  const heads = (typeof AUTH !== "undefined" ? AUTH.users : []).filter((x) => x.active !== false && x.role === "depthead" && p2pMayApprove(c, x));
+  if (u.role === "admin" || u.role === "plant") return (Number(c.value) || 0) > P2P_HEAD_LIMIT || !heads.length;
+  const own = heads.filter((x) => c.requester && c.requester === authDeptName(x.dept));
+  return own.length ? own.some((x) => x.id === u.id) : true;
 }
 function p2pCanRecord(stage, c) {
   const u = typeof authCurrentUser === "function" ? authCurrentUser() : null;

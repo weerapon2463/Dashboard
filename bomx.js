@@ -283,7 +283,7 @@ function bxRefs() {
 function bxRefInfo(ref) { return bxRefs().find((r) => r.ref === ref) || null; }
 
 function bxReqHolder(d) {
-  if (d.status === "รออนุมัติ") return bxDeptHasHead(bxReqDept(d)) ? `หัวหน้า${authDeptName(bxReqDept(d))}` : "ผู้จัดการโรงงาน (แผนกผู้เบิกไม่มีหัวหน้า)";
+  if (d.status === "รออนุมัติ") return typeof apvWaitingFor === "function" ? `ผู้อนุมัติ: ${apvWaitingFor("mreq", d.createdBy)}` : "ผู้อนุมัติ";
   if (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") {
     const short = d.items.some((it) => { const a = bxSxAvail(it.key); return a !== null && a < bxItemOutstanding(d, it); });
     return short ? "คลังสินค้า (ของไม่พอ)" : "คลังสินค้า";
@@ -1022,7 +1022,7 @@ function bxRenderReqModal() {
   const canApprove = bxMayDecide(d);
   const canIssue = bxMayIssue(d);
   const sodNote = d.status === "รออนุมัติ" && !canApprove && bxCanApprove()
-    ? (own ? "ใบเบิกนี้คุณเป็นผู้ขอเบิก — ต้องให้หัวหน้าคนอื่นหรือผู้จัดการอนุมัติ" : `ผู้อนุมัติคือหัวหน้า${authDeptName(bxReqDept(d)) || "แผนกผู้ขอ"}${bxDeptHasHead(bxReqDept(d)) ? "" : " (แผนกนี้ไม่มีหัวหน้า → ผู้จัดการโรงงาน)"}`) : "";
+    ? (own ? "ใบเบิกนี้คุณเป็นผู้ขอเบิก — ต้องให้ผู้อนุมัติคนอื่นอนุมัติ" : `ตามวิธีอนุมัติของบริษัท (${apvModeLabel().split(" — ")[0]}) ใบนี้รอ: ${apvWaitingFor("mreq", d.createdBy)}`) : "";
   const isReceiver = me && (d.receiver === me.id || d.createdBy === me.id);
   const canReturn = (bxCanIssue() || isReceiver) && d.items.some((it) => bxNum(it.issued) - bxNum(it.ret) > 0);
   const logs = [].concat(d.log || []).concat(...d.items.map((it) => (it.log || []).map((g) => Object.assign({ part: `${it.code || ""} ${it.part}` }, g))))
@@ -1176,16 +1176,11 @@ function bxAfterReqChange(d) {
 
 // The same rules as the buttons, checked again when acting (a stale screen or a script cannot skip them)
 function bxSelfOk() { const me = bxUser(); return !me || me.role === "admin" || (typeof esPolicy === "function" && esPolicy().selfApprove); }
-// Who approves a requisition: the head (or an approver) of the requester's own department; a department
-// without a head goes to the plant manager. Managers and admins may always decide.
-function bxReqDept(d) { const u = typeof authUserById === "function" ? authUserById(d.createdBy) : null; return u ? u.dept || "" : ""; }
-function bxDeptHasHead(dept) { return !!dept && typeof AUTH !== "undefined" && AUTH.users.some((x) => x.active && x.role === "depthead" && x.dept === dept); }
+// Who approves a requisition: the company's approval rule (approval.js) — by right, by department or by
+// chain of command; managers and admins may always decide.
 function bxMayApproveFor(d, me) {
-  if (!me) return bxCanApprove();
-  if (me.role === "admin" || me.role === "plant") return true;
-  if (!bxCanApprove()) return false;
-  const dept = bxReqDept(d);
-  return !!dept && me.dept === dept && bxDeptHasHead(dept);
+  if (typeof apvAllows !== "function") return bxCanApprove();
+  return apvAllows(me, d.createdBy, bxCanApprove(), "mreq");
 }
 function bxMayDecide(d) { const me = bxUser(); return d.status === "รออนุมัติ" && bxMayApproveFor(d, me) && !(me && d.createdBy === me.id && !bxSelfOk()); }
 function bxMayIssue(d) { const me = bxUser(); return bxCanIssue() && (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && !(me && d.receiver === me.id && !bxSelfOk()); }

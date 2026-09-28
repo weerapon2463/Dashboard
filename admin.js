@@ -198,6 +198,11 @@ function openUserEditor(id) {
   document.getElementById("ue_company").innerHTML = `<option value="">ทุกบริษัท (ระดับกลุ่ม)</option>`
     + (typeof orgCompanies === "function" ? orgCompanies() : []).map((c) => `<option value="${escapeHtml(c.id)}"${c.id === (isNew ? orgCurrentId() : u.company) ? " selected" : ""}>${escapeHtml(c.short)} — ${escapeHtml(c.name)}</option>`).join("");
   document.getElementById("ue_dept").innerHTML = `<option value="">ส่วนกลาง (ไม่สังกัดแผนก)</option>` + DEPT_WORKSPACES.map((w) => `<option value="${w.id}"${w.id === u.dept ? " selected" : ""}>${escapeHtml(w.name)}</option>`).join("");
+  // supervisor: anyone active except this person and the people under them (no loops)
+  const under = new Set(isNew ? [] : AUTH.users.filter((x) => typeof apvChain === "function" && apvChain(x.id).some((s) => s.id === u.id)).map((x) => x.id));
+  document.getElementById("ue_boss").innerHTML = `<option value="">— ไม่มี / ไม่ใช้สายบังคับบัญชา —</option>`
+    + AUTH.users.filter((x) => x.active !== false && x.id !== u.id && !under.has(x.id))
+      .map((x) => `<option value="${escapeHtml(x.id)}"${x.id === u.reportsTo ? " selected" : ""}>${escapeHtml(x.name)}${x.position ? ` — ${escapeHtml(x.position)}` : ""}</option>`).join("");
   document.getElementById("ue_pin").value = "";
   document.getElementById("ue_pin").placeholder = isNew ? `ไม่กรอก = ${DEMO_PIN} (ต้องเปลี่ยนตอนเข้าครั้งแรก)` : "ไม่กรอก = ใช้รหัสเดิม · กรอก = รีเซ็ต";
   document.getElementById("ue_active").checked = u.active !== false;
@@ -257,6 +262,7 @@ function readUserEditor() {
     role: document.getElementById("ue_role").value,
     dept: document.getElementById("ue_dept").value,
     company: document.getElementById("ue_company").value,
+    reportsTo: document.getElementById("ue_boss").value || "",
     active: document.getElementById("ue_active").checked,
     teams: [...document.querySelectorAll("#ue_teams input:checked")].map((i) => i.value),
     groups: [...document.querySelectorAll("#ue_groups input:checked")].map((i) => i.value),

@@ -475,6 +475,12 @@ function saveDeptModal() {
       showToast(`เปลี่ยนสถานะเป็น "${nextStatus}" ไม่ได้ — ไม่ใช่หน้าที่ของบัญชีนี้`, "warn");
       return;
     }
+    // an approving status follows the company's approval rule (by right / department / chain of command)
+    if (meNow && nextStatus !== before.status && deptIsApproval(nextStatus) && typeof apvAllows === "function" && !apvAllows(meNow, doc.createdBy, true, type)) {
+      Object.assign(doc, before);
+      showToast(`อนุมัติ ${doc.no} ไม่ได้ — ตามวิธีอนุมัติของบริษัท ผู้อนุมัติคือ ${apvWaitingFor(type, doc.createdBy)}`, "warn");
+      return;
+    }
     // editing someone else's document needs the manage right too
     if (meNow && !deptCanManage(meNow.role, type) && doc.createdBy !== meNow.id) { Object.assign(doc, before); showToast("แก้ไขเอกสารของผู้อื่นไม่ได้", "warn"); return; }
     if (meNow && doc.createdBy === meNow.id && meNow.role !== "admin" && !(typeof esPolicy === "function" && esPolicy().selfApprove) && nextStatus !== before.status && deptIsApproval(nextStatus)) {

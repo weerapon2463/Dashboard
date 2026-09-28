@@ -177,7 +177,9 @@ function esWhyNot(type, doc, slot) {
   const manage = deptCanManage(role, type) || (type === "mreq" && typeof authHasAbility === "function" && authHasAbility("approve"));
   if (slot === 1) return manage ? "" : "ไม่มีสิทธิ์ตรวจสอบเอกสารชนิดนี้";
   const approver = ["admin", "plant", "group", "depthead"].includes(me.role) || (typeof authHasAbility === "function" && authHasAbility("approve"));
-  return manage && approver ? "" : "ช่องผู้อนุมัติ ลงนามได้เฉพาะผู้มีอำนาจอนุมัติ (หัวหน้าแผนกขึ้นไป)";
+  if (!(manage && approver)) return "ช่องผู้อนุมัติ ลงนามได้เฉพาะผู้มีอำนาจอนุมัติ (หัวหน้าแผนกขึ้นไป)";
+  if (typeof apvAllows === "function" && !apvAllows(me, doc.createdBy, true, type)) return `ตามวิธีอนุมัติของบริษัท ผู้อนุมัติเอกสารนี้คือ ${apvWaitingFor(type, doc.createdBy)}`;
+  return "";
 }
 function esCanSign(type, doc, slot) { return !esWhyNot(type, doc, slot); }
 function esSignable(type, doc) { return [0, 1, 2].filter((s) => esCanSign(type, doc, s)); }

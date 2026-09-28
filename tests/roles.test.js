@@ -7,7 +7,9 @@ async function run(ctx) {
   const U = (n) => AUTH.users.find((u) => u.username === n);
   const as = (n) => { AUTH_USER = U(n); return AUTH_USER; };
   // company policy under test: the maker may not approve their own (the default since 29 ก.ย.)
-  const fs = JSON.parse(localStorage.getItem("y2j-form-settings-v1") || "{}"); delete fs.selfApprove; localStorage.setItem("y2j-form-settings-v1", JSON.stringify(fs));
+  const fs = JSON.parse(localStorage.getItem("y2j-form-settings-v1") || "{}"); delete fs.selfApprove;
+  const setMode = (m) => { fs.approvalMode = m; localStorage.setItem("y2j-form-settings-v1", JSON.stringify(fs)); };
+  setMode("dept"); // the scenarios below check the "by department" rule; the other modes are checked at the end
   const toasts = [];
   const realToast = showToast;
   showToast = (m, t) => { toasts.push(String(m)); };
@@ -212,6 +214,51 @@ async function run(ctx) {
     const has = authAllowedModules(U(n)).includes(page);
     step(n, `${yes ? "ต้องเปิด" : "ต้องไม่เห็น"}หน้า ${page}`, has === yes);
   });
+
+  /* ================= วิธีกำหนดผู้อนุมัติ 3 แบบ ================= */
+  o.push("— วิธีกำหนดผู้อนุมัติ —");
+  const approvers = (m) => AUTH.users.filter((u) => u.active && inbox(u.username, new RegExp(`อนุมัติใบเบิก ${m.no}`)).length).map((u) => u.username);
+  const mayList = (m) => AUTH.users.filter((u) => u.active && (as(u.username), bxMayDecide(m))).map((u) => u.username);
+  setMode("rights");
+  const r1 = newMR("demo-mt", 1);
+  step("ตามสิทธิ์", "ใบเบิกช่างซ่อมบำรุง → ผู้มีสิทธิ์อนุมัติใบเบิก (ไม่ต้องรอผู้จัดการ)", approvers(r1).includes("demo-prod") && !approvers(r1).includes("demo-exec"), `กล่องงาน: ${approvers(r1).join(", ")} · อนุมัติได้: ${mayList(r1).join(", ")}`);
+  as("demo-prod"); bxOpenReq(r1.no); btn("bxApprove").click(); close();
+  step("ตามสิทธิ์", "หัวหน้าผลิต (มีสิทธิ์) อนุมัติใบเบิกของแผนกอื่นได้", r1.status === "อนุมัติ");
+  const pr3 = { id: "P2P-ROLE-3", pr: "PR-ROLE-3", item: "สายไฮดรอลิก", qty: 2, unit: "เส้น", requester: authDeptName("prod"), value: 8000, status: "open", events: [{ stage: "pr", at: p2pToday(), by: U("demo-plan").name }], issues: [] };
+  P2P_CASES.push(pr3);
+  as("demo-qc"); step("ตามสิทธิ์", "หัวหน้า QC อนุมัติ PR ของฝ่ายผลิตได้ (มีสิทธิ์อนุมัติ PR)", p2pCanRecord(p2pStage("approve"), pr3));
+  step("ตามสิทธิ์", "แต่กล่องงานไปที่หัวหน้าฝ่ายผลิตก่อน (ไม่รบกวนทุกคน)", inbox("demo-prod", /PR-ROLE-3/).length === 1 && !inbox("demo-qc", /PR-ROLE-3/).length);
+  as("demo-plan"); step("ตามสิทธิ์", "คนเปิด PR ยังอนุมัติของตัวเองไม่ได้", !p2pCanRecord(p2pStage("approve"), pr3));
+
+  setMode("chain");
+  const saved = AUTH.users.map((u) => [u.id, u.reportsTo]);
+  U("demo-weld").reportsTo = "u-demo-mc"; U("demo-mc").reportsTo = "u-demo-prod"; U("demo-prod").reportsTo = "u-demo-exec"; U("demo-mt").reportsTo = "";
+  const c1 = newMR("demo-weld", 1);
+  step("ตามสายบังคับบัญชา", "ช่างเชื่อม → ช่างกลึง (ไม่มีสิทธิ์) → หัวหน้าผลิต", approvers(c1).includes("demo-prod"), `สาย: ${apvChain("u-demo-weld").map((s) => s.name.split(" ")[0]).join(" → ")} · กล่องงาน: ${approvers(c1).join(", ")}`);
+  as("demo-mc"); bxReqAction(c1, "อนุมัติ", "");
+  step("ตามสายบังคับบัญชา", "ช่างกลึงอยู่ในสายแต่ไม่มีสิทธิ์อนุมัติ", c1.status === "รออนุมัติ", lastToast());
+  const c2 = newMR("demo-mt", 1);
+  step("ตามสายบังคับบัญชา", "ช่างซ่อมบำรุงไม่ได้ตั้งผู้บังคับบัญชา → ผู้จัดการโรงงาน", approvers(c2).includes("demo-exec") && !approvers(c2).includes("demo-prod"), `กล่องงาน: ${approvers(c2).join(", ")}`);
+  as("demo-prod"); bxReqAction(c2, "อนุมัติ", "");
+  step("ตามสายบังคับบัญชา", "หัวหน้าผลิตอนุมัติใบเบิกคนนอกสายไม่ได้", c2.status === "รออนุมัติ", lastToast());
+  saved.forEach(([id, b]) => { const u = AUTH.users.find((x) => x.id === id); if (b === undefined) delete u.reportsTo; else u.reportsTo = b; });
+  setMode("rights");
+
+  /* the settings screens themselves */
+  as("demo-admin");
+  openFormDesigner();
+  const sel = btn("fs_approvalMode");
+  step("ผู้ดูแลระบบ", "หน้าตั้งค่าแบบฟอร์มมีตัวเลือกวิธีอนุมัติ 3 แบบ", sel && sel.options.length === 3 && sel.value === "rights");
+  sel.value = "chain"; saveFormDesigner(); close();
+  step("ผู้ดูแลระบบ", "เลือก \"ตามสายบังคับบัญชา\" แล้วบันทึก", apvMode() === "chain");
+  openUserEditor("u-demo-weld");
+  const boss = btn("ue_boss");
+  step("ผู้ดูแลระบบ", "หน้าแก้ไขผู้ใช้มีช่องผู้บังคับบัญชา", boss && boss.options.length > 5);
+  boss.value = "u-demo-prod"; saveUserEditor(); close();
+  step("ผู้ดูแลระบบ", "ตั้งผู้บังคับบัญชาของช่างเชื่อม = หัวหน้าผลิต", U("demo-weld").reportsTo === "u-demo-prod");
+  openUserEditor("u-demo-prod");
+  step("ผู้ดูแลระบบ", "ตั้งหัวหน้าผลิตให้รายงานต่อลูกน้องตัวเองไม่ได้ (กันวน)", ![...btn("ue_boss").options].some((x) => x.value === "u-demo-weld")); close();
+  setMode("rights");
 
   showToast = realToast;
   as("demo-admin");
