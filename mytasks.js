@@ -48,8 +48,19 @@ function mtCollect() {
     }
     if (d.receiver === u.id && typeof bxNeedsAck === "function" && bxNeedsAck(d))
       add({ group: "รับของ", icon: "✔", title: `ยืนยันรับของ ${d.no}`, detail: `คลังจ่ายแล้ว — ตรวจของแล้วกดยืนยัน (${d.wo})`, tone: "warning", score: 75, age, act: () => { switchView("bomx"); bxOpenReq(d.no); } });
+    else if (mineReq && d.status === "ปฏิเสธ" && age <= 7) {
+      const why = ((d.log || []).filter((g) => g.kind === "ปฏิเสธ").pop() || {});
+      add({ group: "แจ้งผล", icon: "✖", title: `ใบเบิก ${d.no} ถูกปฏิเสธ`, detail: `${why.by ? `โดย ${why.by}` : ""}${why.note ? ` · เหตุผล: ${why.note}` : ""} — แก้แล้วขอเบิกใหม่ได้`, tone: "warning", score: 58, age, act: () => { switchView("bomx"); bxOpenReq(d.no); } });
+    }
     else if (mineReq && ["รออนุมัติ", "อนุมัติ", "จ่ายบางส่วน"].includes(d.status))
       add({ group: "ติดตาม", icon: "⏳", title: `ใบเบิกของฉัน ${d.no} — ${d.status}`, detail: `อยู่ที่: ${bxReqHolder(d)} · รอมา ${age} วัน`, tone: age >= 2 ? "warning" : "neutral", score: 20 + age, age, act: () => { switchView("bomx"); bxOpenReq(d.no); } });
+  });
+
+  /* purchase requests I opened that were turned down (last 7 days) */
+  if (typeof P2P_CASES !== "undefined" && typeof p2pEvent === "function") P2P_CASES.forEach((c) => {
+    const opened = p2pEvent(c, "pr"), ap = p2pEvent(c, "approve");
+    if (!opened || opened.by !== u.name || !ap || ap.result !== "reject" || mtDays(ap.at) > 7) return;
+    add({ group: "แจ้งผล", icon: "✖", title: `${c.pr} ไม่อนุมัติ`, detail: `${c.item} × ${c.qty} ${c.unit} · โดย ${ap.by}${ap.note ? ` · เหตุผล: ${ap.note}` : ""}`, tone: "warning", score: 57, age: mtDays(ap.at), act: () => { switchView("p2p"); openP2PCase(c.id); } });
   });
 
   /* purchasing steps this person can record */

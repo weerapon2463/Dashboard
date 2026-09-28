@@ -93,6 +93,13 @@ function jcCreate(wo) {
 }
 
 function jcAct(wo, job, act, qty, reason) {
+  // a job claimed by someone else is theirs — leads/planners may still act on it (hand-over, cover)
+  if (!jcCanRun()) { showToast("บัญชีนี้บันทึก Job Card ไม่ได้", "warn"); return; }
+  if (job.assignee && job.assignee !== jcMe() && !jcCanPlan() && act !== "reopen") { showToast(`งานนี้เป็นของ ${job.assignee} — ให้หัวหน้างานโอนงานก่อน`, "warn"); return; }
+  if (act === "claim" && job.assignee && job.assignee !== jcMe() && !jcCanPlan()) return;
+  if (act === "reopen" && !jcCanPlan()) { showToast("เปิดงานใหม่ได้เฉพาะหัวหน้างาน", "warn"); return; }
+  // cannot report more finished than the order asks for
+  if (act === "done" && jcNum(wo.qty) > 0 && qty > jcNum(wo.qty)) { showToast(`ใบสั่งผลิตนี้สั่ง ${jcNum(wo.qty)} — บันทึกเสร็จได้ไม่เกินนั้น`, "warn"); return; }
   const now = new Date().toISOString();
   job.logs = job.logs || [];
   job.downs = job.downs || [];

@@ -137,7 +137,14 @@ function flWire(el) {
     if (a === "problem") { flProblem(); return; }
     if (a === "inbox") { const x = el._inbox[+b.dataset.n]; if (x && x.act) floorAway(x.act); return; }
     if (a === "cancel") { floorPendingStop = floorPendingDone = null; renderFloor(); return; }
-    if (a === "minus" || a === "plus") { const o = document.getElementById("flQty"); o.textContent = Math.max(1, (+o.textContent || 1) + (a === "plus" ? 1 : -1)); return; }
+    if (a === "minus" || a === "plus") {
+      // between 1 and what the order asks for
+      const o = document.getElementById("flQty");
+      const w = floorPendingDone && WORK_ORDERS.find((x) => x.wo === floorPendingDone.split("|")[0]);
+      const max = w && Number(w.qty) > 0 ? Number(w.qty) : 999;
+      o.textContent = Math.min(max, Math.max(1, (+o.textContent || 1) + (a === "plus" ? 1 : -1)));
+      return;
+    }
     if (!t) return;
     if (a === "askstop") { floorPendingStop = `${t.w.wo}|${t.i}`; floorPendingDone = null; renderFloor(); return; }
     if (a === "askdone") { floorPendingDone = `${t.w.wo}|${t.i}`; floorPendingStop = null; renderFloor(); return; }

@@ -1146,7 +1146,15 @@ function bxAfterReqChange(d) {
   bxRenderReqModal();
 }
 
+// The same rules as the buttons, checked again when acting (a stale screen or a script cannot skip them)
+function bxSelfOk() { const me = bxUser(); return !me || me.role === "admin" || (typeof esPolicy === "function" && esPolicy().selfApprove); }
+function bxMayDecide(d) { const me = bxUser(); return bxCanApprove() && d.status === "รออนุมัติ" && !(me && d.createdBy === me.id && !bxSelfOk()); }
+function bxMayIssue(d) { const me = bxUser(); return bxCanIssue() && (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && !(me && d.receiver === me.id && !bxSelfOk()); }
+
 function bxReqAction(d, status, note) {
+  const deciding = status === "อนุมัติ" || status === "ปฏิเสธ";
+  if (deciding ? !bxMayDecide(d) : !bxMayIssue(d)) { showToast(`${d.no}: บัญชีนี้${deciding ? "อนุมัติ/ปฏิเสธ" : "ปิดใบเบิก"}ไม่ได้`, "warn"); return; }
+  if (status === "ปฏิเสธ" && !String(note || "").trim()) { showToast("ปฏิเสธต้องใส่เหตุผล", "warn"); return; }
   const before = d.status;
   d.status = status;
   d.log = d.log || [];
@@ -1157,6 +1165,7 @@ function bxReqAction(d, status, note) {
 }
 
 function bxIssue(d, note) {
+  if (!bxMayIssue(d)) { showToast(`${d.no}: บัญชีนี้จ่ายของตามใบเบิกนี้ไม่ได้`, "warn"); return; }
   const inputs = [...document.querySelectorAll("#bxReqBody .bx-issue")];
   const plan = [];
   for (const inp of inputs) {

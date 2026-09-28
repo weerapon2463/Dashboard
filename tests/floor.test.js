@@ -35,7 +35,7 @@ async function run(ctx) {
   click(`[data-fl="askdone"][data-wo="${wo.wo}"]`);
   click('[data-fl="plus"]');
   click(`[data-fl="done"][data-wo="${wo.wo}"]`);
-  assert(job.status === "done" && job.qtyDone === (Number(wo.qty) || 1) + 1, "done / quantity not recorded");
+  assert(job.status === "done" && job.qtyDone === (Number(wo.qty) || 1), "done / quantity not recorded (and never above the order quantity)");
   o.push(`${wo.wo} ${job.op}: start → stop → resume → done ✓`);
 
   // quick requisition opens with the right station's kits

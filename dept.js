@@ -469,6 +469,14 @@ function saveDeptModal() {
     Object.assign(doc, entry);
     const nextStatus = document.getElementById("deptDocStatus").value;
     const meNow = hasAuth ? authCurrentUser() : null;
+    // status changes need the right to manage this kind of document and the workflow's "who may set it"
+    if (meNow && nextStatus !== before.status && (!deptCanManage(meNow.role, type) || (typeof wfCanSet === "function" && !wfCanSet(type, nextStatus)))) {
+      Object.assign(doc, before);
+      showToast(`เปลี่ยนสถานะเป็น "${nextStatus}" ไม่ได้ — ไม่ใช่หน้าที่ของบัญชีนี้`, "warn");
+      return;
+    }
+    // editing someone else's document needs the manage right too
+    if (meNow && !deptCanManage(meNow.role, type) && doc.createdBy !== meNow.id) { Object.assign(doc, before); showToast("แก้ไขเอกสารของผู้อื่นไม่ได้", "warn"); return; }
     if (meNow && doc.createdBy === meNow.id && meNow.role !== "admin" && !(typeof esPolicy === "function" && esPolicy().selfApprove) && nextStatus !== before.status && deptIsApproval(nextStatus)) {
       showToast("ผู้สร้างเอกสารอนุมัติเอกสารของตัวเองไม่ได้ — ให้หัวหน้าหรือผู้มีอำนาจอนุมัติ", "warn");
       return;

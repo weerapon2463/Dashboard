@@ -544,6 +544,7 @@ function saveP2PStep() {
 
   if (stage === "approve") {
     ev.result = val("p2pStepResult");
+    if (ev.result === "reject" && !ev.note) { showToast("ไม่อนุมัติต้องใส่เหตุผลในช่องหมายเหตุ — ผู้ขอจะเห็นเหตุผลนี้", "warn"); document.getElementById("p2pStepNote").focus(); return; }
     if (ev.result === "reject") { c.status = "cancelled"; auditDetail = "ไม่อนุมัติ PR"; }
     const pr = PR_LIST.find((p) => p.id === c.pr);
     if (pr) pr.status = ev.result === "reject" ? "ปฏิเสธ" : "อนุมัติแล้ว";
