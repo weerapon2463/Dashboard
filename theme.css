@@ -492,4 +492,6 @@ html[data-floor="1"] .floor-toggle { display: none; }
 .st-secure-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
 .st-log { max-height: 360px; overflow-y: auto; }
 .st-log-bad td { color: var(--txt-bad); }
+.bx-short { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--txt-warn); border-radius: var(--radius-sm); }
+.bx-short ul { margin: 6px 0 0; padding-left: 18px; } .bx-short li { margin: 4px 0; }
 .bx-proof { font-family: var(--font-mono); font-size: 0.8em; color: var(--text-secondary); }

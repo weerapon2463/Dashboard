@@ -39,7 +39,7 @@ function mtCollect() {
   if (typeof bxReqs === "function") bxReqs().filter((d) => typeof bxReqVisible !== "function" || bxReqVisible(d)).forEach((d) => {
     const age = mtDays(d.date);
     const mineReq = d.createdBy === u.id || d.receiver === u.id;
-    if (d.status === "รออนุมัติ" && bxCanApprove() && (d.createdBy !== u.id || selfOk || u.role === "admin"))
+    if (typeof bxMayDecide === "function" ? bxMayDecide(d) : d.status === "รออนุมัติ" && bxCanApprove() && (d.createdBy !== u.id || selfOk || u.role === "admin"))
       add({ group: "อนุมัติ", icon: "✍", title: `อนุมัติใบเบิก ${d.no}`, detail: `${d.wo} · ${d.items.length} รายการ · ขอโดย ${d.owner || "-"}`, tone: age >= 1 ? "warning" : "neutral", score: 70 + age, age, act: () => { switchView("bomx"); bxOpenReq(d.no); } });
     const storeMan = u.dept === "wh" || (BX_SETTINGS.issuers || []).includes(u.id) || (typeof authHasAbility === "function" && authHasAbility("issue"));
     if ((d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && storeMan && bxCanIssue() && !(d.receiver === u.id && !selfOk && u.role !== "admin")) {

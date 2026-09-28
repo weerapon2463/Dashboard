@@ -6,6 +6,8 @@ async function run(ctx) {
   const o = [];
   const U = (n) => AUTH.users.find((u) => u.username === n);
   const as = (n) => { AUTH_USER = U(n); return AUTH_USER; };
+  // company policy under test: the maker may not approve their own (the default since 29 ก.ย.)
+  const fs = JSON.parse(localStorage.getItem("y2j-form-settings-v1") || "{}"); delete fs.selfApprove; localStorage.setItem("y2j-form-settings-v1", JSON.stringify(fs));
   const toasts = [];
   const realToast = showToast;
   showToast = (m, t) => { toasts.push(String(m)); };
@@ -75,7 +77,67 @@ async function run(ctx) {
 
   const mtMR = newMR("demo-mt", 1);
   const who = AUTH.users.filter((u) => u.active && inbox(u.username, new RegExp(`อนุมัติใบเบิก ${mtMR.no}`)).length).map((u) => u.username);
-  step("ช่างซ่อมบำรุง", `ขอเบิก ${mtMR.no} (แผนกที่ไม่มีหัวหน้า)`, who.length && !who.includes("demo-mt"), `ผู้อนุมัติ: ${who.join(", ")}`);
+  step("ช่างซ่อมบำรุง", `ขอเบิก ${mtMR.no} (แผนกไม่มีหัวหน้า) → ผู้จัดการโรงงาน`, who.includes("demo-exec") && !who.includes("demo-prod") && !who.includes("demo-mt"), `ผู้อนุมัติ: ${who.join(", ")}`);
+  as("demo-prod"); bxReqAction(mtMR, "อนุมัติ", "");
+  step("หัวหน้าผลิต", "พยายามอนุมัติใบเบิกของแผนกซ่อมบำรุง", mtMR.status === "รออนุมัติ", lastToast());
+  as("demo-exec"); bxOpenReq(mtMR.no); btn("bxApprove") && btn("bxApprove").click(); close();
+  step("ผู้จัดการโรงงาน", "อนุมัติใบเบิกของแผนกที่ไม่มีหัวหน้า", mtMR.status === "อนุมัติ");
+
+  const headMR = newMR("demo-prod", 1);
+  as("demo-prod"); bxOpenReq(headMR.no);
+  step("หัวหน้าผลิต", "ไม่มีปุ่มอนุมัติใบเบิกที่ตัวเองขอ (แยกหน้าที่)", !btn("bxApprove"), (document.querySelector("#bxReqBody .muted-note") || {}).textContent || ""); close();
+  step("ผู้จัดการโรงงาน", "ได้ใบเบิกของหัวหน้าผลิตไปอนุมัติ", inbox("demo-exec", new RegExp(`อนุมัติใบเบิก ${headMR.no}`)).length === 1);
+
+  /* ================= ของไม่พอ: ขอซื้อ → ของเข้า → ตรวจรับ → จ่ายต่อ ================= */
+  o.push("— ของไม่พอ —");
+  {
+    as("demo-weld");
+    const w = WORK_ORDERS.find((x) => x.wo === "WO-2026-084");
+    const onOrder = (r) => bxP2PFor({ code: r.r.line.code, part: r.r.line.part }).some((c) => !p2pStageDone(c, "iqc"));
+    const row = w.jobs.map((j) => flReqRows(w, j) || []).flat().find((x) => x.left > 0 && bxSxAvail(x.key) !== null && !onOrder(x));
+    const have = Math.max(0, bxSxAvail(row.key));
+    const pane = document.createElement("div");
+    const i = document.createElement("input"); i.className = "bx-qty"; i.dataset.key = row.key; i.value = have + 3; pane.appendChild(i);
+    bxSubmitReq({ ref: w.wo, model: w.model, qty: 1, kind: "ผลิต", line: w.department }, pane); close();
+    const sm = bxReqs()[bxReqs().length - 1];
+    as("demo-prod"); bxOpenReq(sm.no); btn("bxApprove").click(); close();
+    as("demo-store"); bxOpenReq(sm.no);
+    const shortBox = document.querySelector("#bxReqBody .bx-short");
+    step("คลัง", `เปิดใบเบิก ${sm.no} ขอ ${have + 3} มี ${have}`, !!shortBox, shortBox ? shortBox.textContent.replace(/\s+/g, " ").slice(0, 90) : "ไม่มีกล่องแจ้งของไม่พอ");
+    if (have > 0) { document.querySelectorAll("#bxReqBody .bx-issue").forEach((x) => { x.value = have; }); btn("bxIssue").click(); }
+    step("คลัง", "จ่ายส่วนที่มีไปก่อน", have === 0 || sm.status === "จ่ายบางส่วน", sm.status);
+    as("demo-store"); bxOpenReq(sm.no);
+    const prBtn = document.querySelector("#bxReqBody [data-shortpr]");
+    step("คลัง", "มีปุ่ม \"ขอซื้อส่วนที่ขาด\" ในใบเบิก", !!prBtn, prBtn ? "" : "box: " + ((document.querySelector("#bxReqBody .bx-short") || {}).textContent || "(none)").replace(/\s+/g, " ").slice(0, 200) + " · p2p page " + bxViewAllowed("p2p"));
+    const n0 = P2P_CASES.length;
+    if (prBtn) { prBtn.click(); btn("p2pNewValue").value = 12000; saveP2PNew(); close(); }
+    const c = P2P_CASES[P2P_CASES.length - 1];
+    step("คลัง", "เปิดใบขอซื้อจากใบเบิก (เติมรายการ จำนวน งาน ให้เอง)", P2P_CASES.length === n0 + 1 && c.qty === 3 && c.wo === w.wo && new RegExp(sm.no).test(c.events[0].note), `${c.pr} × ${c.qty}`);
+    as("demo-store"); bxOpenReq(sm.no);
+    step("คลัง", "ใบเบิกแสดงว่ามีใบขอซื้อแล้ว + ขั้นที่อยู่", new RegExp(c.pr).test((document.querySelector("#bxReqBody .bx-short") || {}).textContent || "")); close();
+    // the purchase runs through every stage, each by the person whose job it is
+    const crew = ["demo-exec", "demo-pur", "demo-store", "demo-qc"];
+    const doneBy = [];
+    for (let guard = 0; guard < 12 && !p2pStageDone(c, "iqc"); guard++) {
+      const stg = p2pCurrent(c);
+      const who = crew.slice().sort((a, b) => (a === "demo-exec") - (b === "demo-exec")).find((n) => { as(n); return p2pCanRecord(stg, c); });
+      if (!who) { step("—", `ขั้น "${stg.label}" ไม่มีใครในทีมบันทึกได้`, false); break; }
+      as(who); openP2PStep(c.id, stg.id);
+      const sup = btn("p2pStepSupplier"); if (sup) sup.value = [...sup.options].map((x) => x.value).find(Boolean);
+      if (btn("p2pStepResult")) btn("p2pStepResult").value = stg.id === "iqc" ? "pass" : "approve";
+      if (btn("p2pStepPromised") && !btn("p2pStepPromised").value) btn("p2pStepPromised").value = p2pToday();
+      saveP2PStep(); close();
+      doneBy.push(`${stg.label}:${U(who).name.split(" ")[0]}`);
+      if (!p2pEvent(c, stg.id)) { step(who, `บันทึก "${stg.label}" ไม่สำเร็จ`, false, lastToast()); break; }
+    }
+    step("ทีมจัดซื้อ-คลัง-QC", "ขอซื้อ → อนุมัติ → ขอราคา → PO → ยืนยันส่ง → รับของ → ตรวจรับ", p2pStageDone(c, "iqc"), doneBy.join(" → "));
+    const nowHave = bxSxAvail(row.key);
+    step("คลัง", "ของเข้าคลังหลักหลังตรวจผ่าน", nowHave >= 3 - 0, `มีในคลัง ${nowHave}`);
+    step("คลัง", "ใบเบิกที่รอยังอยู่ในงานจ่ายของ", inbox("demo-store", new RegExp(`จ่ายของตามใบเบิก ${sm.no}`)).length === 1);
+    as("demo-store"); bxOpenReq(sm.no); btn("bxIssue").click(); close();
+    step("คลัง", "จ่ายส่วนที่เหลือครบ", sm.status === "จ่ายของแล้ว", sm.status);
+    step("ช่างเชื่อม", "ได้งานยืนยันรับของครบ", inbox("demo-weld", new RegExp(`ยืนยันรับของ ${sm.no}`)).length === 1);
+  }
 
   /* ================= จัดซื้อ ================= */
   o.push("— จัดซื้อ —");
@@ -140,6 +202,9 @@ async function run(ctx) {
   doc.signatures[0] = { uid: "u-demo-op", name: U("demo-op").name };
   as("demo-weld"); step("ช่างเชื่อม", "ลงช่องผู้ตรวจสอบ", !!esWhyNot("ecr", doc, 1), esWhyNot("ecr", doc, 1));
   as("demo-rnd"); step("หัวหน้า R&D", "ลงช่องผู้ตรวจสอบ", !esWhyNot("ecr", doc, 1));
+  const own = { no: "ECR-ROLE-2", title: "ของหัวหน้าเอง", status: "ร่าง", createdBy: "u-demo-rnd", signatures: { 0: { uid: "u-demo-rnd" }, 1: { uid: "u-demo-qc" } } };
+  as("demo-rnd"); step("หัวหน้า R&D", "ลงช่องผู้อนุมัติของเอกสารที่ตัวเองทำ", !!esWhyNot("ecr", own, 2), esWhyNot("ecr", own, 2));
+  as("demo-exec"); step("ผู้จัดการโรงงาน", "ลงช่องผู้อนุมัติแทน", !esWhyNot("ecr", own, 2));
 
   /* ================= หน้าที่ใช้ได้ ================= */
   o.push("— หน้าที่เปิดได้ —");

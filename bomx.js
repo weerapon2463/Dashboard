@@ -80,6 +80,9 @@ function bxCanIssue() {
 function bxCanStock() { return bxCan("stk", "create") || bxIsAdminish() || bxAbility("stock"); }
 function bxCanSettings() { return bxCan("stk", "manage") || bxIsAdminish() || bxAbility("stock"); }
 function bxViewAllowed(view) {
+  // the signed-in person's pages (not whatever the menu happens to show)
+  const u = bxUser();
+  if (u && typeof authAllowedModules === "function") return authAllowedModules(u).includes(view);
   const b = document.querySelector(`.nav-item[data-view="${view}"]`);
   return !!b && !b.hidden;
 }
@@ -280,7 +283,7 @@ function bxRefs() {
 function bxRefInfo(ref) { return bxRefs().find((r) => r.ref === ref) || null; }
 
 function bxReqHolder(d) {
-  if (d.status === "รออนุมัติ") return "หัวหน้าแผนกผู้เบิก";
+  if (d.status === "รออนุมัติ") return bxDeptHasHead(bxReqDept(d)) ? `หัวหน้า${authDeptName(bxReqDept(d))}` : "ผู้จัดการโรงงาน (แผนกผู้เบิกไม่มีหัวหน้า)";
   if (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") {
     const short = d.items.some((it) => { const a = bxSxAvail(it.key); return a !== null && a < bxItemOutstanding(d, it); });
     return short ? "คลังสินค้า (ของไม่พอ)" : "คลังสินค้า";
@@ -1016,9 +1019,10 @@ function bxRenderReqModal() {
   const open = BX_OPEN_REQ.includes(d.status);
   const me = bxUser();
   const own = me && d.createdBy === me.id && me.role !== "admin" && !(typeof esPolicy === "function" && esPolicy().selfApprove);
-  const canApprove = bxCanApprove() && d.status === "รออนุมัติ" && !own;
-  const canIssue = bxCanIssue() && (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && !(me && d.receiver === me.id && me.role !== "admin" && !(typeof esPolicy === "function" && esPolicy().selfApprove));
-  const sodNote = bxCanApprove() && d.status === "รออนุมัติ" && own ? "ใบเบิกนี้คุณเป็นผู้ขอเบิก — ต้องให้หัวหน้าคนอื่นอนุมัติ" : "";
+  const canApprove = bxMayDecide(d);
+  const canIssue = bxMayIssue(d);
+  const sodNote = d.status === "รออนุมัติ" && !canApprove && bxCanApprove()
+    ? (own ? "ใบเบิกนี้คุณเป็นผู้ขอเบิก — ต้องให้หัวหน้าคนอื่นหรือผู้จัดการอนุมัติ" : `ผู้อนุมัติคือหัวหน้า${authDeptName(bxReqDept(d)) || "แผนกผู้ขอ"}${bxDeptHasHead(bxReqDept(d)) ? "" : " (แผนกนี้ไม่มีหัวหน้า → ผู้จัดการโรงงาน)"}`) : "";
   const isReceiver = me && (d.receiver === me.id || d.createdBy === me.id);
   const canReturn = (bxCanIssue() || isReceiver) && d.items.some((it) => bxNum(it.issued) - bxNum(it.ret) > 0);
   const logs = [].concat(d.log || []).concat(...d.items.map((it) => (it.log || []).map((g) => Object.assign({ part: `${it.code || ""} ${it.part}` }, g))))
@@ -1055,6 +1059,24 @@ function bxRenderReqModal() {
         }).join("")}</tbody>
       </table>
     </div>
+    ${(() => {
+      // not enough in stock: issue what there is now; the shortfall is bought, and this requisition waits
+      // (it stays in the store's inbox) until the goods arrive and pass incoming inspection
+      if (!open) return "";
+      const short = d.items.map((it, k) => ({ it, k, out: bxItemOutstanding(d, it), avail: bxSxAvail(it.key) }))
+        .filter((x) => x.out > 0 && x.avail !== null && x.out > x.avail);
+      if (!short.length) return "";
+      const mayPR = bxViewAllowed("p2p") && typeof openP2PNew === "function";
+      return `<div class="bx-short"><b>⚠ ของไม่พอ ${short.length} รายการ</b> — จ่ายส่วนที่มีก่อนได้ · ส่วนที่ขาดเปิดขอซื้อ · ใบเบิกนี้จะรอในงานของคลังจนของเข้าและผ่าน IQC แล้วจึงจ่ายต่อ
+        <ul>${short.map((x) => {
+          // only purchases still on their way count — an old PR already received and used up does not
+          const cases = bxP2PFor({ code: x.it.code, part: x.it.part }).filter((c) => typeof p2pStageDone !== "function" || !p2pStageDone(c, "iqc"));
+          const lack = x.out - Math.max(0, x.avail);
+          return `<li>${bxEsc(x.it.code || "")} ${bxEsc(x.it.part)} · ขาด <b>${bxFmt(lack)}</b> ${bxEsc(x.it.unit || "")}${x.avail > 0 ? ` (มี ${bxFmt(x.avail)})` : ""}
+            ${cases.length ? cases.map((c) => `<span class="pill pill-schedule" title="ใบขอซื้อที่ตรงกับรายการนี้">${bxEsc(c.pr)} · ${bxEsc((typeof p2pCurrent === "function" && p2pCurrent(c) || {}).label || "ครบแล้ว")}</span>`).join(" ")
+              : mayPR ? `<button type="button" class="btn-link" data-shortpr="${x.k}" data-lack="${lack}">🛒 ขอซื้อส่วนที่ขาด</button>` : `<span class="muted-inline">ยังไม่มีใบขอซื้อ — แจ้งจัดซื้อ/วางแผน</span>`}</li>`;
+        }).join("")}</ul></div>`;
+    })()}
     ${canApprove || canIssue || canReturn ? `<div class="form-field"><label for="bxReqActNote">หมายเหตุการดำเนินการ</label><input id="bxReqActNote" placeholder="เช่น เหตุผลที่ปฏิเสธ / จ่ายแทนด้วยรหัสใหม่"></div>` : ""}
     <div class="bx-log">
       <div class="bx-docgroup-title">ประวัติ: ใครทำอะไร เมื่อไร</div>
@@ -1103,6 +1125,12 @@ function bxRenderReqModal() {
     bxAfterReqChange(d);
     showToast("ยืนยันรับของแล้ว", "good");
   });
+  box.querySelectorAll("[data-shortpr]").forEach((b) => b.addEventListener("click", () => {
+    const it = d.items[+b.dataset.shortpr];
+    document.getElementById("bxReqBackdrop").classList.remove("open");
+    bxOpenPR({ code: it.code, part: it.part, unit: it.unit }, Number(b.dataset.lack), d.wo);
+    const n = document.getElementById("p2pNewNote"); if (n) n.value = `ของไม่พอจ่ายตามใบเบิก ${d.no} (${d.owner || ""})`;
+  }));
   if ($("bxPickList")) $("bxPickList").addEventListener("click", () => bxPrintPickList(d));
   if ($("bxScanPick")) $("bxScanPick").addEventListener("click", () => snScan(`สแกนชิ้นที่หยิบ — ${d.no}`, (raw) => {
     let v = String(raw).trim();
@@ -1148,7 +1176,18 @@ function bxAfterReqChange(d) {
 
 // The same rules as the buttons, checked again when acting (a stale screen or a script cannot skip them)
 function bxSelfOk() { const me = bxUser(); return !me || me.role === "admin" || (typeof esPolicy === "function" && esPolicy().selfApprove); }
-function bxMayDecide(d) { const me = bxUser(); return bxCanApprove() && d.status === "รออนุมัติ" && !(me && d.createdBy === me.id && !bxSelfOk()); }
+// Who approves a requisition: the head (or an approver) of the requester's own department; a department
+// without a head goes to the plant manager. Managers and admins may always decide.
+function bxReqDept(d) { const u = typeof authUserById === "function" ? authUserById(d.createdBy) : null; return u ? u.dept || "" : ""; }
+function bxDeptHasHead(dept) { return !!dept && typeof AUTH !== "undefined" && AUTH.users.some((x) => x.active && x.role === "depthead" && x.dept === dept); }
+function bxMayApproveFor(d, me) {
+  if (!me) return bxCanApprove();
+  if (me.role === "admin" || me.role === "plant") return true;
+  if (!bxCanApprove()) return false;
+  const dept = bxReqDept(d);
+  return !!dept && me.dept === dept && bxDeptHasHead(dept);
+}
+function bxMayDecide(d) { const me = bxUser(); return d.status === "รออนุมัติ" && bxMayApproveFor(d, me) && !(me && d.createdBy === me.id && !bxSelfOk()); }
 function bxMayIssue(d) { const me = bxUser(); return bxCanIssue() && (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && !(me && d.receiver === me.id && !bxSelfOk()); }
 
 function bxReqAction(d, status, note) {

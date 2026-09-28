@@ -137,7 +137,9 @@ function esDocHash(type, doc) {
 function esPolicy() {
   let s = {};
   try { s = JSON.parse(localStorage.getItem("y2j-form-settings-v1") || "{}") || {}; } catch (e) { /* defaults */ }
-  return { multiSign: s.multiSign !== false, selfApprove: s.selfApprove !== false };
+  // selfApprove (the person who made it may also approve it) is OFF unless a company turns it on:
+  // requester and approver are two people by default (separation of duties, 29 ก.ย.)
+  return { multiSign: s.multiSign !== false, selfApprove: s.selfApprove === true };
 }
 
 // Signature images live once on the user (current + history); a signed box stores only a short key.
@@ -166,6 +168,7 @@ function esWhyNot(type, doc, slot) {
   if (!pol.multiSign && Object.values(sigs).some((s) => s && s.uid === me.id)) return "คุณลงนามในเอกสารนี้แล้ว — นโยบายบริษัท: หนึ่งคนลงนามได้หนึ่งช่อง";
   if (me.signature && Object.values(sigs).some((s) => s && s.uid !== me.id && (s.sig ? s.sig === esSigKey(me.signature) : s.img === me.signature))) return "ลายเซ็นนี้ถูกใช้ในเอกสารนี้แล้ว (บัญชีอื่น)";
   if (slot > 0 && !sigs[slot - 1]) return `ต้องรอ "${esSlots()[slot - 1]}" ลงนามก่อน`;
+  if (slot === 2 && doc.createdBy === me.id && me.role !== "admin" && !pol.selfApprove) return "ผู้จัดทำลงนามอนุมัติเอกสารของตัวเองไม่ได้ — ให้หัวหน้าคนอื่นหรือผู้จัดการอนุมัติ";
   const role = currentRole();
   if (slot === 0) {
     if (doc.createdBy) return doc.createdBy === me.id ? "" : "ช่องผู้จัดทำ ลงนามได้เฉพาะผู้สร้างเอกสาร";
