@@ -7,7 +7,12 @@ import html, io, os, re, shutil, subprocess, sys, tempfile
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from run import HERE, REPO, DATA, chrome
 
-SCRIPT = """try{if(!sessionStorage.getItem('b')){sessionStorage.setItem('b','1');localStorage.clear();localStorage.setItem('y2j-demo-clean-v1','1');localStorage.setItem('y2j-company-v1','demo');}}catch(e){}
+# With server sign-in on (the DEMO has it since 28 ก.ย.), a full copy needs the DEMO master key from the
+# sheet's _ตั้งค่า tab (B1):  set FORGE_DEMO_KEY=<key>  — it is only used here, never saved in the repo.
+DEMO_URL = "https://script.google.com/macros/s/AKfycbwbMJvGEudXfHvw0YeKNaLhA6vyIzb1qsyLNBhCy7GlgFx_3TRK7fC1McqJnu4deGXIdw/exec"
+KEY = os.environ.get("FORGE_DEMO_KEY", "")
+CFG = ("localStorage.setItem('y2j-storage-config',JSON.stringify({mode:'sheets',demo:true,url:'%s',token:'%s'}));" % (DEMO_URL, KEY)) if KEY else ""
+SCRIPT = """try{if(!sessionStorage.getItem('b')){sessionStorage.setItem('b','1');localStorage.clear();""" + CFG + """localStorage.setItem('y2j-demo-clean-v1','1');localStorage.setItem('y2j-company-v1','demo');}}catch(e){}
 document.addEventListener('DOMContentLoaded',()=>setTimeout(async()=>{const sl=(m)=>new Promise(r=>setTimeout(r,m));
  for(let i=0;i<600&&Y2JStore.status().state!=='synced';i++)await sl(200);
  const d={};Object.keys(localStorage).forEach((k)=>{if(/^y2j-/.test(k)&&!/storage-config|sync-meta|session|demo-clean/.test(k))d[k]=localStorage.getItem(k);});
@@ -31,7 +36,7 @@ def main():
         shutil.rmtree(prof, ignore_errors=True)
     m = re.search(r'<pre id="SNAP" data-state="(\w+)">(.*?)</pre>', out, re.S)
     if not m or m.group(1) != "synced":
-        sys.exit("DEMO did not sync — snapshot not written")
+        sys.exit("DEMO did not sync — snapshot not written" + ("" if KEY else " (server sign-in is on: set FORGE_DEMO_KEY to the DEMO key from _ตั้งค่า!B1)"))
     text = html.unescape(m.group(2))
     if len(text) < 100000:
         sys.exit(f"snapshot looks partial ({len(text)} chars) — not written")
