@@ -78,6 +78,9 @@ function mtCollect() {
   if (["depthead", "plant", "admin"].includes(u.role) && ["prod", "plan", ""].includes(u.dept || "") && typeof WORK_ORDERS !== "undefined")
     WORK_ORDERS.filter((w) => w.status === "ล่าช้า").forEach((w) => add({ group: "ใบสั่งผลิต", icon: "🏭", title: `${w.wo} ${w.serial || w.model} ล่าช้า`, detail: `กำหนด ${w.dueDate} · ${(w.jobs || []).filter((j) => j.status === "done").length}/${(w.jobs || []).length || "–"} ขั้น · เบิก ${w.issuedPct}%`, tone: "critical", score: 85, act: () => { jcWo = w.wo; switchView("workorder"); } }));
 
+  /* stopped job cards: to production leads, and to the department that can fix the reason */
+  if (typeof jcStopInbox === "function") jcStopInbox(u).forEach(add);
+
   return out.sort((a, b) => b.score - a.score);
 }
 

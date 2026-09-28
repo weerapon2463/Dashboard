@@ -1,0 +1,5 @@
+[
+  ["sweep", ["u-demo-admin", "u-demo-exec", "u-demo-prod", "u-demo-qc", "u-demo-store", "u-demo-weld", "u-demo-pur"]],
+  ["floor", ["u-demo-weld", "u-demo-mc", "u-demo-op"]],
+  ["pilot", ["u-demo-prod"]]
+]

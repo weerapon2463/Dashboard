@@ -429,6 +429,7 @@ function planNotifications() {
       else if (p.due && p.due < todayIso) out.push({ at: `${p.due}T23:59:00`, id: p.id, text: "เลยกำหนดแล้ว", title: p.title, remind: true, late: true });
     }
   });
+  if (typeof jcStopNotifications === "function") jcStopNotifications(me).forEach((n) => out.push(n));
   return out.sort((a, b) => String(b.at).localeCompare(String(a.at))).slice(0, 30);
 }
 
@@ -440,14 +441,14 @@ function planBellRender() {
   if (!me) return;
   const seen = planSeenAt();
   const list = planNotifications();
-  const unread = list.filter((n) => n.remind || n.at > seen).length;
+  const unread = list.filter((n) => n.remind || n.wo || n.at > seen).length;
   const badge = document.getElementById("notifyCount");
   badge.textContent = unread > 9 ? "9+" : String(unread);
   badge.hidden = !unread;
   btn.setAttribute("aria-label", `การแจ้งเตือน ${unread} รายการใหม่`);
   const panel = document.getElementById("notifyPanel");
   panel.innerHTML = `<div class="notify-head"><strong>การแจ้งเตือน</strong><button type="button" class="btn-chip" id="notifyReadAll">อ่านแล้วทั้งหมด</button></div>`
-    + (list.length ? `<ul class="notify-list">${list.map((n) => `<li><button type="button" class="notify-item${n.remind || n.at > seen ? " notify-new" : ""}${n.late ? " notify-late" : ""}" data-nplan="${escapeHtml(n.id)}">
+    + (list.length ? `<ul class="notify-list">${list.map((n) => `<li><button type="button" class="notify-item${n.remind || n.wo || n.at > seen ? " notify-new" : ""}${n.late ? " notify-late" : ""}" ${n.wo ? `data-nwo="${escapeHtml(n.wo)}"` : `data-nplan="${escapeHtml(n.id)}"`}>
         <span class="notify-title">${n.remind ? "⏰ " : ""}${escapeHtml(n.title)}</span>
         <span class="notify-text">${escapeHtml(n.text)}</span>
         ${n.remind ? "" : `<span class="notify-at">${fmtDateTime(n.at)}</span>`}</button></li>`).join("")}</ul>`
@@ -456,6 +457,11 @@ function planBellRender() {
     try { localStorage.setItem(PLAN_SEEN_PREFIX + me.id, new Date().toISOString()); } catch (e) { /* per-device */ }
     planBellRender();
   });
+  panel.querySelectorAll("[data-nwo]").forEach((b) => b.addEventListener("click", () => {
+    panel.hidden = true; btn.setAttribute("aria-expanded", "false");
+    if (typeof jcWo !== "undefined") jcWo = b.dataset.nwo;
+    switchView("workorder");
+  }));
   panel.querySelectorAll("[data-nplan]").forEach((b) => b.addEventListener("click", () => {
     panel.hidden = true; btn.setAttribute("aria-expanded", "false");
     switchView("plans");

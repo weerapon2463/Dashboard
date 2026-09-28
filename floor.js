@@ -141,12 +141,108 @@ function flWire(el) {
     if (!t) return;
     if (a === "askstop") { floorPendingStop = `${t.w.wo}|${t.i}`; floorPendingDone = null; renderFloor(); return; }
     if (a === "askdone") { floorPendingDone = `${t.w.wo}|${t.i}`; floorPendingStop = null; renderFloor(); return; }
-    if (a === "req") { floorAway(() => jcRequestFor(t.w, t.j)); return; }
+    if (a === "req") { flReqOpen(t.w, t.j); return; }
     const qty = a === "done" ? +(document.getElementById("flQty") || {}).textContent || 1 : 0;
     floorPendingStop = floorPendingDone = null;
     jcAct(t.w, t.j, a, qty, b.dataset.reason || "");
     showToast({ start: "เริ่มจับเวลาแล้ว", hold: "บันทึกการหยุดแล้ว — หัวหน้างานเห็นทันที", done: "บันทึกงานเสร็จแล้ว 👍", claim: "รับงานแล้ว" }[a] || "บันทึกแล้ว", "good");
   }));
+}
+
+/* ---- 📦 quick requisition: the kits this step still needs, tick and send ----------------- */
+function flReqRows(w, j) {
+  if (typeof bxTree !== "function" || !MASTER_BOM[w.model]) return null;
+  const qty = Number(w.qty) || 1;
+  const cv = bxCoverage(w.model, qty, bxRefUsage(w.wo));
+  const all = bxTree(w.model);
+  const byId = new Map(all.filter((r) => r.line).map((r) => [r.line.id, r]));
+  const isKit = (r) => r.line && r.line.parent && byId.get(r.line.parent) && !byId.get(r.line.parent).line.parent;
+  // assembly draws from every assembly line of the BOM; other steps from their own station only,
+  // so a painter never gets the whole machine's kit list (steps with no BOM station get none)
+  const station = JC_BOM_STATION[j.station] || "";
+  const atStation = (r) => j.station === "ASSY" ? /ประกอบ/.test(r.line.station || "") : !!station && r.line.station === station;
+  return all.filter((r) => isKit(r) && atStation(r)).map((r) => {
+    const c = cv.cov.get(r.line.id);
+    const need = r.per * qty;
+    const left = c ? Math.max(0, Math.round(need * (1 - c.reqd) * 1000) / 1000) : need;
+    return { r, key: bxKey(r.line), need, left };
+  });
+}
+function flReqOpen(w, j) {
+  if (typeof bxCanRequest !== "function" || !bxCanRequest()) { showToast("บัญชีนี้ขอเบิกไม่ได้ — แจ้งหัวหน้างาน", "warn"); return; }
+  const rows = flReqRows(w, j);
+  if (!rows) { showToast(`ไม่พบ BOM ของรุ่น ${w.model}`, "warn"); return; }
+  const open = rows.filter((x) => x.left > 0);
+  const pending = bxReqs().filter((d) => d.wo === w.wo && ["รออนุมัติ", "อนุมัติ", "จ่ายบางส่วน"].includes(d.status));
+  let bd = document.getElementById("flReqBackdrop");
+  if (!bd) {
+    bd = document.createElement("div");
+    bd.className = "modal-backdrop"; bd.id = "flReqBackdrop";
+    bd.innerHTML = `<div class="modal fl-req" role="dialog" aria-labelledby="flReqT"><div class="sn-mhead"><h3 id="flReqT"></h3><button type="button" class="btn-link" data-flr="close" aria-label="ปิด">✕</button></div><div id="flReqBody"></div></div>`;
+    document.body.appendChild(bd);
+    bd.addEventListener("click", (e) => { if (e.target === bd || e.target.dataset.flr === "close") bd.classList.remove("open"); });
+  }
+  bd.querySelector("#flReqT").textContent = `ขอเบิกของ — ${j.op} · ${w.wo}`;
+  const body = bd.querySelector("#flReqBody");
+  body.innerHTML = `
+    ${pending.length ? `<p class="fl-note">ขอไปแล้ว รอคลัง: ${pending.map((d) => `<b>${flEsc(d.no)}</b> (${flEsc(d.status)})`).join(", ")}</p>` : ""}
+    ${open.length ? `<p class="fl-note">แตะเลือกชุดที่ต้องการ แล้วกด "ส่งใบเบิก" — หัวหน้าอนุมัติ แล้วคลังจ่ายของ</p>
+      <div class="fl-req-list">${open.map((x, n) => `<label class="fl-req-row"><input type="checkbox" data-n="${n}" checked>
+        <span><b>${flEsc(x.r.line.part)}</b><small>${flEsc(x.r.line.code || "")} · ต้องใช้ ${flEsc(x.need)} ${flEsc(x.r.line.unit || "")}</small></span>
+        <input type="number" class="fl-req-qty" data-n="${n}" min="0" step="any" value="${flEsc(x.left)}" aria-label="จำนวน ${flEsc(x.r.line.part)}"></label>`).join("")}</div>
+      <label class="fl-req-note">ถึงคลัง (ถ้ามี) <input id="flReqNote" placeholder="เช่น ต้องใช้ก่อนบ่ายโมง"></label>
+      <button type="button" class="fl-btn fl-go" id="flReqSend">📦 ส่งใบเบิก</button>`
+    : `<p class="fl-empty">${rows.length ? "ของสำหรับขั้นนี้ขอเบิกครบแล้ว ✓" : "ขั้นนี้ไม่มีชิ้นส่วนใน BOM (เช่น สี วัสดุสิ้นเปลือง)"}</p>`}
+    <button type="button" class="fl-link" id="flReqFull">ต้องการของอื่น → เปิดหน้าเบิกแบบเต็ม</button>`;
+  body.querySelector("#flReqFull").addEventListener("click", () => { bd.classList.remove("open"); floorAway(() => jcRequestFor(w, j)); });
+  const send = body.querySelector("#flReqSend");
+  if (send) send.addEventListener("click", () => {
+    // hand the ticked rows to the regular requisition flow (same numbering, approval, audit)
+    const pane = document.createElement("div");
+    body.querySelectorAll(".fl-req-row").forEach((row) => {
+      const chk = row.querySelector("input[type=checkbox]");
+      const q = Number(row.querySelector(".fl-req-qty").value);
+      if (!chk.checked || !(q > 0)) return;
+      const inp = document.createElement("input");
+      inp.className = "bx-qty"; inp.dataset.key = open[chk.dataset.n].key; inp.value = q;
+      pane.appendChild(inp);
+    });
+    if (!pane.children.length) { showToast("ยังไม่ได้เลือกรายการ", "warn"); return; }
+    const note = document.createElement("input");
+    note.id = "bxReqNote"; note.hidden = true; note.value = body.querySelector("#flReqNote").value;
+    document.body.appendChild(note);
+    try { bxSubmitReq({ ref: w.wo, model: w.model, qty: Number(w.qty) || 1, kind: "ผลิต", line: w.department || "" }, pane); } finally { note.remove(); }
+    const rb = document.getElementById("bxReqBackdrop"); if (rb) rb.classList.remove("open");
+    bd.classList.remove("open");
+    renderFloor();
+  });
+  bd.classList.add("open");
+}
+
+/* ---- ⚠ stop alerts: a stopped job reaches the people who can fix it ----------------------- */
+// production leads / planners / managers see every stop; other departments see the reasons that are theirs
+const FL_STOP_OWNERS = [[/เครื่องจักร|ไฟฟ้า/, "mt"], [/วัสดุ|ชิ้นส่วน/, "wh"], [/วัสดุ|ชิ้นส่วน/, "pur"], [/QC/, "qc"], [/แบบ|R&D/, "rnd"]];
+function flStopWatcher(u, reason) {
+  if (!u) return false;
+  if (["admin", "plant", "group"].includes(u.role)) return true;
+  if (u.role === "depthead" && ["prod", "plan"].includes(u.dept)) return true;
+  return FL_STOP_OWNERS.some(([re, dept]) => re.test(reason || "") && u.dept === dept);
+}
+function flOpenStops(u) {
+  const out = [];
+  if (typeof WORK_ORDERS === "undefined") return out;
+  WORK_ORDERS.filter((w) => w.status !== "เสร็จสมบูรณ์").forEach((w) => (w.jobs || []).forEach((j) => {
+    const d = (j.downs || []).find((x) => !x.to);
+    if (d && j.status === "hold" && flStopWatcher(u, d.reason)) out.push({ w, j, d, mins: jcDownMins(d) });
+  }));
+  return out.sort((a, b) => b.mins - a.mins);
+}
+function jcStopNotifications(u) {
+  return flOpenStops(u).map(({ w, j, d, mins }) => ({ at: d.from, wo: w.wo, title: `⚠ งานหยุด: ${j.op} · ${w.wo}`, text: `${d.reason} — ${d.by || j.assignee || ""} · หยุดมา ${jcFmtMins(mins)}`, late: true }));
+}
+function jcStopInbox(u) {
+  return flOpenStops(u).map(({ w, j, d, mins }) => ({ group: "งานหยุด", icon: "⚠", title: `${j.op} หยุด — ${d.reason}`, detail: `${w.wo} · ${w.serial || w.model} · ${d.by || j.assignee || ""} · หยุดมา ${jcFmtMins(mins)}`,
+    tone: "critical", score: 88 + Math.min(10, Math.floor(mins / 30)), act: () => { if (typeof jcWo !== "undefined") jcWo = w.wo; switchView("workorder"); } }));
 }
 
 // report a problem: stop the running job with a reason, or open a non-conformance report
@@ -178,7 +274,7 @@ function initFloor() {
   // re-draw after any job-card change (here or synced from another device)
   if (typeof jcRefresh === "function" && !jcRefresh._floor) {
     const orig = jcRefresh;
-    jcRefresh = function () { orig(); if (flIsOn()) renderFloor(); };
+    jcRefresh = function () { orig(); if (flIsOn()) renderFloor(); if (typeof planBellRender === "function") planBellRender(); };
     jcRefresh._floor = true;
   }
   if (flIsOn()) { document.documentElement.setAttribute("data-floor", "1"); renderFloor(); }

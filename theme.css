@@ -470,3 +470,11 @@ html[data-floor="1"] .floor-toggle { display: none; }
 @media print { .floor, .floor-back { display: none !important; } }
 .fl-wait { color: var(--txt-warn); font-weight: 600; }
 .fl-later { opacity: 0.8; border-style: dashed; }
+.fl-req { max-width: 640px; }
+.fl-note { color: var(--text-secondary); margin: 6px 0 10px; }
+.fl-req-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; max-height: 50vh; overflow-y: auto; }
+.fl-req-row { display: grid; grid-template-columns: 32px 1fr 90px; gap: 10px; align-items: center; padding: 10px; min-height: 60px; border: 1px solid var(--border-hairline); border-radius: 10px; cursor: pointer; }
+.fl-req-row input[type=checkbox] { width: 26px; height: 26px; }
+.fl-req-row span { display: flex; flex-direction: column; } .fl-req-row small { color: var(--text-secondary); }
+.fl-req-qty { min-height: 44px; font-size: 1.1rem; text-align: center; }
+.fl-req-note { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; font-weight: 600; }
