@@ -127,3 +127,5 @@ html.tv-on, html.tv-on body { overflow: hidden; }
 .tv-person-support { border-left-color: #5b8def; }
 .tv-person-support .tv-avatar { background: #5b8def; color: #fff; }
 .tv-person-tasks { display: flex; flex-direction: column; gap: 0.3em; font-size: 0.9em; color: #d7d5cd; padding: 0.2em 0; }
+
+.tv-mine-list > div { padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.08); font-size: 1.05em; }

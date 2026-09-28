@@ -905,7 +905,9 @@
   var auth = read("y2j-auth-v1") || {};
   var bom = read("y2j-bom-v1") || {};
   var audit = read("y2j-audit-v1") || [];
-  var has = Object.keys(docs).length || wos.length || p2p.length;
+  // company figures only for someone signed in on this browser
+  var signedIn = !!localStorage.getItem("y2j-session-v1");
+  var has = signedIn && (Object.keys(docs).length || wos.length || p2p.length);
   var n = function (t) { return (docs[t] || []).length; };
   var open = function (t, closed) { return (docs[t] || []).filter(function (d) { return closed.indexOf(d.status) < 0; }).length; };
   var mreqItems = (docs.mreq || []).filter(function (d) { return d.items && d.items.length; });
@@ -914,7 +916,7 @@
 
   var live = document.getElementById("cxLive");
   if (!has) {
-    live.innerHTML = '<div class="cx-live-empty">เปิด <a href="./index.html">Y2J ONE</a> ในเบราว์เซอร์นี้ก่อน หน้านี้จะแสดงตัวเลขจริงจากระบบ</div>';
+    live.innerHTML = '<div class="cx-live-empty">' + (signedIn ? 'เปิด <a href="./index.html">FORGE</a> ในเบราว์เซอร์นี้ก่อน หน้านี้จะแสดงตัวเลขจริงจากระบบ' : '🔒 <a href="./index.html">เข้าสู่ระบบ FORGE</a> ก่อน จึงจะเห็นตัวเลขจากระบบ') + '</div>';
   } else {
     var tiles = [
       [docTotal, "เอกสารในระบบ", "ทุกแผนก มีเลขที่และประวัติ"],

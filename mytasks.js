@@ -17,6 +17,17 @@ function mtDays(fromIso) {
   return isNaN(d) ? 0 : Math.max(0, d);
 }
 
+// Which departments a waiting status hands the document to (besides the approvers of its own type):
+// the department named in it, and — when that department has no head — its owners' own staff.
+const MT_WAITS_ON = [[/QC|ตรวจรับ|ตรวจสอบคุณภาพ/, ["qc"]], [/อะไหล่|วัสดุ|ของ/, ["wh", "pur"]], [/จัดซื้อ|ราคา/, ["pur"]], [/แบบ|R&D|วิศวกร/, ["rnd"]], [/ซ่อม|ช่าง/, ["mt"]], [/วางแผน|แผน/, ["plan"]], [/ลูกค้า/, ["sales"]]];
+function mtWaitsOn(type, status) {
+  const out = [];
+  MT_WAITS_ON.forEach(([re, depts]) => { if (re.test(status || "")) depts.forEach((x) => { if (!out.includes(x)) out.push(x); }); });
+  const owner = (typeof DEPT_WORKSPACES !== "undefined" ? DEPT_WORKSPACES : []).find((w) => w.docTypes.includes(type));
+  if (owner && typeof AUTH !== "undefined" && !AUTH.users.some((x) => x.active && x.role === "depthead" && x.dept === owner.id) && !out.includes(owner.id)) out.push(owner.id);
+  return out;
+}
+
 function mtCollect() {
   const u = mtMe();
   if (!u) return [];
@@ -45,7 +56,10 @@ function mtCollect() {
   if (typeof P2P_CASES !== "undefined" && typeof p2pCurrent === "function") P2P_CASES.forEach((c) => {
     const st = p2pCurrent(c);
     if (!st || st.id === "ship" || st.id === "pr") return;
-    const may = st.who === "approver" ? (st.id === "approve" && (u.role === "plant" ? (c.value || 0) > 100000 : u.role === "depthead" && (c.value || 0) <= 100000))
+    // same rule as recording the step (p2pMayApprove); managers get only what is above the heads' limit
+    const may = st.who === "approver"
+      ? st.id === "approve" && typeof p2pMayApprove === "function" && p2pMayApprove(c, u) && (u.role !== "plant" || (Number(c.value) || 0) > P2P_HEAD_LIMIT
+        || !AUTH.users.some((x) => x.active && x.role === "depthead" && authDeptName(x.dept) === c.requester)) // no head to ask: the manager
       : st.who !== "any" && u.dept === st.who;
     if (!may) return;
     const state = p2pState(c);
@@ -60,9 +74,16 @@ function mtCollect() {
       if (typeof authCanSeeDoc === "function" && !authCanSeeDoc(t, d)) return;
       if (!deptIsOpen(t, d)) return;
       const waiting = /^รอ/.test(d.status || "") && d.createdBy !== u.id && deptCanManage(u.role, t);
+      // a status that waits on another department ("รอ QC ตรวจ", "รออะไหล่") goes to that department too
+      const handoff = !waiting && d.createdBy !== u.id && mtWaitsOn(t, d.status).includes(u.dept);
       const mine = d.createdBy === u.id || d.owner === u.name || d.tech === u.name;
-      if (!waiting && !mine) return;
+      if (!waiting && !handoff && !mine) return;
       const age = mtDays(d.date);
+      if (handoff) {
+        add({ group: "ส่งต่อถึงแผนก", icon: "↪", title: `${d.no} ${d.title || ""}`, detail: `${def.name.split(" (")[0]} · ${d.status}${age ? ` · ${age} วัน` : ""}`,
+          tone: age >= 2 ? "warning" : "neutral", score: 55 + age, age, act: () => openDocViewByNo(d.no) });
+        return;
+      }
       add({ group: waiting ? "อนุมัติ" : "เอกสารของฉัน", icon: waiting ? "✍" : "📄", title: `${waiting ? "ตรวจ / อนุมัติ " : ""}${d.no} ${d.title || ""}`, detail: `${def.name.split(" (")[0]} · ${d.status}${age ? ` · ${age} วัน` : ""}`,
         tone: waiting && age >= 2 ? "warning" : "neutral", score: waiting ? 60 + age : 10 + Math.min(age, 20), age, act: () => openDocViewByNo(d.no) });
     });

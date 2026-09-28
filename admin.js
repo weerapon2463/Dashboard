@@ -49,6 +49,82 @@ function renderAdminStorage() {
     ? `<div class="storage-mode storage-sheets">☁ ตอนนี้เก็บข้อมูลที่ <strong>Google Sheets</strong> — ทุกเครื่องที่เชื่อมต่อเห็นข้อมูลชุดเดียวกัน</div>
        <div class="muted-inline">สถานะ: ${st.state === "synced" ? "ซิงก์แล้ว" : st.state === "saving" ? "กำลังบันทึก" : "ออฟไลน์ — จะส่งเมื่อเน็ตกลับมา"}${st.pending.length ? ` · รอส่ง ${st.pending.length} ชุดข้อมูล` : ""}${st.error ? ` · ${escapeHtml(st.error)}` : ""}</div>`
     : `<div class="storage-mode storage-local">💻 ตอนนี้เก็บข้อมูลใน <strong>เบราว์เซอร์เครื่องนี้</strong> เท่านั้น — เครื่องอื่นจะไม่เห็นข้อมูลเดียวกัน</div>`;
+  renderAdminSecure(remote, c);
+}
+
+// Server sign-in: passwords checked by Apps Script, sessions instead of the master key on every device
+function renderAdminSecure(remote, c) {
+  let box = document.getElementById("stSecure");
+  const anchor = document.getElementById("storageStatus");
+  if (!box && anchor) { box = document.createElement("div"); box.id = "stSecure"; box.className = "st-secure"; anchor.insertAdjacentElement("afterend", box); }
+  if (!box) return;
+  if (!remote || c.demo) { box.innerHTML = ""; return; }
+  const on = !!c.secure;
+  box.innerHTML = `<h4>🔒 การเข้าระบบ</h4>
+    ${on ? `<p class="storage-mode storage-sheets">เปิดแล้ว: ตรวจรหัสผ่านที่เซิร์ฟเวอร์ · เครื่องต่าง ๆ ไม่มีรหัสลับหลักแล้ว · ผิด 5 ครั้งระงับ 15 นาที · ไม่ได้ใช้ 6 ชั่วโมงต้องเข้าใหม่ · เห็นเฉพาะรหัสผ่าน (แบบเข้ารหัส) ของตัวเอง · แก้ผู้ใช้/สิทธิ์ได้เฉพาะผู้ดูแลระบบ · ประวัติการใช้งานลบไม่ได้ · บันทึกการเข้าระบบที่แท็บ _log ใน Google Sheet</p>
+      <div class="st-secure-tools">
+        <button type="button" class="btn-secondary" id="stLogBtn">📜 ประวัติการเข้าระบบ</button>
+        <button type="button" class="btn-secondary" id="stUnlockBtn">🔓 ปลดล็อกบัญชี</button>
+        <button type="button" class="btn-secondary" id="stRevokeBtn">⏏ ให้ทุกเครื่องออกจากระบบ</button>
+        <button type="button" class="btn-link" id="stSecureOff">ปิด (กลับไปใช้รหัสลับหลักบนทุกเครื่อง)</button>
+      </div>
+      <div id="stLogBox"></div>`
+    : `<p class="muted-inline">ตอนนี้ทุกเครื่องที่เชื่อมเก็บ <b>รหัสลับหลัก</b> ไว้ และตรวจรหัสผ่านในเบราว์เซอร์ — คนที่แกะเครื่องได้จะเข้าแทนคนอื่นได้ เปิดการเข้าระบบผ่านเซิร์ฟเวอร์เพื่อปิดช่องนี้ (ทุกคนต้องเข้าระบบใหม่ 1 ครั้ง ด้วยรหัสผ่านเดิม)</p>
+      <button type="button" class="btn-primary" id="stSecureOn">เปิดการเข้าระบบผ่านเซิร์ฟเวอร์</button>`}`;
+  const onBtn = document.getElementById("stSecureOn");
+  if (onBtn) onBtn.addEventListener("click", async () => {
+    if (!confirm("เปิดการเข้าระบบผ่านเซิร์ฟเวอร์?\n• รหัสลับหลักจะถูกเปลี่ยน ลิงก์ตั้งค่าเดิมใช้ไม่ได้\n• ทุกเครื่อง (รวมเครื่องนี้) ต้องเข้าระบบใหม่ด้วยรหัสผ่านของตัวเอง\n• ผู้ดูแลระบบต้องจำรหัสผ่านของตัวเองได้")) return;
+    try {
+      onBtn.disabled = true;
+      await Y2JStore.flush();
+      const r = await Y2JStore.setSecure(true);
+      auditLog("เปิดการเข้าระบบผ่านเซิร์ฟเวอร์", "Google Sheets", "");
+      await Y2JStore.flush().catch(() => {});
+      alert(`เปิดแล้ว — รหัสลับหลักใหม่อยู่ในแท็บ _ตั้งค่า ของ Google Sheet (เก็บไว้สำหรับกู้คืนเท่านั้น)\nรหัสลับใหม่: ${r.token}\n\nเครื่องนี้จะกลับไปหน้าเข้าสู่ระบบ`);
+      try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch (e) { /* ignore */ }
+      location.reload();
+    } catch (e) {
+      onBtn.disabled = false;
+      showToast(/unknown action/.test(e.message) ? "สคริปต์ฝั่ง Google Sheets ยังเป็นรุ่นเก่า — อัปเดต Apps Script (Code.gs) ก่อน แล้วค่อยเปิด" : "เปิดไม่สำเร็จ: " + e.message, "warn");
+    }
+  });
+  const logBtn = document.getElementById("stLogBtn");
+  if (logBtn) logBtn.addEventListener("click", async () => {
+    const out = document.getElementById("stLogBox");
+    out.innerHTML = `<p class="muted-inline">กำลังโหลด…</p>`;
+    try {
+      const r = await Y2JStore.admin("signinlog", { limit: 300 });
+      out.innerHTML = r.rows.length ? `<div class="table-scroll st-log"><table class="data-table"><thead><tr><th>เวลา</th><th>เหตุการณ์</th><th>ผู้ใช้</th><th>รายละเอียด</th></tr></thead><tbody>
+        ${r.rows.map((x) => `<tr class="${/ไม่สำเร็จ|ระงับ/.test(x[1]) ? "st-log-bad" : ""}"><td>${escapeHtml(fmtDateTime(x[0]))}</td><td>${escapeHtml(x[1])}</td><td>${escapeHtml(x[2])}</td><td>${escapeHtml(x[3])}</td></tr>`).join("")}</tbody></table></div>`
+        : `<p class="muted-inline">ยังไม่มีบันทึก</p>`;
+    } catch (e) { out.innerHTML = `<p class="muted-inline">โหลดไม่ได้: ${escapeHtml(e.message)}</p>`; }
+  });
+  const unlockBtn = document.getElementById("stUnlockBtn");
+  if (unlockBtn) unlockBtn.addEventListener("click", async () => {
+    const who = prompt("ปลดล็อกบัญชีไหน? (ชื่อผู้ใช้ หรือ รหัสพนักงาน)");
+    if (!who) return;
+    try { await Y2JStore.admin("unlock", { user: who.trim() }); auditLog("ปลดล็อกบัญชี", who.trim(), ""); showToast(`ปลดล็อก ${who} แล้ว — เข้าระบบได้ทันที`, "good"); }
+    catch (e) { showToast("ปลดล็อกไม่สำเร็จ: " + e.message, "warn"); }
+  });
+  const revokeBtn = document.getElementById("stRevokeBtn");
+  if (revokeBtn) revokeBtn.addEventListener("click", async () => {
+    if (!confirm("ให้ทุกเครื่อง (รวมเครื่องนี้) ออกจากระบบทันที? ใช้เมื่อเครื่องหาย หรือสงสัยว่ามีคนเข้าแทน — งานที่ยังไม่ส่งจะเก็บไว้ในเครื่องนั้น")) return;
+    try { await Y2JStore.flush(); await Y2JStore.admin("revokeall", {}); auditLog("ให้ทุกเครื่องออกจากระบบ", "ทุกเครื่อง", ""); await Y2JStore.flush().catch(() => {}); location.reload(); }
+    catch (e) { showToast("ไม่สำเร็จ: " + e.message, "warn"); }
+  });
+  const offBtn = document.getElementById("stSecureOff");
+  if (offBtn) offBtn.addEventListener("click", async () => {
+    if (!confirm("ปิดการเข้าระบบผ่านเซิร์ฟเวอร์? เครื่องอื่นจะต้องใช้ลิงก์ตั้งค่าที่มีรหัสลับหลักอีกครั้ง")) return;
+    try { await Y2JStore.setSecure(false); auditLog("ปิดการเข้าระบบผ่านเซิร์ฟเวอร์", "Google Sheets", ""); renderAdminStorage(); showToast("ปิดแล้ว — ส่งลิงก์ตั้งค่าใหม่ให้ทีม", "good"); }
+    catch (e) { showToast("ปิดไม่สำเร็จ: " + e.message, "warn"); }
+  });
+}
+
+// 🪪 employee badges: QR = employee number, scanned on the sign-in screen (password still needed)
+function adminPrintBadges() {
+  if (typeof snPrintLabels !== "function") return;
+  const users = AUTH.users.filter((u) => u.active && (u.empNo || u.username));
+  snPrintLabels(users.map((u) => ({ code: u.empNo || u.username, link: `forge:u:${u.empNo || u.username}`, line1: u.name, line2: [u.position, authDeptName(u.dept)].filter(Boolean).join(" · ") })));
 }
 
 async function adminStorageTest() {
@@ -92,6 +168,10 @@ function renderAdminUsers() {
   tbody.querySelectorAll("[data-edit]").forEach((b) => b.addEventListener("click", () => openUserEditor(b.dataset.edit)));
   tbody.querySelectorAll("[data-as]").forEach((b) => b.addEventListener("click", () => {
     const u = authUserById(b.dataset.as);
+    if (typeof Y2JStore !== "undefined" && Y2JStore.secure && Y2JStore.secure()) {
+      alert("เข้าระบบผ่านเซิร์ฟเวอร์เปิดอยู่: การเข้าใช้แทนผู้อื่นถูกปิด (ทุกการกระทำต้องเป็นของเจ้าของบัญชีจริง)\nดูสิทธิ์ของคนนี้ได้ที่ปุ่ม แก้ไข › สิทธิ์ หรือชุดทดสอบ flows");
+      return;
+    }
     if (confirm(`เข้าใช้ระบบเป็น "${u.name}" เพื่อดูสิ่งที่ผู้ใช้นี้เห็น? (ออกจากระบบแล้วเข้าใหม่ด้วยบัญชี admin เพื่อกลับ)`)) authSignIn(u, "impersonate");
   }));
 }
@@ -425,6 +505,11 @@ function exportAuditCsv() {
 function initAdmin() {
   document.querySelectorAll(".admin-tab").forEach((b) => b.addEventListener("click", () => { adminTab = b.dataset.tab; renderAdmin(); }));
   document.getElementById("adminAddUserBtn").addEventListener("click", () => openUserEditor(""));
+  if (!document.getElementById("adminBadgeBtn")) {
+    const add = document.getElementById("adminAddUserBtn");
+    add.insertAdjacentHTML("afterend", ` <button type="button" class="btn-secondary" id="adminBadgeBtn" title="บัตร QR สำหรับสแกนเข้าระบบ (ยังต้องใส่รหัสผ่าน)">🪪 พิมพ์บัตรพนักงาน QR</button>`);
+    document.getElementById("adminBadgeBtn").addEventListener("click", adminPrintBadges);
+  }
   document.getElementById("adminAddTeamBtn").addEventListener("click", () => openTeamEditor(""));
   document.getElementById("auditExportBtn").addEventListener("click", exportAuditCsv);
   document.getElementById("stTestBtn").addEventListener("click", adminStorageTest);
@@ -450,7 +535,7 @@ function initAdmin() {
   });
   document.getElementById("stLinkBtn").addEventListener("click", () => {
     const link = Y2JStore.setupLink();
-    const done = () => showToast("คัดลอกลิงก์แล้ว — ส่งให้ทีมเฉพาะคนในบริษัท (มีรหัสลับอยู่ในลิงก์)", "good");
+    const done = () => showToast(Y2JStore.secure() ? "คัดลอกลิงก์แล้ว — ลิงก์นี้ไม่มีรหัสลับ ทุกคนเข้าด้วยรหัสผ่านของตัวเอง" : "คัดลอกลิงก์แล้ว — ส่งให้ทีมเฉพาะคนในบริษัท (มีรหัสลับอยู่ในลิงก์)", "good");
     if (navigator.clipboard) navigator.clipboard.writeText(link).then(done, () => prompt("คัดลอกลิงก์นี้", link));
     else prompt("คัดลอกลิงก์นี้", link);
   });

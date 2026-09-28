@@ -389,12 +389,23 @@ function renderP2PCaseTable() {
 
 /* ---- permissions ------------------------------------------------------------ */
 
-function p2pCanRecord(stage) {
+// Who approves a purchase request (one rule for the inbox and for recording it):
+// up to 100,000 ฿ the head of the department that asked; above that the plant manager; never the person who opened it.
+const P2P_HEAD_LIMIT = 100000;
+function p2pMayApprove(c, u) {
+  if (!u || !c) return false;
+  const opener = (p2pEvent(c, "pr") || {}).by;
+  if (opener && opener === u.name && u.role !== "admin") return false;
+  if (u.role === "admin") return true;
+  if (u.role === "plant") return true;
+  return u.role === "depthead" && (Number(c.value) || 0) <= P2P_HEAD_LIMIT && (!c.requester || c.requester === authDeptName(u.dept));
+}
+function p2pCanRecord(stage, c) {
   const u = typeof authCurrentUser === "function" ? authCurrentUser() : null;
-  if (!u) return ["depthead", "plant"].includes(currentRole());
+  if (!u) return false;
+  if (stage.who === "approver") return stage.id === "approve" && (c ? p2pMayApprove(c, u) : ["admin", "plant", "depthead"].includes(u.role));
   if (u.role === "admin" || u.role === "plant") return true;
   if (stage.who === "any") return u.role !== "group";
-  if (stage.who === "approver") return u.role === "depthead" && stage.id === "approve";
   return u.dept === stage.who;
 }
 
@@ -462,7 +473,7 @@ function openP2PCase(id) {
 
   const actions = [];
   if (cur && c.status !== "cancelled") {
-    if (p2pCanRecord(cur)) actions.push({ label: `✔ บันทึก: ${cur.label}`, primary: true, onClick: () => openP2PStep(c.id, cur.id) });
+    if (p2pCanRecord(cur, c)) actions.push({ label: `✔ บันทึก: ${cur.label}`, primary: true, onClick: () => openP2PStep(c.id, cur.id) });
   }
   if (cur) actions.push({ label: "⚠ แจ้งปัญหา", onClick: () => openP2PIssue(c.id) });
   docViewFileName = `${c.pr}-tracking`;
@@ -526,6 +537,7 @@ function openP2PStep(caseId, stageId) {
 function saveP2PStep() {
   const { caseId, stage } = p2pStepCtx;
   const c = P2P_CASES.find((x) => x.id === caseId);
+  if (!c || !p2pCanRecord(p2pStage(stage), c)) { showToast("ขั้นนี้ไม่ใช่หน้าที่ของบัญชีนี้", "warn"); return; }
   const val = (id) => { const el = document.getElementById(id); return el ? el.value.trim() : ""; };
   const ev = { stage, at: val("p2pStepDate") || p2pToday(), by: p2pUserName(), note: val("p2pStepNote") };
   let auditDetail = p2pStage(stage).label;

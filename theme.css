@@ -478,3 +478,18 @@ html[data-floor="1"] .floor-toggle { display: none; }
 .fl-req-row span { display: flex; flex-direction: column; } .fl-req-row small { color: var(--text-secondary); }
 .fl-req-qty { min-height: 44px; font-size: 1.1rem; text-align: center; }
 .fl-req-note { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; font-weight: 600; }
+
+/* ---- sign-in / password dialog ---- */
+.pw-modal { max-width: 420px; display: flex; flex-direction: column; gap: 12px; }
+.pw-modal label { display: flex; flex-direction: column; gap: 4px; font-weight: 600; }
+.pw-modal input[type=password], .pw-modal input[type=text] { min-height: 44px; font-size: 1.05rem; }
+.pw-modal .pw-show { flex-direction: row; align-items: center; gap: 8px; font-weight: 400; }
+.pw-modal .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.login-eye { margin-left: -4px; }
+.login-more { display: flex; gap: 12px; align-items: center; margin-top: 8px; flex-wrap: wrap; }
+.st-secure { margin: 14px 0; padding: 14px; border: 1px solid var(--border-hairline); border-radius: var(--radius); }
+.st-secure h4 { margin: 0 0 8px; }
+.st-secure-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 8px 0; }
+.st-log { max-height: 360px; overflow-y: auto; }
+.st-log-bad td { color: var(--txt-bad); }
+.bx-proof { font-family: var(--font-mono); font-size: 0.8em; color: var(--text-secondary); }

@@ -98,8 +98,17 @@ function tvDownIn(fromMs) {
 
 /* ---- enter / leave --------------------------------------------------------------- */
 
+// the floor board shows every order and who works on what: people who may open work orders
+function tvCanFloor() {
+  const u = typeof authCurrentUser === "function" ? authCurrentUser() : null;
+  if (!u) return false;
+  const pages = typeof authAllowedModules === "function" ? authAllowedModules(u) : null;
+  return !pages || pages.includes("workorder");
+}
 function tvEnter(mode) {
-  if (mode === "exec" && !tvCanExec()) mode = "floor";
+  if (!authCurrentUser()) return; // boards need a signed-in person
+  if (mode === "exec" && !tvCanExec()) mode = tvCanFloor() ? "floor" : "team";
+  if (mode === "floor" && !tvCanFloor()) mode = tvCanExec() ? "exec" : "team";
   tvMode = mode;
   tvSlide = 0;
   let root = document.getElementById("tvRoot");
@@ -140,7 +149,11 @@ function tvClock() {
 function tvRender() {
   const root = document.getElementById("tvRoot");
   if (!root || !tvMode) return;
-  const slides = tvMode === "exec" ? [["ภาพรวมวันนี้", tvExecKpi], ["ต้นทุน & เวลาหยุด", tvExecCost]] : [["สถานีงานตอนนี้", tvFloorStations], ["ทีมงานตอนนี้ — ทุกคนทำอะไรอยู่", tvFloorPeople], ["ความคืบหน้าใบสั่งผลิต", tvFloorOrders]];
+  const me = authCurrentUser() || {};
+  const slides = tvMode === "exec" ? [["ภาพรวมวันนี้", tvExecKpi], ["ต้นทุน & เวลาหยุด", tvExecCost]]
+    : tvMode === "team" ? [[`งานของทีม ${authDeptName(me.dept)}`, tvTeam]]
+    : tvMode === "mine" ? [[`จอของ ${me.name || ""}${me.position ? ` — ${me.position}` : ""}`, tvMine]]
+    : [["สถานีงานตอนนี้", tvFloorStations], ["ทีมงานตอนนี้ — ทุกคนทำอะไรอยู่", tvFloorPeople], ["ความคืบหน้าใบสั่งผลิต", tvFloorOrders]];
   const i = tvSlide % slides.length;
   const co = typeof orgCurrent === "function" && orgCurrent() ? orgCurrent().name : APP_NAME;
   let body = "";
@@ -148,10 +161,10 @@ function tvRender() {
   root.innerHTML = `
     <div class="tv-frame tv-${tvMode}">
       <header class="tv-head">
-        <div class="tv-brand"><span class="tv-mark">${tvEsc(typeof orgCurrent === "function" && orgCurrent() ? (orgCurrent().short || APP_NAME) : APP_NAME)}</span><div><div class="tv-co">${tvEsc(co)}</div><div class="tv-kind">${tvMode === "exec" ? "จอผู้บริหาร" : "จอหน้างาน"} · ${tvEsc(slides[i][0])}</div></div></div>
+        <div class="tv-brand"><span class="tv-mark">${tvEsc(typeof orgCurrent === "function" && orgCurrent() ? (orgCurrent().short || APP_NAME) : APP_NAME)}</span><div><div class="tv-co">${tvEsc(co)}</div><div class="tv-kind">${tvMode === "exec" ? "จอผู้บริหาร" : tvMode === "team" ? "จอทีม" : tvMode === "mine" ? "จอส่วนตัว" : "จอหน้างาน"} · ${tvEsc(slides[i][0])} · เปิดโดย ${tvEsc(me.name || "")}${me.position ? ` (${tvEsc(me.position)})` : ""}</div></div></div>
         <div class="tv-dots">${slides.map((s, k) => `<button type="button" class="tv-dot${k === i ? " on" : ""}" data-tvslide="${k}" aria-label="${tvEsc(s[0])}"></button>`).join("")}</div>
         <div class="tv-right"><div class="tv-clock" id="tvClock">${tvClock()}</div>
-          <select class="tv-switch" id="tvSwitch" aria-label="เลือกจอ"><option value="floor"${tvMode === "floor" ? " selected" : ""}>จอหน้างาน</option>${tvCanExec() ? `<option value="exec"${tvMode === "exec" ? " selected" : ""}>จอผู้บริหาร</option>` : ""}</select>
+          <select class="tv-switch" id="tvSwitch" aria-label="เลือกจอ">${tvCanFloor() ? `<option value="floor"${tvMode === "floor" ? " selected" : ""}>จอหน้างาน</option>` : ""}${me.dept ? `<option value="team"${tvMode === "team" ? " selected" : ""}>จอทีมของฉัน</option>` : ""}<option value="mine"${tvMode === "mine" ? " selected" : ""}>จอส่วนตัว (${tvEsc(me.name || "")})</option>${tvCanExec() ? `<option value="exec"${tvMode === "exec" ? " selected" : ""}>จอผู้บริหาร</option>` : ""}</select>
           <button type="button" class="tv-simbtn${tvSim ? " on" : ""}" id="tvSimBtn" title="จำลองการทำงาน — ข้อมูลขยับเองเพื่อสาธิต ไม่บันทึกลงระบบ">${tvSim ? "■ หยุดจำลอง" : "▶ จำลองการทำงาน"}</button>
           <button type="button" class="tv-exit" id="tvExit" aria-label="ออกจากโหมดทีวี">✕</button></div>
       </header>
@@ -284,6 +297,59 @@ function tvFloorOrders() {
   <div class="tv-legend"><span class="tv-step tv-step-done">เสร็จ</span><span class="tv-step tv-step-wip">กำลังทำ</span><span class="tv-step tv-step-hold">หยุด</span><span class="tv-step tv-step-open">รอเริ่ม</span></div>`;
 }
 
+/* ---- team: what each person of the viewer's department has waiting (by name and position) ------ */
+
+// each teammate's inbox, worked out with that person's own rights (the viewer sees only their department)
+function tvTeamItems() {
+  const me = typeof authCurrentUser === "function" ? authCurrentUser() : null;
+  if (!me || typeof mtCollect !== "function") return [];
+  const team = AUTH.users.filter((u) => u.active && u.dept && u.dept === me.dept && u.role !== "admin" && (!u.company || !me.company || u.company === me.company));
+  const saved = AUTH_USER;
+  try {
+    return team.map((u) => { AUTH_USER = u; return { u, items: mtCollect().filter((x) => x.group !== "แผนงาน" || x.tone === "critical") }; });
+  } finally { AUTH_USER = saved; }
+}
+function tvTeam() {
+  const me = authCurrentUser();
+  if (!me || !me.dept) return `<p class="tv-empty">บัญชีนี้ไม่ได้อยู่ในแผนกใด — ใช้จอหน้างานหรือจอผู้บริหาร</p>`;
+  const rows = tvTeamItems().sort((a, b) => (b.u.id === me.id) - (a.u.id === me.id) || b.items.length - a.items.length);
+  const total = rows.reduce((s, r) => s + r.items.length, 0);
+  const urgent = rows.reduce((s, r) => s + r.items.filter((x) => x.tone === "critical").length, 0);
+  return `<div class="tv-strip"><div class="tv-chip">งานรอทั้งทีม <b>${total}</b></div><div class="tv-chip tv-chip-bad">ด่วน <b>${urgent}</b></div><div class="tv-chip">สมาชิก <b>${rows.length}</b></div></div>
+    <div class="tv-people" style="--cols:${Math.min(4, Math.max(1, rows.length))}">${rows.map(({ u, items }) => `
+      <div class="tv-person tv-person-${items.some((x) => x.tone === "critical") ? "hold" : items.length ? "support" : "idle"}">
+        <div class="tv-person-head"><span class="tv-avatar">${tvEsc((u.name || "?").trim().charAt(0))}</span><div><b>${tvEsc(u.name)}${u.id === me.id ? " (คุณ)" : ""}</b><small>${tvEsc(u.position || authRoleLabel(u.role))}</small></div></div>
+        ${items.length ? `<div class="tv-person-tasks">${items.slice(0, 4).map((x) => `<div class="${x.tone === "critical" ? "tv-bad" : ""}">${tvEsc(x.icon || "•")} ${tvEsc(x.title)}</div>`).join("")}${items.length > 4 ? `<div class="tv-mut">และอีก ${items.length - 4} งาน</div>` : ""}</div>` : `<div class="tv-person-free">ไม่มีงานค้าง</div>`}
+      </div>`).join("")}</div>`;
+}
+/* ---- mine: one person's board — their tasks, their job cards, their plans today ------------------ */
+function tvMine() {
+  const me = authCurrentUser();
+  if (!me) return "";
+  const items = typeof mtCollect === "function" ? mtCollect() : [];
+  const jobs = [];
+  tvOpenWos().forEach((w) => (w.jobs || []).forEach((j) => { if (j.assignee === me.name && j.status !== "done") jobs.push({ w, j }); }));
+  const today = new Date().toISOString().slice(0, 10);
+  const plans = typeof PLANS !== "undefined" ? PLANS.filter((p) => (p.assignees || []).includes(me.id) && !/เสร็จ|ยกเลิก/.test(p.status || "") && (!p.start || p.start <= today)) : [];
+  const urgent = items.filter((x) => x.tone === "critical").length;
+  const list = (arr, fn, empty) => (arr.length ? arr.map(fn).join("") : `<div class="tv-mut">${empty}</div>`);
+  return `<div class="tv-strip"><div class="tv-chip">งานรอฉัน <b>${items.length}</b></div><div class="tv-chip tv-chip-bad">ด่วน <b>${urgent}</b></div><div class="tv-chip">Job Card <b>${jobs.length}</b></div><div class="tv-chip">แผนงานวันนี้ <b>${plans.length}</b></div></div>
+    <div class="tv-split">
+      <section class="tv-panel"><h2>งานที่รอ ${tvEsc(me.name)}</h2><div class="tv-person-tasks tv-mine-list">${list(items.slice(0, 10), (x) => `<div class="${x.tone === "critical" ? "tv-bad" : ""}">${tvEsc(x.icon || "•")} <b>${tvEsc(x.title)}</b> <span class="tv-mut">${tvEsc(x.detail || "")}</span></div>`, "ไม่มีงานค้าง 👍")}</div></section>
+      <section class="tv-panel"><h2>Job Card & แผนงานของฉัน</h2><div class="tv-person-tasks tv-mine-list">
+        ${list(jobs, ({ w, j }) => { const d = (j.downs || []).find((x) => !x.to); return `<div class="${d ? "tv-bad" : ""}"><span class="tv-step tv-step-${j.status}">${tvEsc(j.station)}</span> ${tvEsc(j.op)} · ${tvEsc(w.serial || w.wo)}${d ? ` · ⏸ ${tvEsc(d.reason)}` : ""}</div>`; }, "ไม่มี Job Card")}
+        ${plans.map((p) => `<div>🗒 ${tvEsc(p.title)} <span class="tv-mut">${p.due ? `กำหนด ${tvEsc(p.due)}` : ""}</span></div>`).join("")}</div></section>
+    </div>`;
+}
+
+// the board that fits the person: management → exec, the shop floor → floor, everyone else → their team
+function tvDefaultMode(u) {
+  u = u || (typeof authCurrentUser === "function" ? authCurrentUser() : null);
+  if (!u) return "floor";
+  if (["admin", "plant", "group"].includes(u.role) && tvCanExec()) return "exec";
+  return ["prod", "plan"].includes(u.dept) && tvCanFloor() ? "floor" : "team";
+}
+
 /* ---- exec: headline numbers + decisions ---------------------------------------------------- */
 
 function tvExecKpi() {
@@ -333,12 +399,14 @@ function initTv() {
     const wrap = document.createElement("span");
     wrap.className = "tv-launch";
     wrap.innerHTML = `<button type="button" class="theme-toggle" id="tvBtn" title="โหมดจอทีวี" aria-label="โหมดจอทีวี">📺</button>
-      <span class="tv-menu" id="tvMenu" hidden><button type="button" data-tv="floor">จอหน้างาน (ทีม / พนักงาน)</button><button type="button" data-tv="exec" id="tvExecBtn">จอผู้บริหาร</button></span>`;
+      <span class="tv-menu" id="tvMenu" hidden><button type="button" data-tv="floor">จอหน้างาน (สถานี / พนักงาน)</button><button type="button" data-tv="team">จอทีมของฉัน (งานค้างรายคน)</button><button type="button" data-tv="mine">จอส่วนตัว (งานของฉัน)</button><button type="button" data-tv="exec" id="tvExecBtn">จอผู้บริหาร</button></span>`;
     actions.insertBefore(wrap, actions.firstChild);
     const menu = wrap.querySelector("#tvMenu");
     wrap.querySelector("#tvBtn").addEventListener("click", (e) => {
       e.stopPropagation();
       wrap.querySelector("#tvExecBtn").hidden = !tvCanExec();
+      wrap.querySelector('[data-tv="floor"]').hidden = !tvCanFloor();
+      wrap.querySelector('[data-tv="team"]').hidden = !(authCurrentUser() || {}).dept;
       menu.hidden = !menu.hidden;
     });
     menu.querySelectorAll("[data-tv]").forEach((b) => b.addEventListener("click", () => { menu.hidden = true; tvEnter(b.dataset.tv); }));
@@ -350,6 +418,7 @@ function initTv() {
   });
   try {
     const m = new URLSearchParams(location.search).get("tv");
-    if (m === "floor" || m === "exec") { tvEnter(m); if (new URLSearchParams(location.search).get("sim") === "1") tvSimToggle(true); }
+    // ?tv=me opens the board that fits whoever is signed in on that screen
+    if (["floor", "exec", "team", "mine", "me"].includes(m)) { tvEnter(m === "me" ? tvDefaultMode() : m); if (new URLSearchParams(location.search).get("sim") === "1") tvSimToggle(true); }
   } catch (e) { /* ignore */ }
 }

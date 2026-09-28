@@ -54,6 +54,19 @@ const GROUP_ABILITIES = [
 ];
 // Documents that carry prices, customers or supplier ratings: other departments' heads do not see them by default
 const SENSITIVE_DOC_TYPES = ["so", "rfq", "sev"];
+const DEPT_PAGES = { sales: ["service"], qc: ["service"], rnd: ["rnd", "service"], pur: ["p2p", "procurement"], wh: ["p2p"], plan: ["schedule"] };
+// Other departments' document types a department head reads by default (least privilege — anything else
+// is granted per group or per user in Admin). Sales orders reach planning only; supplier prices stay in purchasing.
+const HEAD_RELATED = {
+  rnd: ["ncr", "capa", "cc", "svc", "mc", "fi", "iqc", "plan"],
+  plan: ["so", "mreq", "dpr", "grn", "stk", "ecr", "eo", "bom", "ncr", "fi", "iqc", "mtr"],
+  prod: ["plan", "ecr", "eo", "wi", "dwg", "bom", "tq", "ncr", "capa", "fi", "iqc", "grn", "mtr", "pm"],
+  qc: ["grn", "ecr", "eo", "wi", "dwg", "bom", "dpr", "cc", "svc", "mc", "tq"],
+  pur: ["mrq", "grn", "iqc", "stk", "ncr", "capa", "mreq"],
+  wh: ["mreq", "mrq", "iqc", "dpr"],
+  mt: ["saf", "dpr", "ncr"],
+  sales: ["plan", "fi", "ncr", "capa"],
+};
 // Cost, stock value, prices, hour rates, the management TV board: managers and groups granted "cost"
 function authCanSeeCost(user) {
   const u = user || AUTH_USER;
@@ -71,7 +84,7 @@ function authCanSeeMgmtCost(user) {
 function authDefaultGroups() {
   return [
     { id: "g-rnd", name: "วิศวกร R&D", desc: "วางแผนโครงการพัฒนา ดูแล BOM แบบ ECR/EO WI และข้อมูลชิ้นส่วน", modules: ["rnd", "bomx", "dept", "reports", "service"], docPerms: { tq: "manage", ecr: "manage", eo: "create", dwg: "manage", wi: "manage", bom: "manage" }, abilities: [], members: ["rnd"] },
-    { id: "g-tech", name: "ช่างประกอบ / ช่างเทคนิค", desc: "เบิกวัสดุตาม BOM ดูใบสั่งผลิตและงานของตัวเอง", modules: ["bomx", "workorder", "mytasks", "service"], docPerms: { mreq: "create", dpr: "create", ncr: "create" }, abilities: ["request"], members: ["op1"] },
+    { id: "g-tech", name: "ช่างประกอบ / ช่างเทคนิค", desc: "เบิกวัสดุตาม BOM ดูใบสั่งผลิตและงานของตัวเอง", modules: ["bomx", "workorder", "mytasks"], docPerms: { mreq: "create", dpr: "create", ncr: "create" }, abilities: ["request"], members: ["op1"] },
     { id: "g-lead", name: "หัวหน้างาน / ผู้อนุมัติเบิก", desc: "อนุมัติใบเบิก สั่งเบิกแทนและมอบหมายช่างรับของ", modules: ["bomx", "workorder", "reports"], docPerms: { mreq: "manage", dpr: "manage" }, abilities: ["request", "approve"], members: ["prod"] },
     { id: "g-store", name: "คลังสินค้า", desc: "จ่ายของตามใบเบิก รับของเข้าคลัง ปรับยอดคงคลัง", modules: ["bomx", "workorder", "p2p"], docPerms: { grn: "manage", stk: "manage", mreq: "create" }, abilities: ["issue", "stock"], members: ["store"] },
     { id: "g-svc", name: "ช่างบริการหลังการขาย", desc: "เปิด/อัปเดตงานบริการ เบิกอะไหล่ตาม BOM ของเครื่องลูกค้า", modules: ["service", "bomx"], docPerms: { svc: "manage", mc: "create", cc: "create", mreq: "create" }, abilities: ["request"], members: ["svc1"] },
@@ -135,19 +148,65 @@ function authNeedsNewSecret(user) {
   const demo = typeof Y2JStore !== "undefined" && Y2JStore.config().demo;
   return !demo && (user.mustChange || (!user.pw && user.pin === pinHash(DEMO_PIN, user.id)));
 }
-// ask twice with prompt(); resolves true once a new password is stored on the user
-async function authPromptNewSecret(user, title) {
-  for (;;) {
-    const a = prompt(`${title}
-ตั้งรหัสผ่านใหม่ (4–32 ตัว ตัวอักษรหรือตัวเลขก็ได้)`);
-    if (a === null) return false;
-    const bad = authSecretProblem(a);
-    if (bad) { alert(bad); continue; }
-    const b = prompt("พิมพ์รหัสผ่านใหม่อีกครั้ง");
-    if (b === null) return false;
-    if (a !== b) { alert("รหัสผ่านสองครั้งไม่ตรงกัน"); continue; }
-    await authSetSecret(user, a);
-    return true;
+// Password dialog (masked fields, show/hide) — resolves { cur, next } or null when cancelled.
+// check(cur) may reject the current password before the dialog closes.
+function authPwDialog(title, opts) {
+  opts = opts || {};
+  return new Promise((resolve) => {
+    let bd = document.getElementById("pwBackdrop");
+    if (!bd) { bd = document.createElement("div"); bd.className = "modal-backdrop"; bd.id = "pwBackdrop"; document.body.appendChild(bd); }
+    bd.innerHTML = `<form class="modal pw-modal" role="dialog" aria-labelledby="pwTitle" novalidate>
+      <h3 id="pwTitle">${escapeHtml(title)}</h3>
+      ${opts.note ? `<p class="muted-note">${escapeHtml(opts.note)}</p>` : ""}
+      ${opts.needCurrent ? `<label>รหัสผ่านปัจจุบัน<input type="password" id="pwCur" autocomplete="current-password" maxlength="32"></label>` : ""}
+      <label>รหัสผ่านใหม่ (4–32 ตัว)<input type="password" id="pwNew" autocomplete="new-password" maxlength="32"></label>
+      <label>พิมพ์รหัสผ่านใหม่อีกครั้ง<input type="password" id="pwNew2" autocomplete="new-password" maxlength="32"></label>
+      <label class="pw-show"><input type="checkbox" id="pwShow"> แสดงรหัสผ่าน</label>
+      <p class="login-error" id="pwErr" hidden></p>
+      <div class="modal-actions">${opts.required ? "" : `<button type="button" class="btn-secondary" id="pwCancel">ยกเลิก</button>`}<button type="submit" class="btn-primary">บันทึกรหัสผ่าน</button></div></form>`;
+    const q = (id) => bd.querySelector("#" + id);
+    const err = (m) => { q("pwErr").textContent = m; q("pwErr").hidden = false; };
+    q("pwShow").addEventListener("change", (e) => bd.querySelectorAll("input[id^=pw][type=password], input[id^=pw][type=text]").forEach((i) => { if (i.id !== "pwShow") i.type = e.target.checked ? "text" : "password"; }));
+    const done = (v) => { bd.classList.remove("open"); resolve(v); };
+    if (q("pwCancel")) q("pwCancel").addEventListener("click", () => done(null));
+    bd.querySelector("form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const cur = q("pwCur") ? q("pwCur").value : "";
+      const a = q("pwNew").value, b = q("pwNew2").value;
+      if (opts.check && !(await opts.check(cur))) { err("รหัสผ่านปัจจุบันไม่ถูกต้อง"); q("pwCur").select(); return; }
+      const bad = authSecretProblem(a);
+      if (bad) { err(bad); q("pwNew").focus(); return; }
+      if (a !== b) { err("รหัสผ่านสองครั้งไม่ตรงกัน"); q("pwNew2").select(); return; }
+      done({ cur, next: a });
+    });
+    bd.classList.add("open");
+    setTimeout(() => (q("pwCur") || q("pwNew")).focus(), 30);
+  });
+}
+// resolves true once a new password is stored on the user
+async function authPromptNewSecret(user, title, required) {
+  const r = await authPwDialog(title, { required, note: "ตั้งรหัสของตัวเอง ตัวอักษรหรือตัวเลขก็ได้ — ใช้ทั้งเข้าระบบและลงนามเอกสาร" });
+  if (!r) return false;
+  await authSetSecret(user, r.next);
+  return true;
+}
+
+// Server sign-in (sign-in moved to Apps Script): the device proves the password with the same hash the
+// app stores, the server checks it, counts failures, and hands back a session.
+function authServerLogin() { return typeof Y2JStore !== "undefined" && Y2JStore.needLogin && Y2JStore.needLogin(); }
+async function authLoginOnServer(user, secret) {
+  const proof = user.iter ? await pwDerive(secret, user.id, user.iter) : "";
+  return Y2JStore.login(user.username, proof, pinHash(secret, user.id));
+}
+// after a server sign-in the page reloads with the data; a temporary password is replaced right away
+async function authAfterServerLogin() {
+  let flag = "";
+  try { flag = sessionStorage.getItem("y2j-must-change") || ""; sessionStorage.removeItem("y2j-must-change"); } catch (e) { /* ignore */ }
+  if (!flag || !AUTH_USER || (typeof Y2JStore !== "undefined" && Y2JStore.config().demo)) return;
+  if (await authPromptNewSecret(AUTH_USER, `สวัสดี ${AUTH_USER.name} — ใช้รหัสผ่านชั่วคราวอยู่ ตั้งรหัสใหม่ก่อนใช้งาน`, true)) {
+    authSave();
+    auditLog("ตั้งรหัสผ่านใหม่", AUTH_USER.username, "ตอนเข้าสู่ระบบครั้งแรก");
+    showToast("ตั้งรหัสผ่านแล้ว", "good");
   }
 }
 
@@ -216,6 +275,13 @@ function authLoad() {
         AUTH.costAbility = true;
         migrated = true;
       }
+      // one-time (least privilege review 28 ก.ย.): assembly technicians' group no longer opens the customer-service page
+      if (!AUTH.permsV2) {
+        const t = (AUTH.groups || []).find((g) => g.id === "g-tech");
+        if (t && Array.isArray(t.modules)) t.modules = t.modules.filter((m) => m !== "service");
+        AUTH.permsV2 = true;
+        migrated = true;
+      }
       if (migrated) authSave();
       return;
     }
@@ -261,11 +327,27 @@ function authLegacyRole() {
 
 // Returns true when a valid user is signed in
 function authInit() {
-  authLoad();
+  if (authServerLogin()) {
+    AUTH = { users: (Y2JStore.roster() || []).map((u) => Object.assign({}, u)), groups: [], teams: [], serverLogin: true };
+    AUTH_USER = null;
+    return false;
+  }
   let id = null;
   try { id = localStorage.getItem(SESSION_STORAGE_KEY); } catch (e) { /* ignore */ }
+  // server sign-in: the person on screen must be the person the server session belongs to — otherwise
+  // (signed out while a reload cut in, or someone else's session left behind) start over at the server
+  if (typeof Y2JStore !== "undefined" && Y2JStore.secure && Y2JStore.secure() && (!id || id !== Y2JStore.sessionUid())) {
+    Y2JStore.dropSession();
+    try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch (e) { /* ignore */ }
+    AUTH = { users: [], groups: [], teams: [], serverLogin: true };
+    AUTH_USER = null;
+    location.reload();
+    return false;
+  }
+  authLoad();
   const u = id ? authUserById(id) : null;
   AUTH_USER = u && u.active ? u : null;
+  if (AUTH_USER) setTimeout(authAfterServerLogin, 400);
   return !!AUTH_USER;
 }
 
@@ -278,8 +360,12 @@ function authSignIn(user, via) {
   location.reload();
 }
 
-function authSignOut() {
+async function authSignOut() {
   auditLog("ออกจากระบบ", AUTH_USER ? AUTH_USER.username : "", "");
+  if (typeof Y2JStore !== "undefined" && Y2JStore.secure && Y2JStore.secure()) {
+    try { await Y2JStore.flush(); } catch (e) { /* unsent work stays on this device */ }
+    await Y2JStore.logout();
+  }
   try { localStorage.removeItem(SESSION_STORAGE_KEY); } catch (e) { /* ignore */ }
   location.reload();
 }
@@ -298,7 +384,8 @@ function authAllowedModules(user) {
   const list = Array.isArray(u.modules) ? u.modules.slice() : roleDefaultModules(u.role);
   // pages granted by the user's groups are added to the role defaults (not to a hand-picked list)
   if (!Array.isArray(u.modules)) authUserGroups(u).forEach((g) => (g.modules || []).forEach((m) => { if (!list.includes(m)) list.push(m); }));
-  if (!Array.isArray(u.modules) && u.dept === "rnd" && !list.includes("rnd")) list.push("rnd");
+  // pages that come with a department (customers → sales/QC/R&D, purchasing → purchasing/store, R&D → R&D)
+  if (!Array.isArray(u.modules)) (DEPT_PAGES[u.dept] || []).forEach((m) => { if (!list.includes(m)) list.push(m); });
   if (u.role === "admin" && !list.includes("admin")) list.push("admin");
   if (u.role !== "admin") return list.filter((v) => v !== "admin");
   return list;
@@ -312,8 +399,9 @@ function roleDefaultDocPerm(user, type) {
   const own = !!ownDept && ownDept.docTypes.includes(type);
   if (role === "depthead") {
     if (own) return "manage";
-    if (SENSITIVE_DOC_TYPES.includes(type)) return "none";
-    return CROSS_CREATE_TYPES.includes(type) ? "create" : "view";
+    if (CROSS_CREATE_TYPES.includes(type)) return "create";
+    // other departments' documents: only the kinds that feed this department's own work
+    return (HEAD_RELATED[user.dept] || []).includes(type) ? "view" : "none";
   }
   // operator
   if (own) return "create";
@@ -381,9 +469,35 @@ function visAllows(vis, createdBy, user) {
   return true;
 }
 
+// A document names this person: they made it, own it, were assigned to it, or receive from it
+function authDocInvolves(doc, u) {
+  u = u || AUTH_USER;
+  if (!u || !doc) return false;
+  return doc.createdBy === u.id || doc.receiver === u.id || doc.owner === u.name || doc.tech === u.name || doc.assignee === u.name
+    || doc.requestedBy === u.name || (Array.isArray(doc.assignees) && doc.assignees.includes(u.id));
+}
+// "May raise it" (repair, defect, safety, requisition … from any department) is not "may read everyone's":
+// people whose only right to a type is raising it see the ones that involve them.
+function authCreateOnly(type, user) {
+  const u = user || AUTH_USER;
+  if (!u || ["admin", "plant", "group"].includes(u.role)) return false;
+  if (u.role === "depthead" && (HEAD_RELATED[u.dept] || []).includes(type)) return false;
+  // approving or issuing requisitions means reading them
+  if (type === "mreq" && (authHasAbility("approve", u) || authHasAbility("issue", u))) return false;
+  // an explicit "view" or "manage" (per user or group) opens them all; "create" alone stays create-only
+  const grants = [(u.docPerms || {})[type]].concat(authUserGroups(u).map((g) => (g.docPerms || {})[type])).filter(Boolean);
+  if (grants.some((p) => p === "view" || p === "manage")) return false;
+  const ownDept = DEPT_WORKSPACES.find((w) => w.id === u.dept);
+  const own = !!ownDept && ownDept.docTypes.includes(type);
+  // prices, customers, supplier ratings: staff read the ones they are part of, even in their own department
+  if (SENSITIVE_DOC_TYPES.includes(type)) return u.role === "operator";
+  if (own) return false;
+  return CROSS_CREATE_TYPES.includes(type);
+}
 function authCanSeeDoc(type, doc) {
-  if (!AUTH_USER) return true;
-  if (!authCan(type, "view") && doc.createdBy !== AUTH_USER.id) return false;
+  if (!AUTH_USER) return false; // nothing is readable before signing in
+  if (authDocInvolves(doc)) return visAllows(doc.visibility, doc.createdBy) || doc.createdBy === AUTH_USER.id || doc.receiver === AUTH_USER.id;
+  if (!authCan(type, "view") || authCreateOnly(type)) return false;
   return visAllows(doc.visibility, doc.createdBy);
 }
 
@@ -508,6 +622,13 @@ function renderLoginConn() {
     document.getElementById("loginCode").addEventListener("keydown", (e) => { if (e.key === "Enter") go(); });
     return;
   }
+  if (Y2JStore.isRemote() && Y2JStore.secure && Y2JStore.secure()) {
+    box.className = "login-conn login-conn-ok";
+    box.innerHTML = Y2JStore.roster()
+      ? "🔒 ตรวจรหัสผ่านที่เซิร์ฟเวอร์ — ผิด 5 ครั้งระงับ 15 นาที · ออกจากระบบอัตโนมัติเมื่อไม่ได้ใช้ 6 ชั่วโมง"
+      : "⚠ ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจอินเทอร์เน็ตแล้วโหลดหน้านี้ใหม่";
+    return;
+  }
   if (Y2JStore.isRemote()) {
     const st = Y2JStore.status();
     box.className = "login-conn login-conn-ok";
@@ -583,10 +704,34 @@ function renderLoginScreen() {
     pinBox.scrollIntoView({ block: "nearest", behavior: "smooth" });
     (isDemo ? document.getElementById("loginSubmit") : pinInput).focus();
   }));
+  // server sign-in: true when signed in (the page reloads), or shows the server's message in errEl
+  const serverGo = async (user, secret, errEl, btn) => {
+    const label = btn ? btn.textContent : "";
+    if (btn) { btn.disabled = true; btn.textContent = "กำลังตรวจ…"; }
+    try {
+      const res = await authLoginOnServer(user, secret);
+      try {
+        const prev = JSON.parse(localStorage.getItem(LOGIN_RECENT_KEY) || "[]");
+        localStorage.setItem(LOGIN_RECENT_KEY, JSON.stringify([user.id, ...prev.filter((id) => id !== user.id)].slice(0, 4)));
+        localStorage.setItem(SESSION_STORAGE_KEY, res.uid);
+        if (res.mustChange) sessionStorage.setItem("y2j-must-change", "1");
+      } catch (e) { /* ignore */ }
+      location.reload();
+      return true;
+    } catch (e) {
+      errEl.textContent = e.message === "Failed to fetch" ? "ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจอินเทอร์เน็ต" : e.message;
+      errEl.hidden = false;
+      if (btn) { btn.disabled = false; btn.textContent = label; }
+      return false;
+    }
+  };
   const submit = async () => {
     if (!picked) return;
+    const errEl = document.getElementById("loginError");
+    if (AUTH.serverLogin) { if (!(await serverGo(picked, pinInput.value, errEl, document.getElementById("loginSubmit")))) pinInput.select(); return; }
     if (!(await authCheckSecret(picked, pinInput.value))) {
-      document.getElementById("loginError").hidden = false;
+      errEl.textContent = "รหัสผ่านไม่ถูกต้อง";
+      errEl.hidden = false;
       pinInput.select();
       return;
     }
@@ -594,7 +739,7 @@ function renderLoginScreen() {
   };
   const loginFinish = async (user) => {
     if (authNeedsNewSecret(user)) {
-      if (!(await authPromptNewSecret(user, `สวัสดี ${user.name} — ใช้รหัสผ่านชั่วคราวอยู่`))) return;
+      if (!(await authPromptNewSecret(user, `สวัสดี ${user.name} — ใช้รหัสผ่านชั่วคราวอยู่ ตั้งรหัสใหม่ก่อนใช้งาน`, true))) return;
       authSave();
       auditLog("ตั้งรหัสผ่านใหม่", user.username, "ตอนเข้าสู่ระบบครั้งแรก");
     }
@@ -625,9 +770,14 @@ function renderLoginScreen() {
     const empGo = async () => {
       const id = document.getElementById("loginEmpNo").value.trim().toLowerCase();
       const pw = document.getElementById("loginEmpPw").value;
-      const u = users.find((x) => (x.empNo && x.empNo.toLowerCase() === id) || x.username === id);
+      const u = users.find((x) => (x.empNo && x.empNo.toLowerCase() === id) || String(x.username || "").toLowerCase() === id);
       const err = document.getElementById("loginEmpErr");
-      if (!u || !(await authCheckSecret(u, pw))) { err.hidden = false; document.getElementById("loginEmpPw").select(); return; }
+      if (AUTH.serverLogin) {
+        if (!u) { err.textContent = "ไม่พบรหัสพนักงาน / ชื่อผู้ใช้นี้"; err.hidden = false; return; }
+        if (!(await serverGo(u, pw, err, document.getElementById("loginEmpBtn")))) document.getElementById("loginEmpPw").select();
+        return;
+      }
+      if (!u || !(await authCheckSecret(u, pw))) { err.textContent = "ชื่อผู้ใช้/รหัสพนักงาน หรือรหัสผ่านไม่ถูกต้อง"; err.hidden = false; document.getElementById("loginEmpPw").select(); return; }
       err.hidden = true;
       await loginFinish(u);
     };
@@ -637,6 +787,42 @@ function renderLoginScreen() {
   }
   document.getElementById("loginSubmit").onclick = submit;
   pinInput.onkeydown = (e) => { if (e.key === "Enter") submit(); };
+  loginExtras(users);
+}
+
+// 👁 show password, 🪪 scan an employee badge, "forgot password" — added once per page
+function loginExtras(users) {
+  ["loginEmpPw", "loginPin"].forEach((id) => {
+    const inp = document.getElementById(id);
+    if (!inp || inp.dataset.eye) return;
+    inp.dataset.eye = "1";
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "btn-chip login-eye"; b.textContent = "👁"; b.title = "แสดง / ซ่อนรหัสผ่าน"; b.setAttribute("aria-label", b.title);
+    b.addEventListener("click", () => { inp.type = inp.type === "password" ? "text" : "password"; inp.focus(); });
+    inp.insertAdjacentElement("afterend", b);
+  });
+  const form = document.getElementById("loginEmpForm");
+  if (form && !document.getElementById("loginBadgeBtn")) {
+    const admins = users.filter((u) => u.role === "admin" && !/^u-demo-/.test(u.id)).map((u) => u.name);
+    form.insertAdjacentHTML("beforeend", `<div class="login-more">
+      <button type="button" class="btn-chip" id="loginBadgeBtn">🪪 สแกนบัตรพนักงาน</button>
+      <button type="button" class="btn-link" id="loginForgot">ลืมรหัสผ่าน?</button></div>
+      <p class="muted-note" id="loginForgotMsg" hidden>ให้ผู้ดูแลระบบตั้งรหัสชั่วคราวให้ (Admin › ผู้ใช้ › แก้ไข)${admins.length ? `: ${escapeHtml(admins.join(", "))}` : ""} — เข้าระบบด้วยรหัสชั่วคราวแล้วระบบจะให้ตั้งรหัสใหม่ทันที</p>`);
+    document.getElementById("loginForgot").addEventListener("click", () => { const m = document.getElementById("loginForgotMsg"); m.hidden = !m.hidden; });
+    document.getElementById("loginBadgeBtn").addEventListener("click", () => {
+      if (typeof snScan !== "function") return;
+      snScan("สแกน QR บนบัตรพนักงาน", (code) => {
+        const v = String(code || "").trim().replace(/^forge:u:/i, "");
+        const u = users.find((x) => (x.empNo && x.empNo.toLowerCase() === v.toLowerCase()) || String(x.username || "").toLowerCase() === v.toLowerCase());
+        if (!u) { showToast(`ไม่รู้จักบัตรนี้ (${v})`, "warn"); return true; }
+        if (typeof snCloseModal === "function") snCloseModal();
+        document.getElementById("loginEmpNo").value = u.empNo || u.username;
+        const pw = document.getElementById("loginEmpPw"); pw.value = ""; pw.focus();
+        showToast(`${u.name} — ใส่รหัสผ่าน`, "good");
+        return false;
+      });
+    });
+  }
 }
 
 function renderUserChip() {
@@ -652,10 +838,9 @@ function renderUserChip() {
   document.getElementById("logoutBtn").addEventListener("click", authSignOut);
   document.getElementById("mySignBtn").addEventListener("click", () => { if (typeof esOpenPad === "function") esOpenPad(renderUserChip); });
   document.getElementById("changePinBtn").addEventListener("click", async () => {
-    const cur = prompt("รหัสผ่าน (หรือ PIN) ปัจจุบัน");
-    if (cur === null) return;
-    if (!(await authCheckSecret(AUTH_USER, cur))) { showToast("รหัสผ่านปัจจุบันไม่ถูกต้อง", "warn"); return; }
-    if (!(await authPromptNewSecret(AUTH_USER, "เปลี่ยนรหัสผ่าน"))) return;
+    const r = await authPwDialog("เปลี่ยนรหัสผ่าน", { needCurrent: true, check: (cur) => authCheckSecret(AUTH_USER, cur) });
+    if (!r) return;
+    await authSetSecret(AUTH_USER, r.next);
     authSave();
     auditLog("เปลี่ยนรหัสผ่าน", AUTH_USER.username, "");
     showToast("เปลี่ยนรหัสผ่านแล้ว", "good");

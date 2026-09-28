@@ -342,7 +342,15 @@ function openDocView(type, index) {
     ${longFields.map((f) => `<div class="paper-section-title">${escapeHtml(f.label)}</div><div class="paper-textbox">${doc[f.key] ? escapeHtml(doc[f.key]).replace(/\n/g, "<br>") : '<span class="paper-empty">—</span>'}</div>`).join("")}
     ${Array.isArray(doc.items) ? `<div class="paper-section-title">รายการเบิก${doc.receiver || doc.requestedBy ? ` — สั่งเบิกโดย ${escapeHtml(doc.requestedBy || "")} · ผู้รับของ ${escapeHtml(doc.owner || "")}` : ""}</div>
       <table class="paper-table"><thead><tr><th>ข้อ BOM</th><th>รหัส</th><th>รายการ</th><th class="num">ขอ</th><th class="num">จ่าย</th><th class="num">คืน</th><th>หน่วย</th></tr></thead>
-      <tbody>${doc.items.map((it) => `<tr><td>${escapeHtml(it.item || "")}</td><td class="mono-cell">${escapeHtml(it.code || "")}</td><td>${escapeHtml(it.part || "")}</td><td class="num">${escapeHtml(String(it.req ?? ""))}</td><td class="num">${escapeHtml(String(it.issued ?? 0))}</td><td class="num">${escapeHtml(String(it.ret ?? 0))}</td><td>${escapeHtml(it.unit || "")}</td></tr>`).join("")}</tbody></table>` : ""}
+      <tbody>${doc.items.map((it) => `<tr><td>${escapeHtml(it.item || "")}</td><td class="mono-cell">${escapeHtml(it.code || "")}</td><td>${escapeHtml(it.part || "")}</td><td class="num">${escapeHtml(String(it.req ?? ""))}</td><td class="num">${escapeHtml(String(it.issued ?? 0))}</td><td class="num">${escapeHtml(String(it.ret ?? 0))}</td><td>${escapeHtml(it.unit || "")}</td></tr>`).join("")}</tbody></table>
+      ${(() => {
+        // hand-over record: approvals, each issue from the store, returns and the receiver's signed confirmation
+        const ev = [].concat(doc.log || []).concat(...doc.items.map((it) => (it.log || []).map((g) => Object.assign({ part: it.code || it.part }, g))))
+          .sort((a, b) => String(a.at).localeCompare(String(b.at)));
+        return ev.length ? `<div class="paper-section-title">ประวัติการอนุมัติ / จ่าย / รับของ (หลักฐาน)</div>
+          <table class="paper-table paper-table-compact"><thead><tr><th>วันเวลา</th><th>ผู้ทำ</th><th>การดำเนินการ</th><th>รายการ</th><th class="num">จำนวน</th><th>หลักฐาน</th></tr></thead>
+          <tbody>${ev.map((g) => `<tr><td>${escapeHtml(typeof fmtDateTime === "function" ? fmtDateTime(g.at) : g.at)}</td><td>${escapeHtml(g.by || "")}</td><td>${escapeHtml(g.kind || "")}${g.note ? ` — ${escapeHtml(g.note)}` : ""}</td><td>${escapeHtml(g.part || "")}</td><td class="num">${g.qty ? escapeHtml(String(g.qty)) : ""}</td><td>${g.signed ? "✍ ลงนามด้วยรหัสผ่าน " : ""}${g.proof ? `#${escapeHtml(g.proof)}` : ""}</td></tr>`).join("")}</tbody></table>` : "";
+      })()}` : ""}
     ${type === "dwg" ? `<div class="paper-section-title">แบบ (Drawing)</div><div id="dwgPreview" class="dwg-preview"><span class="paper-empty">${(doc.files || []).length ? "กำลังโหลดไฟล์แบบ…" : "ยังไม่ได้แนบไฟล์แบบ — กด \"แนบไฟล์\" ด้านล่าง"}</span></div>` : ""}
     ${relatedHtml}
     <div class="paper-section-title">ไฟล์แนบ</div>

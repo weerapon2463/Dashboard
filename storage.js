@@ -94,9 +94,9 @@ const Y2JStore = (() => {
   // One-time setup link: ?sheet=<web app url>&key=<secret> configures this device and is removed from the address bar
   try {
     const q = new URLSearchParams(location.search);
-    if (q.get("sheet") && q.get("key")) {
+    if (q.get("sheet") && (q.get("key") || q.get("signin"))) {
       const wasDemo = !!cfg.demo;
-      cfg = { mode: "sheets", url: q.get("sheet"), token: q.get("key") };
+      cfg = q.get("key") ? { mode: "sheets", url: q.get("sheet"), token: q.get("key") } : { mode: "sheets", url: q.get("sheet"), token: "", secure: true, session: "" };
       rawSet(CONFIG_KEY, JSON.stringify(cfg));
       if (wasDemo || company === "demo") {
         // leaving the demo: start this device fresh against the company data
@@ -112,7 +112,11 @@ const Y2JStore = (() => {
     }
   } catch (e) { /* ignore */ }
 
-  const isRemote = () => cfg.mode === "sheets" && !!cfg.url && !!cfg.token;
+  const isRemote = () => cfg.mode === "sheets" && !!cfg.url && (!!cfg.token || !!cfg.secure);
+  // server sign-in: the device holds a session instead of the master key
+  let needLogin = !!(cfg.mode === "sheets" && cfg.url && cfg.secure && !cfg.session);
+  let roster = null;
+  const saveCfg = () => rawSet(CONFIG_KEY, JSON.stringify(cfg));
   // The base copies double what a big dataset (full BOMs, stock ledger) costs in storage and pushed the
   // meta key past the browser quota, so it silently never saved. Persist bases only for small keys; big
   // ones keep theirs in memory for this session (after a reload their offline edits merge record-wise).
@@ -169,20 +173,29 @@ const Y2JStore = (() => {
 
   async function api(action, params, post, url, token) {
     const u = url || cfg.url;
-    const t = token || cfg.token;
+    const t = token || cfg.token || "";
     const ctrl = new AbortController();
-    // a full pull carries every dataset (BOMs are MBs) and Apps Script can take close to a minute to answer
-    const timer = setTimeout(() => ctrl.abort(), post || (action === "pull" && !params.keys) ? 120000 : 20000);
+    // a pull carries whole datasets (BOMs are MBs) and Apps Script can take close to a minute to answer
+    const timer = setTimeout(() => ctrl.abort(), post || action === "pull" ? 120000 : 20000);
+    const base = { action, token: t };
+    if (!url && cfg.session) base.session = cfg.session;
     try {
       let res;
       if (post) {
         // text/plain keeps it a "simple" request: no CORS preflight, which Apps Script can't answer
-        res = await fetch(u, { method: "POST", body: JSON.stringify(Object.assign({ action, token: t }, params)), signal: ctrl.signal });
+        res = await fetch(u, { method: "POST", body: JSON.stringify(Object.assign(base, params)), signal: ctrl.signal });
       } else {
-        const qs = new URLSearchParams(Object.assign({ action, token: t }, params)).toString();
+        const qs = new URLSearchParams(Object.assign(base, params)).toString();
         res = await fetch(`${u}${u.includes("?") ? "&" : "?"}${qs}`, { signal: ctrl.signal });
       }
       const data = await res.json();
+      if (data.auth === "required" && !url) {
+        // the session ended (or the key was replaced when sign-in moved to the server): sign in again
+        cfg.secure = true; cfg.session = ""; cfg.token = ""; saveCfg();
+        needLogin = true;
+        const e = new Error(data.error || "กรุณาเข้าสู่ระบบใหม่"); e.auth = true;
+        throw e;
+      }
       if (!data.ok && !data.conflict) throw new Error(data.error || "error");
       return data;
     } finally {
@@ -258,16 +271,30 @@ const Y2JStore = (() => {
 
   // nothing is uploaded until this device has seen the server's copy at least once
   let pulledOnce = false;
+  let flushAgain = false;
 
   async function pullAll() {
-    const res = await api("pull", {});
+    // A device that synced before asks for the version list first and downloads only what changed
+    // (seconds instead of a full minute); a new device downloads everything.
+    let remote = null;
+    let res;
+    if (Object.keys(meta.keys || {}).length) {
+      try { remote = (await api("versions", {})).versions || {}; } catch (e) { if (e.auth) throw e; remote = null; }
+    }
+    if (remote) {
+      const want = Object.keys(remote).filter((k) => isShared(k) && (!meta.keys[k] || meta.keys[k].version !== remote[k].version
+        || rawGet(k) === null || (dirty.has(k) && meta.keys[k].base == null)));
+      res = want.length ? await api("pull", { keys: want.join(",") }) : { data: {} };
+    } else {
+      res = await api("pull", {});
+    }
     const data = res.data || {};
     const keys = new Set([...Object.keys(data).filter(isShared), ...localSharedKeys()]);
     keys.forEach((key) => {
       const entry = data[key];
       const local = rawGet(key);
       if (!entry) {
-        if (local !== null) dirty.add(key); // first connection: upload what this device has
+        if (local !== null && !(remote && remote[key])) dirty.add(key); // first connection: upload what this device has
         return;
       }
       if (dirty.has(key) && local !== null && meta.keys[key]) {
@@ -295,8 +322,10 @@ const Y2JStore = (() => {
   }
 
   async function flush() {
-    if (pushing || !isRemote() || !pulledOnce) return;
+    if (pushing) { flushAgain = true; return; } // a save made during an upload goes right after it
+    if (!isRemote() || !pulledOnce || needLogin) return;
     pushing = true;
+    flushAgain = false;
     try {
       for (const key of [...dirty]) {
         let attempts = 0;
@@ -306,8 +335,11 @@ const Y2JStore = (() => {
           const m = meta.keys[key] || { version: 0, base: null };
           const res = await api("push", { key, value, baseVersion: m.version, by: who() }, true);
           if (res.ok) {
-            meta.keys[key] = { version: res.version, base: value };
-            if (rawGet(key) === value) dirty.delete(key);
+            if (typeof res.value === "string" && res.value !== value) {
+              if (rawGet(key) === value) rawSet(key, res.value);
+              meta.keys[key] = { version: res.version, base: res.value };
+            } else meta.keys[key] = { version: res.version, base: value };
+            if (rawGet(key) === value || rawGet(key) === res.value) dirty.delete(key);
             break;
           }
           // someone else saved first: merge record-by-record and try again
@@ -323,15 +355,17 @@ const Y2JStore = (() => {
       if (remoteChangedBy) onRemoteChange();
     } catch (e) {
       setStatus("offline", e.message);
-      setTimeout(() => { if (dirty.size) flush(); }, 15000);
+      if (e.auth) showSignInAgain();
+      else setTimeout(() => { if (dirty.size) flush(); }, 15000);
     } finally {
       pushing = false;
-      if (dirty.size && status.state !== "offline") schedulePush();
+      if ((dirty.size || flushAgain) && status.state !== "offline") schedulePush();
     }
   }
 
   async function poll() {
-    if (!isRemote() || document.hidden || pushing) return;
+    if (!isRemote() || document.hidden || pushing || needLogin) return;
+    if (dirty.size && pulledOnce && status.state !== "saving") flush(); // nothing left behind
     if (!pulledOnce) {   // the first download failed (offline / slow): finish it before anything else
       try { await pullAll(); setStatus("synced"); reloadKeepingView(); } catch (e) { /* try again next poll */ }
       return;
@@ -349,7 +383,15 @@ const Y2JStore = (() => {
       if (status.state === "offline" && !dirty.size) setStatus("synced");
     } catch (e) {
       setStatus("offline", e.message);
+      if (e.auth) showSignInAgain();
     }
+  }
+
+  function showSignInAgain() {
+    const bar = document.getElementById("syncBanner");
+    if (!bar || !bar.hidden) return;
+    bar.hidden = false;
+    bar.querySelector("span").textContent = "หมดเวลาการเข้าระบบ — งานที่ยังไม่ส่งเก็บไว้ในเครื่องนี้แล้ว กดเพื่อเข้าสู่ระบบอีกครั้ง";
   }
 
   // Other people's changes are in localStorage now; modules hold in-memory copies, so reload
@@ -389,16 +431,23 @@ const Y2JStore = (() => {
 
   /* ---- startup ------------------------------------------------------------------------ */
 
+  async function loadRoster() {
+    try { roster = (await api("roster", {})).users || []; } catch (e) { roster = null; }
+    return { mode: "sheets", needLogin: true, roster: !!roster };
+  }
+
   function ready() {
     if (!isRemote()) return Promise.resolve({ mode: "local" });
+    if (needLogin) { setStatus("offline", "ยังไม่ได้เข้าสู่ระบบ"); return loadRoster(); }
     const overlay = document.getElementById("syncOverlay");
     if (overlay) overlay.hidden = false;
     const done = (r) => { if (overlay) overlay.hidden = true; return r; };
     const first = !Object.keys(meta.keys || {}).length;
     const timeout = new Promise((resolve) => setTimeout(() => resolve({ mode: "sheets", offline: true }), first ? 120000 : 12000));
     return Promise.race([pullAll().then(() => ({ mode: "sheets" })), timeout])
-      .catch((e) => ({ mode: "sheets", offline: true, error: e.message }))
+      .catch((e) => ({ mode: "sheets", offline: true, error: e.message, auth: !!e.auth }))
       .then((r) => {
+        if (r.auth) { setStatus("offline", r.error); if (overlay) overlay.hidden = true; return loadRoster(); }
         setStatus(r.offline ? "offline" : "synced", r.error);
         if (dirty.size) schedulePush();
         setInterval(poll, POLL_MS);
@@ -498,9 +547,38 @@ const Y2JStore = (() => {
   }
 
   function setupLink() {
-    if (!cfg.url || !cfg.token) return "";
     const base = location.origin + location.pathname;
+    // with server sign-in the link carries only the address; each person signs in with their own password
+    if (cfg.secure && cfg.url) return `${base}?sheet=${encodeURIComponent(cfg.url)}&signin=1`;
+    if (!cfg.url || !cfg.token) return "";
     return `${base}?sheet=${encodeURIComponent(cfg.url)}&key=${encodeURIComponent(cfg.token)}`;
+  }
+
+  // sign in on the server: proof = the same PBKDF2 / PIN hash the app stores, computed on this device
+  async function login(user, proof, proofPin) {
+    const res = await fetch(cfg.url, { method: "POST", body: JSON.stringify({ action: "login", user, proof, proofPin }) }).then((r) => r.json());
+    if (!res.ok) { const e = new Error(res.error || "เข้าสู่ระบบไม่สำเร็จ"); e.locked = !!res.locked; throw e; }
+    cfg.session = res.session; cfg.uid = res.uid; cfg.secure = true; cfg.token = ""; saveCfg();
+    needLogin = false;
+    // each person gets their own copy of the users list (only their own password hash): fetch it fresh
+    try { origRemove.call(ls, "y2j-auth-v1"); } catch (e) { /* ignore */ }
+    delete meta.keys["y2j-auth-v1"]; dirty.delete("y2j-auth-v1"); saveMeta();
+    return res;
+  }
+  // the server session belongs to one person; the device must never show someone else on it
+  function dropSession() { cfg.session = ""; cfg.uid = ""; needLogin = !!cfg.secure; saveCfg(); }
+  async function logout() {
+    const sid = cfg.session;
+    cfg.session = ""; cfg.uid = ""; saveCfg();
+    needLogin = !!cfg.secure;
+    if (sid) { try { await fetch(cfg.url, { method: "POST", body: JSON.stringify({ action: "logout", session: sid }) }); } catch (e) { /* offline: it expires by itself */ } }
+  }
+  async function setSecure(on) {
+    const res = await api("secure", { on: on ? "1" : "0" }, true);
+    if (on) { cfg.secure = true; cfg.token = ""; }
+    else { cfg.secure = false; cfg.token = res.token; cfg.session = ""; }
+    saveCfg();
+    return res;
   }
 
   function setCompany(id) {
@@ -513,7 +591,12 @@ const Y2JStore = (() => {
     ready, test, connect, disconnect, forceUpload, setupLink, uploadFile, fetchFile, flush,
     company: () => company, setCompany,
     bomFiles: () => api("bomfiles", { company }),
-    unlockCompany,
+    unlockCompany, login, logout, setSecure,
+    // back office (admin only on the server): sign-in history, sign everyone out, unlock an account
+    admin: (action, params) => api(action, params || {}, true),
+    needLogin: () => needLogin, roster: () => roster, secure: () => !!cfg.secure,
+    sessionUid: () => cfg.uid || "", dropSession,
+    hello: (url) => api("hello", {}, false, url || cfg.url, "-"),
     bomRead: (model) => api("bomread", { company, model }, true),
     isRemote, config: () => Object.assign({}, cfg), status: () => Object.assign({ pending: [...dirty] }, status),
     sharedKeys: SHARED, merge3,

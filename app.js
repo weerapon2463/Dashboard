@@ -31,8 +31,8 @@ const ROLES = [
 ];
 
 const MODULE_ACCESS = {
-  operator: ["overview", "dept", "mytasks", "plans", "workorder", "bomx", "service"],
-  depthead: ["overview", "pilot", "dept", "p2p", "mytasks", "priority", "workorder", "rnd", "bomx", "service", "reports", "resource"],
+  operator: ["overview", "dept", "mytasks", "plans", "workorder", "bomx"],
+  depthead: ["overview", "pilot", "dept", "p2p", "mytasks", "priority", "workorder", "bomx", "reports", "resource"],
   plant: ["overview", "pilot", "dept", "p2p", "mytasks", "priority", "capacity", "schedule", "makeorbuy", "resource", "procurement", "workorder", "rnd", "bomx", "service", "reports"],
   group: ["overview", "pilot", "dept", "plans", "mytasks", "p2p", "capacity", "schedule", "makeorbuy", "procurement", "workorder", "rnd", "bomx", "service", "reports"],
 };

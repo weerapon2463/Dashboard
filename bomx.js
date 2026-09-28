@@ -292,6 +292,32 @@ function bxReqHolder(d) {
 function bxIssuedTotal(d) { return d.items.reduce((s, it) => s + bxNum(it.issued), 0); }
 function bxNeedsAck(d) { return bxIssuedTotal(d) > 0 && bxNum(d.ackIssued) < bxIssuedTotal(d); }
 
+// Hand-over evidence: a fingerprint of what was issued / received, who and when — shown in the history and
+// on the printed requisition; if the quantities are changed afterwards the fingerprint no longer matches.
+function bxProofText(d) { return d.items.map((it) => `${it.key}:${bxNum(it.req)}/${bxNum(it.issued)}/${bxNum(it.ret)}`).join("|"); }
+function bxProof(d, at, by) {
+  const s = `${d.no}|${bxProofText(d)}|${at}|${by}`;
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16).padStart(8, "0");
+}
+// password prompt for signing a hand-over (masked, Enter to confirm) — resolves the text or null
+function bxAskPassword(title) {
+  return new Promise((resolve) => {
+    let bd = document.getElementById("bxPwBackdrop");
+    if (!bd) { bd = document.createElement("div"); bd.className = "modal-backdrop"; bd.id = "bxPwBackdrop"; document.body.appendChild(bd); }
+    bd.innerHTML = `<form class="modal pw-modal" role="dialog" aria-labelledby="bxPwT" novalidate><h3 id="bxPwT">${bxEsc(title)}</h3>
+      <p class="muted-note">การยืนยันนี้คือลายเซ็นรับของ — ตรวจของให้ครบก่อน</p>
+      <label>รหัสผ่าน<input type="password" id="bxPwIn" autocomplete="current-password" maxlength="32"></label>
+      <div class="modal-actions"><button type="button" class="btn-secondary" id="bxPwNo">ยกเลิก</button><button type="submit" class="btn-primary">ยืนยันรับของ</button></div></form>`;
+    const done = (v) => { bd.classList.remove("open"); resolve(v); };
+    bd.querySelector("#bxPwNo").addEventListener("click", () => done(null));
+    bd.querySelector("form").addEventListener("submit", (e) => { e.preventDefault(); done(bd.querySelector("#bxPwIn").value); });
+    bd.classList.add("open");
+    setTimeout(() => bd.querySelector("#bxPwIn").focus(), 30);
+  });
+}
+
 function bxUpdateWoProgress(ref) {
   const wo = WORK_ORDERS.find((w) => w.wo === ref);
   if (!wo) return;
@@ -944,7 +970,9 @@ function bxSubmitReq(ctx, pane) {
   });
   if (!items.length) { showToast("ยังไม่ได้เลือกรายการหรือใส่จำนวน", "warn"); return; }
   const recvSel = document.getElementById("bxReceiver");
-  const recvId = recvSel ? recvSel.value : "";
+  // no receiver picked (or asked from the floor screen): the person asking receives — so the store's
+  // hand-over comes back to them to confirm
+  const recvId = (recvSel && recvSel.value) || (bxUser() ? bxUser().id : "");
   const recv = recvId && typeof authUserById === "function" ? authUserById(recvId) : null;
   const note = (document.getElementById("bxReqNote") || {}).value || "";
   const me = bxUser();
@@ -1030,7 +1058,7 @@ function bxRenderReqModal() {
     ${canApprove || canIssue || canReturn ? `<div class="form-field"><label for="bxReqActNote">หมายเหตุการดำเนินการ</label><input id="bxReqActNote" placeholder="เช่น เหตุผลที่ปฏิเสธ / จ่ายแทนด้วยรหัสใหม่"></div>` : ""}
     <div class="bx-log">
       <div class="bx-docgroup-title">ประวัติ: ใครทำอะไร เมื่อไร</div>
-      ${logs.length ? `<ul class="bx-list">${logs.map((g) => `<li>${fmtDateTime(g.at)} · <strong>${bxEsc(g.by)}</strong> · ${bxEsc(g.kind)}${g.part ? ` ${bxEsc(g.part)}` : ""}${g.qty ? ` × ${bxFmt(g.qty)}` : ""}${g.note ? ` — ${bxEsc(g.note)}` : ""}</li>`).join("")}</ul>` : `<p class="muted-inline">ยังไม่มีการดำเนินการ</p>`}
+      ${logs.length ? `<ul class="bx-list">${logs.map((g) => `<li>${fmtDateTime(g.at)} · <strong>${bxEsc(g.by)}</strong> · ${bxEsc(g.kind)}${g.part ? ` ${bxEsc(g.part)}` : ""}${g.qty ? ` × ${bxFmt(g.qty)}` : ""}${g.note ? ` — ${bxEsc(g.note)}` : ""}${g.signed ? ` <span class="pill pill-good" title="ยืนยันด้วยรหัสผ่านของผู้รับ">✍ ลงนามด้วยรหัสผ่าน</span>` : ""}${g.proof ? ` <code class="bx-proof" title="รหัสตรวจสอบ: คำนวณจากรายการ จำนวน ผู้ทำ และเวลา ณ ตอนนั้น">#${bxEsc(g.proof)}</code>` : ""}</li>`).join("")}</ul>` : `<p class="muted-inline">ยังไม่มีการดำเนินการ</p>`}
     </div>
     <div class="modal-actions">
       ${sodNote ? `<p class="muted-note">🔒 ${bxEsc(sodNote)}</p>` : ""}
@@ -1058,10 +1086,19 @@ function bxRenderReqModal() {
     bxReqAction(d, "จ่ายของแล้ว", note() || "ปิดยอดค้าง");
   });
   if ($("bxReturn")) $("bxReturn").addEventListener("click", () => bxReturn(d, note()));
-  if ($("bxAck")) $("bxAck").addEventListener("click", () => {
+  if ($("bxAck")) $("bxAck").addEventListener("click", async () => {
+    // evidence of the hand-over: the receiver confirms with their own password (an e-signature);
+    // the record keeps who, when, how many, and a fingerprint of the items as received
+    const me = bxUser();
+    if (me && typeof authCheckSecret === "function") {
+      const pw = await bxAskPassword(`ยืนยันรับของ ${d.no} — ใส่รหัสผ่านของคุณ (${me.name})`);
+      if (pw === null) return;
+      if (!(await authCheckSecret(me, pw))) { showToast("รหัสผ่านไม่ถูกต้อง — ยังไม่ได้ยืนยันรับของ", "warn"); return; }
+    }
     const n = bxIssuedTotal(d) - bxNum(d.ackIssued);
     d.ackIssued = bxIssuedTotal(d); d.ackAt = new Date().toISOString(); d.ackBy = bxUserName();
-    d.log = d.log || []; d.log.push({ at: d.ackAt, by: d.ackBy, kind: "ผู้รับยืนยันรับของ", qty: n, note: note() });
+    const proof = bxProof(d, d.ackAt, d.ackBy);
+    d.log = d.log || []; d.log.push({ at: d.ackAt, by: d.ackBy, uid: me ? me.id : "", kind: "ผู้รับยืนยันรับของ", qty: n, note: note(), signed: true, proof, sig: me && me.signature && typeof esSigKey === "function" ? esSigKey(me.signature) : "" });
     if (typeof auditLog === "function") auditLog("ยืนยันรับของ", d.no, `${n} ชิ้น${note() ? ` · ${note()}` : ""}`);
     bxAfterReqChange(d);
     showToast("ยืนยันรับของแล้ว", "good");
@@ -1143,6 +1180,9 @@ function bxIssue(d, note) {
   });
   const before = d.status;
   d.status = d.items.every((it) => bxNum(it.issued) >= bxNum(it.req)) ? "จ่ายของแล้ว" : "จ่ายบางส่วน";
+  const me = bxUser();
+  d.log = d.log || [];
+  d.log.push({ at, by: bxUserName(), uid: me ? me.id : "", kind: "คลังจ่ายของ", qty: plan.reduce((s, p) => s + p.n, 0), note: `${plan.length} รายการ${d.owner ? ` ให้ ${d.owner}` : ""}${note ? ` · ${note}` : ""}`, proof: bxProof(d, at, bxUserName()) });
   if (typeof auditLog === "function") auditLog("จ่ายของตามใบเบิก", d.no, `${plan.map(({ it, n }) => `${it.code || it.part} × ${n}`).join(", ")} · สถานะ "${before}" → "${d.status}"`);
   bxAfterReqChange(d);
   showToast(`บันทึกจ่ายของ ${d.no} แล้ว (${d.status})`, "good");

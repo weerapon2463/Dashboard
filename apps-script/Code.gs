@@ -74,12 +74,23 @@ function handle_(p) {
     let token = PropertiesService.getScriptProperties().getProperty("TOKEN");
     if (!token && PRESET_TOKEN && p.token === PRESET_TOKEN) token = setup(); // first request after an automated deploy
     if (!token) return json_({ ok: false, error: "ยังไม่ได้รัน setup() ใน Apps Script" });
-    if (p.token !== token) return json_({ ok: false, error: "รหัสลับไม่ถูกต้อง" });
+    // open to anyone who has the web-app address: is sign-in on, the names to pick from, sign in / out
+    if (p.action === "hello") return json_({ ok: true, secure: secure_() });
+    if (p.action === "roster") return json_(secure_() ? roster_() : { ok: false, error: "ยังไม่ได้เปิดการเข้าระบบผ่านเซิร์ฟเวอร์" });
+    if (p.action === "login") return json_(secure_() ? login_(p) : { ok: false, error: "ยังไม่ได้เปิดการเข้าระบบผ่านเซิร์ฟเวอร์" });
+    if (p.action === "logout") return json_(logout_(p));
+    const who = whoIs_(p, token);
+    if (!who) return json_(secure_() ? { ok: false, auth: "required", error: "กรุณาเข้าสู่ระบบใหม่" } : { ok: false, error: "รหัสลับไม่ถูกต้อง" });
+    if (ADMIN_ACTIONS_.indexOf(p.action) >= 0 && !who.admin) return json_({ ok: false, error: "เฉพาะผู้ดูแลระบบ" });
     switch (p.action) {
-      case "ping": return json_({ ok: true, name: sheet_().getName(), keys: Object.keys(readAll_(false)).length });
+      case "ping": return json_({ ok: true, name: sheet_().getName(), keys: Object.keys(readAll_(false)).length, secure: secure_(), me: who.name || "" });
       case "versions": return json_({ ok: true, versions: versions_() });
-      case "pull": return json_({ ok: true, data: readAll_(true, p.keys ? String(p.keys).split(",") : null) });
-      case "push": return json_(push_(p));
+      case "pull": return json_({ ok: true, data: readFor_(who, p.keys ? String(p.keys).split(",") : null) });
+      case "push": return json_(push_(p, who));
+      case "secure": return json_(setSecure_(p, who));
+      case "signinlog": return json_(signinLog_(p));
+      case "revokeall": return json_(revokeAll_(who));
+      case "unlock": return json_(unlock_(p, who));
       case "upload": return json_(upload_(p));
       case "file": return json_(file_(p.id));
       case "bomfiles": return json_(bomFiles_(p.company === "y2j" ? "" : p.company));
@@ -148,10 +159,12 @@ function versions_() {
   return out;
 }
 
-function push_(p) {
+function push_(p, who) {
   const key = String(p.key || "");
   if (!/^y2j-[a-z0-9-]+$/.test(key)) return { ok: false, error: "bad key" };
-  const value = String(p.value == null ? "" : p.value);
+  let value = String(p.value == null ? "" : p.value);
+  who = who || { master: true, admin: true };
+  const guarded = !who.master && (key === AUTH_KEY_ || key === AUDIT_KEY_ || isDocsKey_(key));
   const lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
@@ -161,9 +174,16 @@ function push_(p) {
     const curVersion = cur ? cur.version : 0;
     // optimistic concurrency: the client must have seen the latest version (or force)
     if (!p.force && Number(p.baseVersion || 0) !== curVersion) {
-      const now = readAll_(true, [key])[key];
+      const now = readFor_(who, [key])[key];
       return { ok: false, conflict: true, current: now || { value: "", version: 0 } };
     }
+    if (guarded) {
+      const curValue = cur ? readAll_(true, [key])[key].value : "";
+      const g = key === AUTH_KEY_ ? guardAuth_(value, curValue, who) : key === AUDIT_KEY_ ? guardAudit_(value, curValue, who) : guardDocs_(value, curValue, who);
+      if (g.error) return { ok: false, error: g.error };
+      value = JSON.stringify(g.value);
+    }
+    const by = who.master ? String(p.by || "") : who.name;
     const chunks = [];
     for (let i = 0; i < value.length; i += CHUNK) chunks.push(CHUNK_MARK + value.slice(i, i + CHUNK));
     if (!chunks.length) chunks.push(CHUNK_MARK);
@@ -171,16 +191,252 @@ function push_(p) {
     const rowIdx = cur ? cur.row : sh.getLastRow() + 1;
     const width = Math.max(sh.getLastColumn(), 5 + chunks.length);
     // ISO text, not a Date: the row is text-formatted so a Date would be re-parsed in the wrong timezone
-    const line = [key, version, new Date().toISOString(), String(p.by || ""), chunks.length].concat(chunks);
+    const line = [key, version, new Date().toISOString(), by, chunks.length].concat(chunks);
     while (line.length < width) line.push("");
     if (sh.getMaxColumns() < width) sh.insertColumnsAfter(sh.getMaxColumns(), width - sh.getMaxColumns());
     sh.getRange(rowIdx, 1, 1, width).setNumberFormat("@").setValues([line]);
     SpreadsheetApp.flush();
     try { mirror_(key, value); } catch (err) { /* report tabs are best-effort */ }
-    return { ok: true, version: version };
+    // what was stored differs from what was sent (guarded keys): hand it back so the device matches
+    return guarded ? { ok: true, version: version, value: key === AUTH_KEY_ ? stripAuth_(value, who.uid) : isDocsKey_(key) ? docsFor_(value, who.user) : value } : { ok: true, version: version };
   } finally {
     lock.releaseLock();
   }
+}
+
+/* ------------------------------------------------------------------ sign-in on the server */
+// Script Property SECURE = "1": devices no longer keep the master key. People sign in here and get a
+// session (6 hours, renewed while used) that every request carries. Nobody receives another person's
+// password hash; users, rights and companies change only from an admin's session; the audit log only
+// grows, stamped with the signed-in person; sign-ins go to the "_log" tab.
+const AUTH_KEY_ = "y2j-auth-v1";
+const AUDIT_KEY_ = "y2j-audit-v1";
+const AUDIT_MAX_ = 3000;
+const SESSION_TTL_ = 21600;
+const MAX_FAILS_ = 5;
+const LOCK_MIN_ = 15;
+const OWN_FIELDS_ = ["pw", "pin", "pwAt", "mustChange", "signature", "signatureAt", "sigHistory", "lastLogin"];
+const ADMIN_ACTIONS_ = ["rebuild", "organize", "store", "inspect", "renameroot", "secure", "signinlog", "revokeall", "unlock"];
+
+function props_() { return PropertiesService.getScriptProperties(); }
+function secure_() { return props_().getProperty("SECURE") === "1"; }
+function parse_(s, dflt) { try { return s ? JSON.parse(s) : dflt; } catch (err) { return dflt; } }
+function authData_() { const e = readAll_(true, [AUTH_KEY_])[AUTH_KEY_]; return parse_(e && e.value, { users: [] }); }
+// same short hash the app used for PINs before passwords (FNV-1a) — to spot the default 1234
+function pinHash_(pin, salt) {
+  let h = 2166136261;
+  const s = salt + ":" + pin + ":y2j";
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16);
+}
+function findUser_(auth, name) {
+  const id = String(name || "").trim().toLowerCase();
+  if (!id) return null;
+  return (auth.users || []).filter((u) => u.active && (String(u.username || "").toLowerCase() === id || (u.empNo && String(u.empNo).toLowerCase() === id) || u.id === id))[0] || null;
+}
+function session_(sid) {
+  if (!sid) return null;
+  const c = CacheService.getScriptCache();
+  const raw = c.get("S_" + sid);
+  if (!raw) return null;
+  const s = parse_(raw, null);
+  // "sign every device out" bumps the generation: older sessions stop working
+  if (!s || String(s.gen || "0") !== String(props_().getProperty("SESSION_GEN") || "0")) { c.remove("S_" + sid); return null; }
+  c.put("S_" + sid, raw, SESSION_TTL_); // sliding: stays valid while the device is in use
+  return s;
+}
+
+/* ---- back office: sign-in history, sign everyone out, unlock an account ---- */
+function signinLog_(p) {
+  const sh = sheet_().getSheetByName("_log");
+  if (!sh || sh.getLastRow() < 2) return { ok: true, rows: [] };
+  const n = Math.min(Number(p.limit) || 300, 2000);
+  const last = sh.getLastRow();
+  const from = Math.max(2, last - n + 1);
+  const rows = sh.getRange(from, 1, last - from + 1, 4).getValues().map((r) => [r[0] instanceof Date ? r[0].toISOString() : String(r[0]), String(r[1]), String(r[2]), String(r[3])]);
+  return { ok: true, rows: rows.reverse() };
+}
+function revokeAll_(who) {
+  const g = Number(props_().getProperty("SESSION_GEN") || "0") + 1;
+  props_().setProperty("SESSION_GEN", String(g));
+  log_("ให้ทุกเครื่องออกจากระบบ", who.name, "");
+  return { ok: true, gen: g };
+}
+function unlock_(p, who) {
+  const name = String(p.user || "").trim().toLowerCase();
+  if (!name) return { ok: false, error: "ไม่ระบุผู้ใช้" };
+  CacheService.getScriptCache().remove("F_" + name);
+  const u = findUser_(authData_(), name);
+  if (u) { CacheService.getScriptCache().remove("F_" + String(u.username || "").toLowerCase()); if (u.empNo) CacheService.getScriptCache().remove("F_" + String(u.empNo).toLowerCase()); }
+  log_("ปลดล็อกบัญชี", who.name, name);
+  return { ok: true };
+}
+function log_(event, who, detail) {
+  try {
+    const ss = sheet_();
+    let sh = ss.getSheetByName("_log");
+    if (!sh) { sh = ss.insertSheet("_log"); sh.appendRow(["เวลา", "เหตุการณ์", "ผู้ใช้", "รายละเอียด"]); sh.setFrozenRows(1); sh.getRange("A1:D1").setFontWeight("bold"); }
+    sh.appendRow([new Date(), event, String(who || ""), String(detail || "").slice(0, 500)]);
+  } catch (err) { /* logging never blocks a request */ }
+}
+
+// names for the sign-in screen: no hashes, no signatures
+function roster_() {
+  return { ok: true, secure: secure_(), users: (authData_().users || []).filter((u) => u.active).map((u) => ({
+    id: u.id, username: u.username, name: u.name, empNo: u.empNo || "", role: u.role, dept: u.dept || "", position: u.position || "",
+    company: u.company === undefined ? "" : u.company, active: true, iter: u.pw ? Number(String(u.pw).split("$")[1]) || 0 : 0,
+  })) };
+}
+
+function login_(p) {
+  const name = String(p.user || "").trim().toLowerCase();
+  const cache = CacheService.getScriptCache();
+  const fk = "F_" + name;
+  const fails = Number(cache.get(fk) || 0);
+  if (fails >= MAX_FAILS_) { log_("เข้าระบบถูกระงับชั่วคราว", name, ""); return { ok: false, locked: true, error: "ใส่รหัสผิดเกิน " + MAX_FAILS_ + " ครั้ง — ลองใหม่ใน " + LOCK_MIN_ + " นาที หรือให้ผู้ดูแลตั้งรหัสใหม่" }; }
+  const u = findUser_(authData_(), name);
+  const good = !!u && (u.pw ? String(u.pw).split("$")[2] === String(p.proof || "") : !!u.pin && u.pin === String(p.proofPin || ""));
+  if (!good) {
+    cache.put(fk, String(fails + 1), LOCK_MIN_ * 60);
+    log_("เข้าระบบไม่สำเร็จ", name, "ครั้งที่ " + (fails + 1));
+    return { ok: false, error: fails + 1 >= MAX_FAILS_ ? "ใส่รหัสผิดเกิน " + MAX_FAILS_ + " ครั้ง — ระงับ " + LOCK_MIN_ + " นาที" : "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง (เหลือ " + (MAX_FAILS_ - fails - 1) + " ครั้ง)" };
+  }
+  cache.remove(fk);
+  const sid = Utilities.getUuid().replace(/-/g, "") + Utilities.getUuid().replace(/-/g, "");
+  cache.put("S_" + sid, JSON.stringify({ uid: u.id, name: u.name, gen: props_().getProperty("SESSION_GEN") || "0" }), SESSION_TTL_);
+  log_("เข้าระบบ", u.username, u.name);
+  return { ok: true, session: sid, uid: u.id, name: u.name,
+    mustChange: !!u.mustChange || (!u.pw && u.pin === pinHash_("1234", u.id)) };
+}
+
+function logout_(p) {
+  const s = session_(p.session);
+  if (s) log_("ออกจากระบบ", s.name, "");
+  CacheService.getScriptCache().remove("S_" + String(p.session || ""));
+  return { ok: true };
+}
+
+// who is asking: the master key (setup, backups) or a signed-in person, looked up fresh each time
+function whoIs_(p, token) {
+  if (p.token && p.token === token) return { master: true, admin: true, name: String(p.by || "") };
+  if (!secure_()) return null;
+  const s = session_(p.session);
+  if (!s) return null;
+  const u = (authData_().users || []).filter((x) => x.id === s.uid && x.active)[0];
+  if (!u) return null;
+  return { uid: u.id, name: u.name, admin: u.role === "admin", user: u };
+}
+
+// a person's copy of the users list: everyone else's password hashes removed
+function stripAuth_(value, uid) {
+  const a = parse_(value, null);
+  if (!a || !a.users) return value;
+  a.users.forEach((u) => { if (u.id !== uid) { delete u.pw; delete u.pin; } });
+  return JSON.stringify(a);
+}
+function readFor_(who, keys) {
+  const data = readAll_(true, keys);
+  if (who.master) return data;
+  if (data[AUTH_KEY_]) data[AUTH_KEY_].value = stripAuth_(data[AUTH_KEY_].value, who.uid);
+  Object.keys(data).forEach((k) => { if (isDocsKey_(k)) data[k].value = docsFor_(data[k].value, who.user); });
+  return data;
+}
+
+// Documents marked private / department-only / confidential (same rules as the app's visAllows):
+// only the people they are meant for receive them at all.
+function isDocsKey_(k) { return k === "y2j-dept-docs-v1" || k.indexOf("y2j-dept-docs-v1--c-") === 0; }
+function visOk_(doc, u) {
+  if (!u || u.role === "admin" || !doc) return true;
+  if (doc.createdBy === u.id || doc.receiver === u.id) return true;
+  const v = doc.visibility || {};
+  const mode = v.mode || "all";
+  if (mode === "all") return true;
+  if (mode === "private") return false;
+  if (mode === "dept") return !!v.ownerDept && v.ownerDept === u.dept;
+  if (mode === "custom") return (v.users || []).indexOf(u.id) >= 0 || (v.depts || []).indexOf(u.dept) >= 0 || (v.teams || []).some((t) => (u.teams || []).indexOf(t) >= 0);
+  return true;
+}
+function docsFor_(value, u) {
+  const all = parse_(value, null);
+  if (!all || typeof all !== "object") return value;
+  Object.keys(all).forEach((t) => { if (Array.isArray(all[t])) all[t] = all[t].filter((d) => visOk_(d, u)); });
+  return JSON.stringify(all);
+}
+// a save from someone who never received the hidden documents keeps them as they are
+function guardDocs_(value, curValue, who) {
+  const next = parse_(value, null);
+  const cur = parse_(curValue, {});
+  if (!next || typeof next !== "object") return { error: "ข้อมูลเอกสารไม่ถูกต้อง" };
+  Object.keys(cur).forEach((t) => {
+    if (!Array.isArray(cur[t])) return;
+    const hidden = cur[t].filter((d) => !visOk_(d, who.user));
+    if (!hidden.length) return;
+    const nos = {};
+    hidden.forEach((d) => { nos[d.no] = 1; });
+    next[t] = (Array.isArray(next[t]) ? next[t] : []).filter((d) => !nos[d.no]).concat(hidden);
+  });
+  return { value: next };
+}
+
+// what the server keeps when a signed-in person saves the users list / the audit log
+function guardAuth_(value, curValue, who) {
+  const next = parse_(value, null);
+  const cur = parse_(curValue, { users: [] });
+  if (!next || !Array.isArray(next.users)) return { error: "ข้อมูลผู้ใช้ไม่ถูกต้อง" };
+  const byId = {};
+  (cur.users || []).forEach((u) => { byId[u.id] = u; });
+  if (who.admin) {
+    // hashes the admin's device never saw stay as they are; a new password the admin set is taken
+    next.users.forEach((u) => { const c = byId[u.id]; if (c && !("pw" in u) && !("pin" in u)) { if ("pw" in c) u.pw = c.pw; if ("pin" in c) u.pin = c.pin; } });
+    if (!next.users.some((u) => u.active && u.role === "admin")) return { error: "ต้องมีผู้ดูแลระบบที่ใช้งานอยู่อย่างน้อย 1 คน" };
+    const changed = next.users.filter((u) => { const c = byId[u.id]; return !c || c.role !== u.role || c.active !== u.active || JSON.stringify(c.groups || []) !== JSON.stringify(u.groups || []) || JSON.stringify(c.modules || null) !== JSON.stringify(u.modules || null); });
+    if (changed.length) log_("แก้ไขผู้ใช้/สิทธิ์", who.name, changed.map((u) => u.username + (byId[u.id] ? "" : " (ใหม่)")).join(", "));
+    return { value: next };
+  }
+  // everyone else: only their own password and signature
+  const mine = next.users.filter((u) => u.id === who.uid)[0];
+  const c = byId[who.uid];
+  if (mine && c) {
+    OWN_FIELDS_.forEach((f) => { if (f in mine) c[f] = mine[f]; else if (f === "mustChange") delete c[f]; });
+    if (mine.pw && mine.pw !== (byId[who.uid] || {}).pw) log_("เปลี่ยนรหัสผ่าน", who.name, "");
+  }
+  return { value: cur };
+}
+function guardAudit_(value, curValue, who) {
+  const next = parse_(value, []);
+  const cur = parse_(curValue, []);
+  if (!Array.isArray(next)) return { error: "bad audit" };
+  const k = (e) => [e.ts, e.user, e.action, e.target].join("|");
+  const seen = {};
+  cur.forEach((e) => { seen[k(e)] = 1; });
+  next.forEach((e) => {
+    if (!e || seen[k(e)]) return;
+    const row = Object.assign({}, e, { user: who.uid, userName: who.name, serverAt: new Date().toISOString() });
+    cur.push(row);
+    seen[k(e)] = 1;
+  });
+  while (cur.length > AUDIT_MAX_) cur.shift();
+  return { value: cur };
+}
+
+// turn server sign-in on/off. Turning it on replaces the master key, so every device that held the old
+// one (setup links, company code) is sent to the sign-in screen.
+function setSecure_(p, who) {
+  if (!who.master && !who.admin) return { ok: false, error: "เฉพาะผู้ดูแลระบบ" };
+  const props = props_();
+  if (p.on === true || p.on === "1" || p.on === "true") {
+    const admins = (authData_().users || []).filter((u) => u.active && u.role === "admin");
+    if (!admins.length) return { ok: false, error: "ต้องมีผู้ดูแลระบบอย่างน้อย 1 คนก่อน" };
+    const token = Utilities.getUuid().replace(/-/g, "").slice(0, 24);
+    props.setProperty("TOKEN", token);
+    props.setProperty("SECURE", "1");
+    try { sheet_().getSheetByName(CONFIG_SHEET).getRange("B1").setValue(token); } catch (err) { /* tab optional */ }
+    log_("เปิดการเข้าระบบผ่านเซิร์ฟเวอร์", who.name, "เปลี่ยนรหัสลับแล้ว");
+    return { ok: true, secure: true, token: token };
+  }
+  props.setProperty("SECURE", "0");
+  log_("ปิดการเข้าระบบผ่านเซิร์ฟเวอร์", who.name, "");
+  return { ok: true, secure: false, token: props.getProperty("TOKEN") };
 }
 
 /* ------------------------------------------------------------------ files (Google Drive) */
