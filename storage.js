@@ -312,6 +312,7 @@ const Y2JStore = (() => {
     });
     saveMeta();
     pulledOnce = true;
+    try { rawSet("y2j-last-pull", new Date().toISOString()); } catch (e) { /* shown on demo.html only */ }
     if (dirty.size) schedulePush();
   }
 

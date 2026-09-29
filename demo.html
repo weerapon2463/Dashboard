@@ -201,7 +201,8 @@
   .cx-arch-tag{ font-size:12px; font-weight:700; padding:4px 10px; border-radius:999px; align-self:flex-start; }
   .cx-now{ background:var(--good-bg); color:var(--good); }
   .cx-next{ background:var(--warn-bg); color:var(--warn); }
-  .cx-arch-box{ padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--surface-2); font-size:13px; line-height:1.6; }
+  .cx-live-note{ font-size:12px; color:var(--text-muted); margin:-4px 0 8px; }
+.cx-arch-box{ padding:10px 12px; border-radius:10px; border:1px solid var(--border); background:var(--surface-2); font-size:13px; line-height:1.6; }
   .cx-arch-arrow{ font-size:26px; color:var(--muted); }
   .cx-section-title{ font-size:18px; margin:28px 0 12px; }
   @media (max-width:860px){
@@ -275,15 +276,17 @@
     <div class="cx-arch">
       <div class="cx-arch-col">
         <div class="cx-arch-tag cx-now">ใช้งานอยู่ตอนนี้ · ค่าใช้จ่าย 0 บาท</div>
-        <div class="cx-arch-box"><b>หน้าจอ</b> เว็บแอป (GitHub Pages) ใช้ได้ทั้งคอมพิวเตอร์ iPad มือถือ · โหมดมืด/สว่าง</div>
+        <div class="cx-arch-box"><b>หน้าจอ</b> เว็บแอป (GitHub Pages) ใช้ได้ทั้งคอมพิวเตอร์ iPad มือถือ จอทีวี · โหมดหน้างานปุ่มใหญ่ · สแกน QR</div>
         <div class="cx-arch-box"><b>ฐานข้อมูลกลาง</b> Google Sheets + Apps Script ซิงก์ทุกเครื่อง รวมข้อมูลเมื่อแก้พร้อมกัน</div>
         <div class="cx-arch-box"><b>รายงานใน Sheets</b> แท็บเอกสาร ใบเบิก คงคลัง จัดซื้อ งานบริการ ผู้ขาย · BOM แยกไฟล์ต่อรุ่น</div>
         <div class="cx-arch-box"><b>ไฟล์แนบ</b> รูปถ่าย/แบบ เก็บใน Google Drive ของบริษัท</div>
+        <div class="cx-arch-box"><b>เข้าสู่ระบบ</b> รหัสพนักงาน + รหัสผ่านของแต่ละคน (เข้ารหัส) ตรวจสิทธิ์ที่เซิร์ฟเวอร์ · สิทธิ์รายหน้า/เอกสาร · ลำดับขั้นอนุมัติ · ประวัติทุกการแก้ไข</div>
       </div>
       <div class="cx-arch-arrow" aria-hidden="true">→</div>
       <div class="cx-arch-col">
         <div class="cx-arch-tag cx-next">ขยายผลหลังนำร่อง</div>
-        <div class="cx-arch-box"><b>เข้าสู่ระบบด้วยบัญชี Google ของบริษัท</b> แทน PIN — ความปลอดภัยระดับองค์กร</div>
+        <div class="cx-arch-box"><b>เข้าสู่ระบบด้วยบัญชี Google ของบริษัท</b> เพิ่มจากรหัสผ่าน — ความปลอดภัยระดับองค์กร</div>
+        <div class="cx-arch-box"><b>แจ้งเตือนทาง LINE / อีเมล</b> ต่อจากแจ้งเตือนในระบบและกล่องงานที่มีแล้ว</div>
         <div class="cx-arch-box"><b>ขยายไปทุกบริษัทในกลุ่ม</b> รองรับหลายบริษัทแล้ว ข้อมูลแยก โลโก้แยก ผู้บริหารกลุ่มสลับดูได้</div>
         <div class="cx-arch-box"><b>เชื่อมระบบบัญชี/ERP</b> ส่ง PO รับของ ต้นทุนวัสดุต่องาน</div>
         <div class="cx-arch-box"><b>Power Platform / Dataverse</b> ทางเลือกเมื่อผู้ใช้และข้อมูลโตเกินขีดจำกัดของ Sheets</div>
@@ -312,6 +315,8 @@
   var audit = read("y2j-audit-v1") || [];
   // company figures only for someone signed in on this browser
   var signedIn = !!localStorage.getItem("y2j-session-v1");
+  // when this browser last pulled the data (sync meta), shown with the figures
+  var syncedAt = (function () { try { var t = localStorage.getItem("y2j-last-pull"); return t ? new Date(t).toLocaleString("th-TH", { dateStyle: "medium", timeStyle: "short" }) : ""; } catch (e) { return ""; } })();
   var has = signedIn && (Object.keys(docs).length || wos.length || p2p.length);
   var n = function (t) { return (docs[t] || []).length; };
   var open = function (t, closed) { return (docs[t] || []).filter(function (d) { return closed.indexOf(d.status) < 0; }).length; };
@@ -331,18 +336,18 @@
       [n("mc"), "เครื่องลูกค้าในทะเบียน", "งานบริการ " + n("svc") + " ใบ"],
       [(auth.users || []).filter(function (u) { return u.active; }).length, "ผู้ใช้งาน", (auth.groups || []).length + " กลุ่มสิทธิ์ · " + audit.length + " บันทึกการใช้งาน"],
     ];
-    live.innerHTML = '<div class="cx-live-title">' + (co === "demo" ? "ตัวเลขจากระบบทดลอง (ข้อมูลจำลอง) ณ ตอนนี้" : "ตัวเลขจริงจากระบบ ณ ตอนนี้") + '</div><div class="cx-live-grid">' + tiles.map(function (t) {
+    live.innerHTML = '<div class="cx-live-title">' + (co === "demo" ? "ตัวเลขจากระบบทดลอง (ข้อมูลจำลอง)" : "ตัวเลขจากข้อมูลจริงของบริษัท") + (syncedAt ? " · ข้อมูล ณ " + esc(syncedAt) : "") + '</div><div class="cx-live-note">อ่านจากข้อมูลที่เบราว์เซอร์นี้โหลดไว้ — เปิด <a href="./index.html">FORGE</a> เพื่อดึงข้อมูลล่าสุด แล้วกลับมาหน้านี้' + (co === "demo" ? "" : " · ต้องการดูตัวเลขระบบทดลอง: สลับบริษัทเป็น DEMO ในระบบ") + '</div><div class="cx-live-grid">' + tiles.map(function (t) {
       return '<div class="cx-live-tile"><div class="cx-live-n">' + esc(t[0]) + '</div><div class="cx-live-l">' + esc(t[1]) + '</div><div class="cx-live-s">' + esc(t[2]) + "</div></div>";
     }).join("") + "</div>";
   }
 
   var STEPS = [
     { id: "sales", name: "ขาย", who: "ฝ่ายขาย", docs: ["SO คำสั่งซื้อ", "CC ข้อร้องเรียน"], does: "รับคำสั่งซื้อ ยืนยันวันส่ง แล้วส่งต่อฝ่ายวางแผน — ข้อร้องเรียนส่งต่อ QC/วิศวกรรมจนปิดเรื่อง", check: "ใบสั่งผลิตต้องอ้างคำสั่งซื้อที่มีอยู่จริง", view: "dept", count: function () { return open("so", ["ส่งมอบแล้ว", "ยกเลิก"]) + " คำสั่งซื้อที่กำลังดำเนินการ"; } },
-    { id: "plan", name: "วางแผน", who: "ฝ่ายวางแผนการผลิต", docs: ["ใบสั่งผลิต (WO)", "PLN แผนสัปดาห์", "MRQ ความต้องการวัสดุ"], does: "เปิดใบสั่งผลิตจากคำสั่งซื้อ แล้วคำนวณวัสดุ (MRP) = BOM × จำนวนคัน − ที่เบิกแล้ว − คงคลัง − ของที่สั่งซื้ออยู่ → ออก MRQ หรือเปิด PR ได้ทันที", check: "BOM ของรุ่นที่จะผลิตต้องอนุมัติแล้ว", view: "bomx", tab: "mrp", count: function () { return wos.filter(function (w) { return w.status !== "เสร็จสมบูรณ์"; }).length + " ใบสั่งผลิตที่ยังไม่เสร็จ"; } },
+    { id: "plan", name: "วางแผน", who: "ฝ่ายวางแผนการผลิต", docs: ["ใบสั่งผลิต (WO)", "PLN แผนสัปดาห์", "MRQ ความต้องการวัสดุ"], does: "เปิดใบสั่งผลิต 1 ใบต่อคัน (ได้เลขเครื่อง + Job Card ตามขั้นตอนของรุ่น) · แผนการผลิตหลักตามวันที่จริงเทียบคันจริง · กำลังการผลิตรายสถานีจาก Job Card · คำนวณวัสดุ (MRP) = BOM × จำนวนคัน − ที่เบิกแล้ว − คงคลัง − ของที่สั่งซื้ออยู่ → ออก MRQ หรือเปิด PR", check: "BOM ของรุ่นที่จะผลิตต้องอนุมัติแล้ว", view: "bomx", tab: "mrp", count: function () { return wos.filter(function (w) { return w.status !== "เสร็จสมบูรณ์"; }).length + " ใบสั่งผลิตที่ยังไม่เสร็จ"; } },
     { id: "rnd", name: "R&D / BOM", who: "วิศวกรรม", docs: ["BOM หลายระดับ", "ECR / EO", "DWG แบบ", "WI วิธีทำงาน"], does: "BOM จัดเป็นกลุ่มงาน › ชุดประกอบ › ชิ้นย่อย ทุกบรรทัดมีเลขข้อ ระบุ \"ใช้ที่\" ไลน์/สถานีที่รับไปใช้ต่อ · แก้ได้เฉพาะการออก Revision ใหม่พร้อมอ้างอิง ECR/EO", check: "โครงสร้างวน ชุดแม่หาย รหัสซ้ำ จำนวนผิด", view: "bomx", tab: "tree", count: function () { return bomLines + " รายการใน BOM"; } },
-    { id: "store", name: "เบิก & คลัง", who: "ช่าง · หัวหน้างาน · คลังสินค้า", docs: ["MR ใบเบิก", "STK ตรวจนับ", "คงคลัง"], does: "ช่างเลือกเบิกตามรายการ BOM ของงาน (หัวหน้าสั่งเบิกแทนและมอบหมายช่างรับของได้) → หัวหน้าอนุมัติ → คลังจ่าย (จ่ายบางส่วนได้) → เห็นค้างเบิก/ค้างจ่ายและของไม่พอทันที", check: "เบิกเกิน BOM, คงคลังติดลบ, ของไม่พอแต่ไม่มี PR", view: "bomx", tab: "track", count: function () { return Object.keys(stock).length + " รายการในคลัง"; } },
-    { id: "pur", name: "จัดซื้อ", who: "จัดซื้อ · ผู้อนุมัติ", docs: ["PR → PO 10 ขั้น", "RFQ", "ผู้ขาย", "SE ประเมินผู้ขาย"], does: "ทุกขั้นมีเป้าเวลา รู้ว่างานค้างอยู่ที่ใครกี่วัน · รับของแล้วยอดเข้าคลังอัตโนมัติ ตรวจรับไม่ผ่านหักคืน · ผลงานผู้ขายคำนวณจากการส่งจริง", check: "รับของแล้วคงคลังไม่เพิ่ม, รับไม่ครบ", view: "p2p", count: function () { return p2p.length + " คำขอซื้อ"; } },
-    { id: "prod", name: "ผลิต", who: "หัวหน้าไลน์ · ช่าง", docs: ["ใบสั่งผลิต", "DPR รายงานประจำวัน", "SAF ความปลอดภัย", "MT แจ้งซ่อม"], does: "รับงาน อัปเดตสถานะ · % เบิกวัสดุคำนวณจากใบเบิกจริง ไม่ต้องกรอกเอง · ปิดงานแล้วระบบเตือนถ้ายังมีใบเบิกค้าง", check: "% เบิกวัสดุไม่ตรงกับใบเบิก", view: "workorder", count: function () { return wos.filter(function (w) { return w.status === "ล่าช้า"; }).length + " ใบสั่งผลิตล่าช้า"; } },
+    { id: "store", name: "เบิก & คลัง", who: "ช่าง · หัวหน้างาน · คลังสินค้า", docs: ["MR ใบเบิก", "STK ตรวจนับ", "คงคลัง"], does: "ช่างเบิกตามรายการ BOM ของงาน หรือเบิกทั่วไปนอกใบสั่งผลิต (ซ่อมบำรุง วัสดุสิ้นเปลือง) → อนุมัติตามลำดับขั้น → คลังจ่าย (ใบหยิบของ สแกนยืนยัน) → ผู้รับยืนยันรับของด้วยรหัสผ่าน · สมุดคุมคลัง Min/Max ตรวจนับแบบไม่เห็นยอด", check: "เบิกเกิน BOM, คงคลังติดลบ, ของไม่พอแต่ไม่มี PR, ต่ำกว่า Min / เกิน Max", view: "bomx", tab: "track", count: function () { return Object.keys(stock).length + " รายการในคลัง"; } },
+    { id: "pur", name: "จัดซื้อ", who: "จัดซื้อ · ผู้อนุมัติ", docs: ["PR → PO 10 ขั้น", "RFQ", "ผู้ขาย", "SE ประเมินผู้ขาย"], does: "ทุกขั้นมีเป้าเวลา บอกชื่อคนที่ถืองานและต้องทำอะไรต่อ · อนุมัติตามวงเงิน/ลำดับขั้น · รับของเข้าคลังรอตรวจ (IQC) ผ่านแล้วค่อยเข้าคลังหลัก · ผลงานผู้ขายคำนวณจากการส่งจริง", check: "รับของแล้วคงคลังไม่เพิ่ม, รับไม่ครบ", view: "p2p", count: function () { return p2p.length + " คำขอซื้อ"; } },
+    { id: "prod", name: "ผลิต", who: "หัวหน้าไลน์ · ช่าง", docs: ["ใบสั่งผลิต", "DPR รายงานประจำวัน", "SAF ความปลอดภัย", "MT แจ้งซ่อม"], does: "ช่างกด ▶ เริ่ม / ⏸ พัก (เลือกสาเหตุ) / ✔ เสร็จ ทีละขั้นบนมือถือ ระบบจับเวลาและคิดต้นทุนรายคัน · หยุดงานแจ้งแผนกที่เกี่ยวข้องทันที · จอทีวีหน้างาน · % เบิกวัสดุคำนวณจากใบเบิกจริง", check: "% เบิกวัสดุไม่ตรงกับใบเบิก", view: "workorder", count: function () { var today = new Date().toISOString().slice(0, 10); return wos.filter(function (w) { return w.status !== "เสร็จสมบูรณ์" && w.status !== "ยกเลิก" && w.dueIso && w.dueIso < today; }).length + " ใบสั่งผลิตเลยกำหนดส่ง"; } },
     { id: "qc", name: "คุณภาพ", who: "QC", docs: ["IQC ตรวจรับ", "FI ก่อนส่งมอบ", "NCR", "CAPA"], does: "ตรวจรับวัตถุดิบ ตรวจก่อนส่งมอบรายเครื่อง · NCR ผูกกับชิ้นส่วน ใบสั่งผลิต และงานเคลม", check: "เคลมจากสาเหตุภายในที่ยังไม่มี NCR/CAPA/ECR", view: "dept", count: function () { return open("ncr", ["ปิดแล้ว"]) + " NCR ที่ยังเปิด"; } },
     { id: "svc", name: "ส่งมอบ & บริการ", who: "ฝ่ายขาย · ช่างบริการ", docs: ["MC ทะเบียนเครื่อง", "SV งานบริการ", "เคลม"], does: "ทะเบียนเครื่องจำ BOM Rev. ที่ส่งมอบและวันหมดประกัน · ช่างเบิกอะไหล่ตาม BOM ของเครื่อง · เคลมต่อกับผู้ขาย · อะไหล่ที่เปลี่ยนบ่อยส่งกลับเป็น ECR", check: "งานบริการที่ไม่มีเครื่องในทะเบียน, เคลมนอกประกัน", view: "service", count: function () { return n("svc") + " งานบริการ · " + (docs.svc || []).filter(function (d) { return d.kind === "เคลมประกัน" || d.claimCause; }).length + " เคลม"; } },
   ];
@@ -381,7 +386,7 @@
     { name: "จัดซื้อ", desc: "PR → PO → ผู้ขาย และของที่ต้องสั่งเพิ่ม", abilities: [] },
     { name: "ผู้บริหาร / ผู้ดูรายงาน", desc: "ดูภาพรวม รายงาน และกิจกรรมทั้งระบบ", abilities: ["reports"] },
   ];
-  var ABL = { request: "สั่งเบิก", approve: "อนุมัติเบิก", issue: "จ่ายของ", stock: "ปรับคงคลัง", reports: "รายงานกิจกรรม" };
+  var ABL = { request: "สั่งเบิก", approve: "อนุมัติเบิก", issue: "จ่ายของ", stock: "ปรับคงคลัง", reports: "รายงานกิจกรรม", cost: "ดูต้นทุน" };
   document.getElementById("cxGroups").innerHTML = groups.map(function (g) {
     return "<tr><td><b>" + esc(g.name) + "</b></td><td>" + esc(g.desc || "") + "</td><td>" + ((g.abilities || []).map(function (a) { return '<span class="cx-doc">' + esc(ABL[a] || a) + "</span>"; }).join(" ") || "—") + "</td></tr>";
   }).join("");
