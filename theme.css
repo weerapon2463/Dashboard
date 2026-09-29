@@ -623,3 +623,6 @@ tr.wo-group-row td { background: color-mix(in srgb, var(--accent, #f2a60d) 10%, 
 .og-imp textarea { width: 100%; min-width: 220px; font: inherit; }
 
 tr.sup-best td { background: color-mix(in srgb, var(--txt-good, #067647) 12%, transparent); }
+
+.mob-pick { grid-column: 1 / -1; }
+.mob-pick input { width: 100%; }

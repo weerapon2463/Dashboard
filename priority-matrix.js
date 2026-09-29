@@ -82,7 +82,7 @@ function populatePriorityDeptFilter() {
   const select = document.getElementById("priorityDeptFilter");
   if (!select) return;
   const previous = select.value;
-  const depts = Array.from(new Set(PRIORITY_JOBS.map((j) => j.department))).sort();
+  const depts = Array.from(new Set(pmAllJobs().map((j) => j.department).filter(Boolean))).sort();
   select.innerHTML = "";
   const allOpt = document.createElement("option");
   allOpt.value = "__all__";
@@ -98,6 +98,46 @@ function populatePriorityDeptFilter() {
   select.addEventListener("change", () => renderPriorityMatrix());
 }
 
+// Items the system already knows are urgent — scored from real data, refreshed every time (30 ก.ย.)
+//   work orders: urgency from days to the due date, impact higher for a customer order / a stopped step
+//   job cards stopped now · open NCRs by age · purchases late (worse when a work order waits on them)
+function pmAutoJobs() {
+  const out = [];
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const days = (iso) => iso ? Math.round((Date.parse(iso + "T00:00:00") - today.getTime()) / 86400000) : null;
+  const clamp = (n) => Math.max(1, Math.min(10, n));
+  (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []).forEach((w) => {
+    if (w.status === "เสร็จสมบูรณ์" || w.status === "ยกเลิก") return;
+    const d = days(w.dueIso);
+    const stopped = (w.jobs || []).some((j) => j.status === "hold");
+    let urg = d === null ? 3 : d < 0 ? 10 : d <= 3 ? 9 : d <= 7 ? 8 : d <= 14 ? 6 : d <= 30 ? 4 : 2;
+    let imp = w.so || (w.po && w.po !== "สต็อก") ? 8 : 5;
+    if (stopped) { urg += 1; imp += 1; }
+    out.push({ auto: true, name: `${w.wo} ${w.serial || ""} — ${d === null ? "ไม่มีกำหนดส่ง" : d < 0 ? `เลยกำหนดส่ง ${-d} วัน` : `ส่งใน ${d} วัน`}${stopped ? " · มีขั้นตอนหยุดอยู่" : ""}`, model: w.model, department: w.department || "ฝ่ายผลิต", urgency: clamp(urg), impact: clamp(imp), go: { view: "workorder", hist: w.wo } });
+    (w.jobs || []).forEach((j) => (j.downs || []).filter((x) => !x.to).forEach((x) => out.push({ auto: true, name: `หยุดงาน: ${x.reason} — ${w.wo} ${j.station}`, model: w.model, department: w.department || "ฝ่ายผลิต", urgency: 9, impact: 8, go: { view: "workorder", hist: w.wo } })));
+  });
+  const ncrDef = typeof DOC_TYPES !== "undefined" && DOC_TYPES.ncr;
+  ((typeof DEPT_DOCS !== "undefined" && DEPT_DOCS.ncr) || []).forEach((d) => {
+    if ((ncrDef && (ncrDef.closed || []).includes(d.status)) || /ปิด|ยกเลิก/.test(d.status || "")) return;
+    const age = d.date ? -days(d.date) : 0;
+    out.push({ auto: true, name: `${d.no} ${d.title || ""} (${d.status})`, model: d.model || "", department: "ฝ่าย QC/ตรวจสอบคุณภาพ", urgency: clamp(age > 14 ? 8 : age > 7 ? 6 : 5), impact: 7, go: { doc: d.no } });
+  });
+  (typeof P2P_CASES !== "undefined" ? P2P_CASES : []).forEach((c) => {
+    if (typeof p2pState !== "function" || p2pState(c) !== "late") return;
+    out.push({ auto: true, name: `${c.pr} ${String(c.item || "").slice(0, 40)} — ค้าง${(p2pCurrent(c) || {}).label || ""}`, model: "", department: "ฝ่ายจัดซื้อ", urgency: c.wo ? 8 : 6, impact: c.wo ? 8 : 5, go: { view: "p2p", p2p: c.id } });
+  });
+  return out;
+}
+// the "items from the system" switch beside the department filter
+function pmAutoToggle() {
+  const sel = document.getElementById("priorityDeptFilter");
+  if (!sel || document.getElementById("pmAuto")) return;
+  sel.insertAdjacentHTML("afterend", ` <label class="vis-opt"><input type="checkbox" id="pmAuto"${pmShowAuto ? " checked" : ""}> รวมงานจากระบบ (ใบสั่งผลิต · งานหยุด · NCR · จัดซื้อล่าช้า)</label>`);
+  document.getElementById("pmAuto").addEventListener("change", (e) => { pmShowAuto = e.target.checked; renderPriorityMatrix(); });
+}
+function pmAllJobs() { return PRIORITY_JOBS.concat(pmShowAuto ? pmAutoJobs() : []); }
+let pmShowAuto = true;
+
 function currentPriorityDept() {
   const select = document.getElementById("priorityDeptFilter");
   return select ? select.value : "__all__";
@@ -108,12 +148,14 @@ function renderPriorityMatrix() {
   if (!canvas) return;
 
   const dept = currentPriorityDept();
-  const jobs = dept && dept !== "__all__" ? PRIORITY_JOBS.filter((j) => j.department === dept) : PRIORITY_JOBS;
+  const all = pmAllJobs();
+  const jobs = dept && dept !== "__all__" ? all.filter((j) => j.department === dept) : all;
+  pmAutoToggle();
 
   const byQuadrant = { doFirst: [], schedule: [], delegate: [], eliminate: [] };
   jobs.forEach((job) => {
     const q = classifyQuadrant(job.urgency, job.impact);
-    byQuadrant[q].push({ x: job.urgency, y: job.impact, label: job.name, model: job.model, department: job.department });
+    byQuadrant[q].push({ x: job.urgency, y: job.impact, label: `${job.auto ? "🤖 " : ""}${job.name}`, model: job.model, department: job.department });
   });
 
   const colorMap = {
@@ -214,17 +256,24 @@ function renderPriorityTable(jobs) {
       const realIndex = PRIORITY_JOBS.indexOf(job);
       const tr = document.createElement("tr");
       tr.innerHTML = `
-        <td>${escapeHtml(job.name)}</td>
+        <td>${job.auto ? '<span class="pill pill-schedule" title="ระบบคำนวณจากข้อมูลจริง">จากระบบ</span> ' : ""}${escapeHtml(job.name)}</td>
         <td>${escapeHtml(job.model)}</td>
         <td>${escapeHtml(job.department)}</td>
         <td>${job.urgency}</td>
         <td>${job.impact}</td>
         <td><span class="pill ${meta.pillClass}">${meta.label}</span></td>
-        <td>${canEdit ? `<button class="btn-chip" data-action="edit" data-index="${realIndex}">แก้ไข</button>` : "—"}</td>
+        <td>${job.auto ? `<button class="btn-chip" data-pmgo="${escapeHtml(JSON.stringify(job.go))}">เปิด</button>` : canEdit ? `<button class="btn-chip" data-action="edit" data-index="${realIndex}">แก้ไข</button>` : "—"}</td>
       `;
       tbody.appendChild(tr);
     });
 
+  tbody.querySelectorAll("[data-pmgo]").forEach((b) => b.addEventListener("click", () => {
+    const g = JSON.parse(b.dataset.pmgo);
+    if (g.doc && typeof openDocViewByNo === "function") return openDocViewByNo(g.doc);
+    if (g.hist && typeof snOpenHistory === "function") return snOpenHistory(g.hist);
+    if (g.p2p) { switchView("p2p"); if (typeof openP2PCase === "function") openP2PCase(g.p2p); return; }
+    if (g.view) switchView(g.view);
+  }));
   if (canEdit) {
     tbody.querySelectorAll("[data-action='edit']").forEach((btn) => {
       btn.addEventListener("click", () => openPriorityModal(Number(btn.getAttribute("data-index"))));
@@ -234,7 +283,7 @@ function renderPriorityTable(jobs) {
 
 function updatePriorityStat() {
   // สถิติในหน้าภาพรวมนับจากงานทั้งหมดของทุกแผนก ไม่ผูกกับตัวกรองแผนกในหน้า Priority Matrix
-  const count = PRIORITY_JOBS.filter((j) => classifyQuadrant(j.urgency, j.impact) === "doFirst").length;
+  const count = pmAllJobs().filter((j) => classifyQuadrant(j.urgency, j.impact) === "doFirst").length;
   const el = document.getElementById("statDoFirst");
   if (el) el.textContent = count;
 }
