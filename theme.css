@@ -578,3 +578,10 @@ tr.st-var td { background: color-mix(in srgb, var(--txt-warn, #b54708) 8%, trans
 @media (min-width: 900px) { #view-schedule .gantt-row, #view-schedule .gantt-header { grid-template-columns: 310px 1fr; } .ms-lot .gantt-row-label small.ms-cust { max-width: 210px; } }
 #view-schedule .gantt-row-label small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #view-schedule .gantt-row-label small.ms-actual { white-space: normal; }
+
+/* work orders: grouped by sales order, production progress */
+tr.wo-group-row td { background: color-mix(in srgb, var(--accent, #f2a60d) 10%, transparent); font-size: 13px; padding-top: 10px; padding-bottom: 8px; }
+.wo-steps { display: flex; align-items: center; gap: 8px; }
+.wo-steps-bar { width: 90px; height: 8px; border-radius: 4px; background: var(--gridline, #d0d5dd); overflow: hidden; }
+.wo-steps-bar span { display: block; height: 100%; background: var(--txt-good, #067647); }
+.wo-late-txt { color: var(--txt-bad, #b42318); }

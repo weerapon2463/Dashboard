@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=20260929k">
-<link rel="stylesheet" href="theme.css?v=20260929k">
-<link rel="stylesheet" href="tv.css?v=20260929k">
+<link rel="stylesheet" href="style.css?v=20260930a">
+<link rel="stylesheet" href="theme.css?v=20260930a">
+<link rel="stylesheet" href="tv.css?v=20260930a">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -1113,7 +1113,7 @@
           <div class="stat-tile">
             <div class="stat-label">ใบสั่งผลิตทั้งหมด</div>
             <div class="stat-value" id="woStatTotal">-</div>
-            <div class="stat-note">โปรเจกต์ที่กำลังติดตาม</div>
+            <div class="stat-note">1 ใบ = 1 คัน</div>
           </div>
           <div class="stat-tile">
             <div class="stat-label">ใบสั่งผลิตล่าช้า</div>
@@ -1130,8 +1130,8 @@
         <div class="card">
           <div class="card-header wo-card-header">
             <div>
-              <h3>ใบสั่งผลิต (Work Orders) — จัดกลุ่มเป็นโปรเจกต์ตามใบสั่งซื้อ (PO)</h3>
-              <p class="card-sub">แต่ละใบสั่งผลิตอ้างอิงกับ PO ในโมดูลจัดซื้อ เพื่อติดตามได้ว่าโปรเจกต์ไหนรออะไหล่จาก PO ใด — รับงาน อัปเดตความคืบหน้า และเพิ่มใบสั่งผลิตใหม่ได้ตามสิทธิ์ของแต่ละบทบาท</p>
+              <h3>ใบสั่งผลิต (Work Orders) — 1 ใบ = 1 คัน จัดกลุ่มตามคำสั่งซื้อลูกค้า (SO)</h3>
+              <p class="card-sub">ขั้นตอนผลิตนับจาก Job Card จริง (เสร็จกี่ขั้น · ตอนนี้อยู่สถานีไหน ใครทำ) · % เบิกวัสดุนับจากใบเบิก · "ล่าช้า" คิดจากกำหนดส่งเทียบวันนี้ · กดเลขที่ใบสั่งผลิตเพื่อดูประวัติรายคัน</p>
             </div>
             <button id="woAddBtn" class="btn-primary" type="button" hidden>+ เพิ่มใบสั่งผลิตใหม่</button>
           </div>
@@ -1141,14 +1141,14 @@
               <label for="woLineFilter">แผนก/ไลน์ผลิต:</label>
               <select id="woLineFilter"></select>
               <label for="woSearchInput">ค้นหา:</label>
-              <input type="text" id="woSearchInput" class="wo-search" placeholder="เลขที่ใบสั่งผลิต / รุ่น / PO / ผู้รับผิดชอบ">
+              <input type="text" id="woSearchInput" class="wo-search" placeholder="เลขที่ / เลขเครื่อง / รุ่น / SO / ลูกค้า / ผู้รับผิดชอบ">
               <button id="woExportBtn" class="btn-secondary" type="button">ส่งออก CSV</button>
             </div>
             <table class="data-table" id="woTable">
               <thead>
                 <tr>
                   <th>เลขที่ใบสั่งผลิต</th>
-                  <th>อ้างอิง PO</th>
+                  <th>ขั้นตอนผลิต (Job Card)</th>
                   <th>รุ่นเครื่องจักร</th>
                   <th>แผนก/ไลน์ผลิต</th>
                   <th>คัน</th>
@@ -1238,7 +1238,7 @@
     <div class="modal">
       <h3>เพิ่มใบสั่งผลิตใหม่</h3>
       <div class="form-field">
-        <label for="woFormPo">อ้างอิง PO</label>
+        <label for="woFormPo">คำสั่งซื้อ (SO) / สต็อก</label>
         <input type="text" id="woFormPo" placeholder="เช่น PO-2026-0330">
       </div>
       <div class="form-field">
@@ -1708,53 +1708,53 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260929k"></script>
-  <script src="data.js?v=20260929k"></script>
-  <script src="partcode.js?v=20260929k"></script>
-  <script src="priority-matrix.js?v=20260929k"></script>
-  <script src="capacity-planning.js?v=20260929k"></script>
-  <script src="master-schedule.js?v=20260929k"></script>
-  <script src="make-or-buy.js?v=20260929k"></script>
-  <script src="resource.js?v=20260929k"></script>
-  <script src="procurement.js?v=20260929k"></script>
-  <script src="workorder.js?v=20260929k"></script>
-  <script src="jobcard.js?v=20260929k"></script>
-  <script src="alerts.js?v=20260929k"></script>
-  <script src="overview-charts.js?v=20260929k"></script>
-  <script src="pilot.js?v=20260929k"></script>
-  <script src="pilot-measure.js?v=20260929k"></script>
-  <script src="pilot-timer.js?v=20260929k"></script>
-  <script src="dept-data.js?v=20260929k"></script>
-  <script src="workflow.js?v=20260929k"></script>
-  <script src="dept-samples.js?v=20260929k"></script>
-  <script src="org.js?v=20260929k"></script>
-  <script src="dept.js?v=20260929k"></script>
-  <script src="bom.js?v=20260929k"></script>
-  <script src="bomx.js?v=20260929k"></script>
-  <script src="stockx.js?v=20260929k"></script>
-  <script src="stockops.js?v=20260929k"></script>
-  <script src="naming.js?v=20260929k"></script>
-  <script src="tv.js?v=20260929k"></script>
-  <script src="serial.js?v=20260929k"></script>
-  <script src="mytasks.js?v=20260929k"></script>
-  <script src="bomsheet.js?v=20260929k"></script>
-  <script src="service.js?v=20260929k"></script>
-  <script src="reports.js?v=20260929k"></script>
-  <script src="integrity.js?v=20260929k"></script>
-  <script src="overview.js?v=20260929k"></script>
-  <script src="rnd.js?v=20260929k"></script>
-  <script src="docview.js?v=20260929k"></script>
-  <script src="esign.js?v=20260929k"></script>
-  <script src="p2p-data.js?v=20260929k"></script>
-  <script src="p2p.js?v=20260929k"></script>
-  <script src="suppliers.js?v=20260929k"></script>
-  <script src="auth.js?v=20260929k"></script>
-  <script src="admin.js?v=20260929k"></script>
-  <script src="plans.js?v=20260929k"></script>
-  <script src="approval.js?v=20260929k"></script>
-  <script src="loginadmin.js?v=20260929k"></script>
-  <script src="glossary.js?v=20260929k"></script>
-  <script src="floor.js?v=20260929k"></script>
-  <script src="app.js?v=20260929k"></script>
+  <script src="storage.js?v=20260930a"></script>
+  <script src="data.js?v=20260930a"></script>
+  <script src="partcode.js?v=20260930a"></script>
+  <script src="priority-matrix.js?v=20260930a"></script>
+  <script src="capacity-planning.js?v=20260930a"></script>
+  <script src="master-schedule.js?v=20260930a"></script>
+  <script src="make-or-buy.js?v=20260930a"></script>
+  <script src="resource.js?v=20260930a"></script>
+  <script src="procurement.js?v=20260930a"></script>
+  <script src="workorder.js?v=20260930a"></script>
+  <script src="jobcard.js?v=20260930a"></script>
+  <script src="alerts.js?v=20260930a"></script>
+  <script src="overview-charts.js?v=20260930a"></script>
+  <script src="pilot.js?v=20260930a"></script>
+  <script src="pilot-measure.js?v=20260930a"></script>
+  <script src="pilot-timer.js?v=20260930a"></script>
+  <script src="dept-data.js?v=20260930a"></script>
+  <script src="workflow.js?v=20260930a"></script>
+  <script src="dept-samples.js?v=20260930a"></script>
+  <script src="org.js?v=20260930a"></script>
+  <script src="dept.js?v=20260930a"></script>
+  <script src="bom.js?v=20260930a"></script>
+  <script src="bomx.js?v=20260930a"></script>
+  <script src="stockx.js?v=20260930a"></script>
+  <script src="stockops.js?v=20260930a"></script>
+  <script src="naming.js?v=20260930a"></script>
+  <script src="tv.js?v=20260930a"></script>
+  <script src="serial.js?v=20260930a"></script>
+  <script src="mytasks.js?v=20260930a"></script>
+  <script src="bomsheet.js?v=20260930a"></script>
+  <script src="service.js?v=20260930a"></script>
+  <script src="reports.js?v=20260930a"></script>
+  <script src="integrity.js?v=20260930a"></script>
+  <script src="overview.js?v=20260930a"></script>
+  <script src="rnd.js?v=20260930a"></script>
+  <script src="docview.js?v=20260930a"></script>
+  <script src="esign.js?v=20260930a"></script>
+  <script src="p2p-data.js?v=20260930a"></script>
+  <script src="p2p.js?v=20260930a"></script>
+  <script src="suppliers.js?v=20260930a"></script>
+  <script src="auth.js?v=20260930a"></script>
+  <script src="admin.js?v=20260930a"></script>
+  <script src="plans.js?v=20260930a"></script>
+  <script src="approval.js?v=20260930a"></script>
+  <script src="loginadmin.js?v=20260930a"></script>
+  <script src="glossary.js?v=20260930a"></script>
+  <script src="floor.js?v=20260930a"></script>
+  <script src="app.js?v=20260930a"></script>
 </body>
 </html>

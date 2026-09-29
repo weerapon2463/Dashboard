@@ -172,8 +172,50 @@ function populateWOLineFilter() {
 
 function woMatchesSearch(wo, term) {
   if (!term) return true;
-  const haystack = [wo.wo, wo.po, wo.model, wo.department, wo.assignee || ""].join(" ").toLowerCase();
+  const haystack = [wo.wo, wo.serial, wo.po, wo.so, wo.customer, wo.model, wo.department, wo.assignee || ""].join(" ").toLowerCase();
   return haystack.includes(term);
+}
+
+// late = not finished and the due date has passed (worked out, not typed in)
+function woIsLate(w) {
+  if (!w || w.status === "เสร็จสมบูรณ์" || w.status === "ยกเลิก") return false;
+  const due = w.dueIso || "";
+  return !!due && due < new Date().toISOString().slice(0, 10);
+}
+// production progress from the job cards: steps done, and where the machine is now and who has it
+function woStepsCell(wo) {
+  const jobs = wo.jobs || [];
+  if (!jobs.length) return `<span class="muted-inline">ยังไม่มี Job Card</span>`;
+  const done = jobs.filter((j) => j.status === "done").length;
+  const now = jobs.find((j) => (j.logs || []).some((l) => !l.to)) || jobs.find((j) => j.status === "hold") || jobs.find((j) => j.status !== "done");
+  const pct = Math.round((done / jobs.length) * 100);
+  const down = now && now.status === "hold" ? ((now.downs || []).filter((d) => !d.to).pop() || {}).reason : "";
+  const where = done === jobs.length ? "ครบทุกขั้น" : now ? `${now.station}${now.assignee ? ` · ${now.assignee}` : ""}${now.status === "hold" ? ` · หยุด${down ? `: ${down}` : ""}` : (now.logs || []).some((l) => !l.to) ? " · กำลังทำ" : " · รอเริ่ม"}` : "";
+  return `<div class="wo-steps"><div class="wo-steps-bar"><span style="width:${pct}%"></span></div><b>${done}/${jobs.length}</b></div><div class="muted-inline${now && now.status === "hold" ? " wo-late-txt" : ""}">${escapeHtml(where)}</div>`;
+}
+function woRow(wo, role) {
+  const late = woIsLate(wo);
+  const status = late && wo.status !== "วางแผน" ? "ล่าช้า" : wo.status === "ล่าช้า" ? "กำลังผลิต" : wo.status;
+  const pillClass = WO_STATUS_META[status] || "pill-good";
+  const tr = document.createElement("tr");
+  const canClaim = woCanClaimOrUpdate(role) && wo.status === "วางแผน";
+  const canUpdate = woCanClaimOrUpdate(role) && (wo.status === "กำลังผลิต" || wo.status === "ล่าช้า");
+  let actions = "";
+  if (canClaim) actions += `<button class="btn-chip" data-action="claim" data-wo="${escapeHtml(wo.wo)}">รับงาน</button>`;
+  if (canUpdate) actions += `<button class="btn-chip" data-action="update" data-wo="${escapeHtml(wo.wo)}">อัปเดต</button>`;
+  tr.innerHTML = `
+    <td><button type="button" class="bx-link" data-hist="${escapeHtml(wo.wo)}" title="ประวัติรายคัน">${escapeHtml(wo.wo)}</button>${wo.serial ? `<div class="muted-inline mono-cell">${escapeHtml(wo.serial)}</div>` : ""}</td>
+    <td>${woStepsCell(wo)}</td>
+    <td>${escapeHtml(wo.model)}</td>
+    <td>${escapeHtml(wo.department)}</td>
+    <td>${wo.qty}</td>
+    <td>${wo.issuedPct}%</td>
+    <td${late ? ' class="wo-late-txt"' : ""}>${escapeHtml(wo.dueDate)}${late ? `<div class="muted-inline">เลยมา ${Math.round((Date.now() - Date.parse(wo.dueIso)) / 86400000)} วัน</div>` : ""}</td>
+    <td><span class="pill ${pillClass}">${escapeHtml(status)}</span></td>
+    <td>${wo.assignee ? escapeHtml(wo.assignee) : `<span class="wo-late-txt">ยังไม่มี</span>`}</td>
+    <td class="wo-actions-cell">${actions || "—"}</td>
+  `;
+  return tr;
 }
 
 function renderWOTable(lineFilter) {
@@ -193,27 +235,20 @@ function renderWOTable(lineFilter) {
     return;
   }
 
-  list.forEach((wo) => {
-    const pillClass = WO_STATUS_META[wo.status] || "pill-good";
-    const tr = document.createElement("tr");
-    const canClaim = woCanClaimOrUpdate(role) && wo.status === "วางแผน";
-    const canUpdate = woCanClaimOrUpdate(role) && (wo.status === "กำลังผลิต" || wo.status === "ล่าช้า");
-    let actions = "";
-    if (canClaim) actions += `<button class="btn-chip" data-action="claim" data-wo="${escapeHtml(wo.wo)}">รับงาน</button>`;
-    if (canUpdate) actions += `<button class="btn-chip" data-action="update" data-wo="${escapeHtml(wo.wo)}">อัปเดต</button>`;
-    tr.innerHTML = `
-      <td><button type="button" class="bx-link" data-hist="${escapeHtml(wo.wo)}" title="ประวัติรายคัน">${escapeHtml(wo.wo)}</button>${wo.serial ? `<div class="muted-inline mono-cell">${escapeHtml(wo.serial)}</div>` : ""}</td>
-      <td>${escapeHtml(wo.po)}</td>
-      <td>${escapeHtml(wo.model)}</td>
-      <td>${escapeHtml(wo.department)}</td>
-      <td>${wo.qty}</td>
-      <td>${wo.issuedPct}%</td>
-      <td>${escapeHtml(wo.dueDate)}</td>
-      <td><span class="pill ${pillClass}">${escapeHtml(wo.status)}</span></td>
-      <td>${wo.assignee ? escapeHtml(wo.assignee) : "—"}</td>
-      <td class="wo-actions-cell">${actions || "—"}</td>
-    `;
-    tbody.appendChild(tr);
+  // grouped by sales order (1 work order = 1 machine); machines built for stock go last
+  const groups = new Map();
+  list.forEach((wo) => { const k = wo.so || wo.po || "สต็อก"; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(wo); });
+  const keys = [...groups.keys()].sort((x, y) => (x === "สต็อก") - (y === "สต็อก") || x.localeCompare(y));
+  keys.forEach((k) => {
+    const ws = groups.get(k);
+    const fin = ws.filter((w) => w.status === "เสร็จสมบูรณ์").length;
+    const late = ws.filter(woIsLate).length;
+    const cust = (ws.find((w) => w.customer) || {}).customer || "";
+    const g = document.createElement("tr");
+    g.className = "wo-group-row";
+    g.innerHTML = `<td colspan="10"><b>${escapeHtml(k === "สต็อก" ? "ผลิตเข้าสต็อก (ไม่มีคำสั่งซื้อ)" : k)}</b>${cust ? ` · ${escapeHtml(cust)}` : ""} · ${ws.length} คัน · เสร็จ ${fin}${late ? ` · <span class="wo-late-txt">เลยกำหนด ${late}</span>` : ""}</td>`;
+    tbody.appendChild(g);
+    ws.forEach((wo) => tbody.appendChild(woRow(wo, role)));
   });
 
   tbody.querySelectorAll("[data-hist]").forEach((b) => b.addEventListener("click", () => { if (typeof snOpenHistory === "function") snOpenHistory(b.dataset.hist); }));
@@ -310,7 +345,7 @@ function renderIssuanceTable() {
 
 function updateWorkOrderStats() {
   // สถิติในหน้าภาพรวมนับจากใบสั่งผลิตทั้งหมดของทุกไลน์ ไม่ผูกกับตัวกรองแผนกในตาราง
-  const lateCount = WORK_ORDERS.filter((w) => w.status === "ล่าช้า").length;
+  const lateCount = WORK_ORDERS.filter(woIsLate).length;
   const avgIssuedPct = WORK_ORDERS.length ? Math.round(WORK_ORDERS.reduce((s, w) => s + (Number(w.issuedPct) || 0), 0) / WORK_ORDERS.length) : 0;
 
   const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
