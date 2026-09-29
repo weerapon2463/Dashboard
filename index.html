@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=20260930e">
-<link rel="stylesheet" href="theme.css?v=20260930e">
-<link rel="stylesheet" href="tv.css?v=20260930e">
+<link rel="stylesheet" href="style.css?v=20260930f">
+<link rel="stylesheet" href="theme.css?v=20260930f">
+<link rel="stylesheet" href="tv.css?v=20260930f">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -481,12 +481,13 @@
               <button type="button" class="dept-tab admin-tab" data-tab="audit">ประวัติการใช้งาน (Audit Log)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="org">🏢 องค์กร (บริษัท / ฝ่าย / โลโก้)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="workflow">⚙ ขั้นตอนการทำงาน (Workflow)</button>
+              <button type="button" class="dept-tab admin-tab" data-tab="orgchart">🏢 ผังองค์กร</button>
               <button type="button" class="dept-tab admin-tab" data-tab="logins">🔑 การเข้าสู่ระบบ &amp; รหัสผ่าน</button>
               <button type="button" class="dept-tab admin-tab" data-tab="levels">🪜 ลำดับขั้น &amp; การอนุมัติ</button>
               <button type="button" class="dept-tab admin-tab" data-tab="naming">เลขที่เอกสาร (Naming Series)</button>
               <button type="button" class="dept-tab admin-tab" data-tab="storage">☁ ที่เก็บข้อมูล</button>
             </div>
-            <p class="admin-note">ข้อมูลใช้ร่วมกันทุกเครื่องเมื่อเชื่อม Google Sheets (แท็บ "ที่เก็บข้อมูล") · การเข้าสู่ระบบด้วย PIN เป็นระดับแอป — ถ้าต้องการความปลอดภัยระดับองค์กร ขั้นต่อไปคือเข้าสู่ระบบด้วยบัญชี Google ของบริษัท</p>
+            <p class="admin-note">ข้อมูลใช้ร่วมกันทุกเครื่องเมื่อเชื่อม Google Sheets (แท็บ "ที่เก็บข้อมูล") · เข้าสู่ระบบด้วยรหัสพนักงาน/ชื่อผู้ใช้ + รหัสผ่านของแต่ละคน (เข้ารหัส) · ขั้นต่อไป: เข้าสู่ระบบด้วยบัญชี Google ขององค์กร</p>
 
             <div class="admin-panel" data-panel="users">
               <div class="filter-row"><button id="adminAddUserBtn" class="btn-primary" type="button">+ เพิ่มผู้ใช้</button></div>
@@ -579,6 +580,7 @@
               <p class="admin-note">ใน Sheets จะมีแท็บอ่านง่ายให้ดูและทำรายงาน: เอกสาร · จัดซื้อ · ผู้ใช้ · ประวัติ · แผนงาน · Pilot · ใบสั่งผลิต (สร้างใหม่ทุกครั้งที่บันทึก — แก้ข้อมูลที่ Dashboard) · ไฟล์แนบเก็บในโฟลเดอร์ Google Drive · ข้อมูลเครื่องนี้ยังเก็บสำเนาไว้เผื่อเน็ตหลุด</p>
             </div>
             <div class="admin-panel" data-panel="workflow" hidden><div id="workflowPanel"></div></div>
+            <div class="admin-panel" data-panel="orgchart" hidden><div id="orgChartPanel"></div></div>
             <div class="admin-panel" data-panel="logins" hidden><div id="loginsPanel"></div></div>
             <div class="admin-panel" data-panel="levels" hidden><div id="levelsPanel"></div></div>
             <div class="admin-panel" data-panel="naming" hidden><div id="namingPanel"></div></div>
@@ -1709,53 +1711,54 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260930e"></script>
-  <script src="data.js?v=20260930e"></script>
-  <script src="partcode.js?v=20260930e"></script>
-  <script src="priority-matrix.js?v=20260930e"></script>
-  <script src="capacity-planning.js?v=20260930e"></script>
-  <script src="master-schedule.js?v=20260930e"></script>
-  <script src="make-or-buy.js?v=20260930e"></script>
-  <script src="resource.js?v=20260930e"></script>
-  <script src="procurement.js?v=20260930e"></script>
-  <script src="workorder.js?v=20260930e"></script>
-  <script src="jobcard.js?v=20260930e"></script>
-  <script src="alerts.js?v=20260930e"></script>
-  <script src="overview-charts.js?v=20260930e"></script>
-  <script src="pilot.js?v=20260930e"></script>
-  <script src="pilot-measure.js?v=20260930e"></script>
-  <script src="pilot-timer.js?v=20260930e"></script>
-  <script src="dept-data.js?v=20260930e"></script>
-  <script src="workflow.js?v=20260930e"></script>
-  <script src="dept-samples.js?v=20260930e"></script>
-  <script src="org.js?v=20260930e"></script>
-  <script src="dept.js?v=20260930e"></script>
-  <script src="bom.js?v=20260930e"></script>
-  <script src="bomx.js?v=20260930e"></script>
-  <script src="stockx.js?v=20260930e"></script>
-  <script src="stockops.js?v=20260930e"></script>
-  <script src="naming.js?v=20260930e"></script>
-  <script src="tv.js?v=20260930e"></script>
-  <script src="serial.js?v=20260930e"></script>
-  <script src="mytasks.js?v=20260930e"></script>
-  <script src="bomsheet.js?v=20260930e"></script>
-  <script src="service.js?v=20260930e"></script>
-  <script src="reports.js?v=20260930e"></script>
-  <script src="integrity.js?v=20260930e"></script>
-  <script src="overview.js?v=20260930e"></script>
-  <script src="rnd.js?v=20260930e"></script>
-  <script src="docview.js?v=20260930e"></script>
-  <script src="esign.js?v=20260930e"></script>
-  <script src="p2p-data.js?v=20260930e"></script>
-  <script src="p2p.js?v=20260930e"></script>
-  <script src="suppliers.js?v=20260930e"></script>
-  <script src="auth.js?v=20260930e"></script>
-  <script src="admin.js?v=20260930e"></script>
-  <script src="plans.js?v=20260930e"></script>
-  <script src="approval.js?v=20260930e"></script>
-  <script src="loginadmin.js?v=20260930e"></script>
-  <script src="glossary.js?v=20260930e"></script>
-  <script src="floor.js?v=20260930e"></script>
-  <script src="app.js?v=20260930e"></script>
+  <script src="storage.js?v=20260930f"></script>
+  <script src="data.js?v=20260930f"></script>
+  <script src="partcode.js?v=20260930f"></script>
+  <script src="priority-matrix.js?v=20260930f"></script>
+  <script src="capacity-planning.js?v=20260930f"></script>
+  <script src="master-schedule.js?v=20260930f"></script>
+  <script src="make-or-buy.js?v=20260930f"></script>
+  <script src="resource.js?v=20260930f"></script>
+  <script src="procurement.js?v=20260930f"></script>
+  <script src="workorder.js?v=20260930f"></script>
+  <script src="jobcard.js?v=20260930f"></script>
+  <script src="alerts.js?v=20260930f"></script>
+  <script src="overview-charts.js?v=20260930f"></script>
+  <script src="pilot.js?v=20260930f"></script>
+  <script src="pilot-measure.js?v=20260930f"></script>
+  <script src="pilot-timer.js?v=20260930f"></script>
+  <script src="dept-data.js?v=20260930f"></script>
+  <script src="workflow.js?v=20260930f"></script>
+  <script src="dept-samples.js?v=20260930f"></script>
+  <script src="org.js?v=20260930f"></script>
+  <script src="dept.js?v=20260930f"></script>
+  <script src="bom.js?v=20260930f"></script>
+  <script src="bomx.js?v=20260930f"></script>
+  <script src="stockx.js?v=20260930f"></script>
+  <script src="stockops.js?v=20260930f"></script>
+  <script src="naming.js?v=20260930f"></script>
+  <script src="tv.js?v=20260930f"></script>
+  <script src="serial.js?v=20260930f"></script>
+  <script src="mytasks.js?v=20260930f"></script>
+  <script src="bomsheet.js?v=20260930f"></script>
+  <script src="service.js?v=20260930f"></script>
+  <script src="reports.js?v=20260930f"></script>
+  <script src="integrity.js?v=20260930f"></script>
+  <script src="overview.js?v=20260930f"></script>
+  <script src="rnd.js?v=20260930f"></script>
+  <script src="docview.js?v=20260930f"></script>
+  <script src="esign.js?v=20260930f"></script>
+  <script src="p2p-data.js?v=20260930f"></script>
+  <script src="p2p.js?v=20260930f"></script>
+  <script src="suppliers.js?v=20260930f"></script>
+  <script src="auth.js?v=20260930f"></script>
+  <script src="admin.js?v=20260930f"></script>
+  <script src="plans.js?v=20260930f"></script>
+  <script src="approval.js?v=20260930f"></script>
+  <script src="loginadmin.js?v=20260930f"></script>
+  <script src="orgchart.js?v=20260930f"></script>
+  <script src="glossary.js?v=20260930f"></script>
+  <script src="floor.js?v=20260930f"></script>
+  <script src="app.js?v=20260930f"></script>
 </body>
 </html>

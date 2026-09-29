@@ -9,5 +9,6 @@
   ["sign", ["u-demo-admin"]],
   ["store", ["u-demo-admin"]],
   ["logins", ["u-demo-admin"]],
-  ["overview", ["u-demo-admin"]]
+  ["overview", ["u-demo-admin"]],
+  ["orgchart", ["u-demo-admin"]]
 ]

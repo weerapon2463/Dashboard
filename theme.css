@@ -599,3 +599,25 @@ tr.wo-group-row td { background: color-mix(in srgb, var(--accent, #f2a60d) 10%, 
 .res-live-bad { border-color: var(--txt-bad, #b42318); background: color-mix(in srgb, var(--txt-bad, #b42318) 8%, transparent); }
 
 .p2p-who { font-weight: 600; margin-top: 2px; }
+
+/* ผังองค์กร */
+.og-tree, .og-tree ul { list-style: none; margin: 0; padding-left: 22px; }
+.og-tree { padding-left: 0; }
+.og-tree ul { border-left: 2px solid var(--gridline, #d0d5dd); margin-left: 12px; }
+.og-tree li { position: relative; margin: 8px 0; }
+.og-tree ul > li::before { content: ""; position: absolute; left: -22px; top: 22px; width: 18px; border-top: 2px solid var(--gridline, #d0d5dd); }
+.og-card { display: inline-flex; flex-direction: column; gap: 4px; min-width: 260px; max-width: 560px; padding: 8px 12px; border: 1px solid var(--gridline, #d0d5dd); border-radius: 10px; background: var(--surface-1, transparent); }
+.og-card.og-adv { border-style: dashed; opacity: .9; }
+.og-head { display: flex; align-items: center; gap: 6px; }
+.og-head b { flex: 1; }
+.og-n { min-width: 28px; text-align: center; border-radius: 6px; font-weight: 700; font-size: 12px; padding: 1px 6px; }
+.og-plan { background: color-mix(in srgb, var(--txt-warn, #b54708) 22%, transparent); }
+.og-full { background: color-mix(in srgb, var(--txt-good, #067647) 28%, transparent); }
+.og-short { background: color-mix(in srgb, var(--txt-bad, #b42318) 26%, transparent); }
+.og-people { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; }
+.og-linked { font-weight: 600; }
+.og-free { opacity: .75; }
+.og-vac { color: var(--txt-bad, #b42318); font-weight: 600; }
+.og-meta { font-size: 12px; opacity: .8; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.og-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.og-imp textarea { width: 100%; min-width: 220px; font: inherit; }
