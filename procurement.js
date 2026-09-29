@@ -87,83 +87,69 @@ function renderProcurement() {
   updateProcurementStats();
 }
 
+// PR / PO rows act through the purchase tracking flow (p2p.js) — the same approval rules, steps,
+// goods receipt into stock and incoming inspection — never a shortcut that only flips a status (30 ก.ย.)
+function procCase(field, id) { return (typeof P2P_CASES !== "undefined" ? P2P_CASES : []).find((c) => c[field] === id) || null; }
+function procStepBtn(c, stageId, label) {
+  if (!c || typeof p2pCurrent !== "function") return "";
+  const cur = p2pCurrent(c);
+  if (!cur || cur.id !== stageId || !p2pCanRecord(cur, c)) return "";
+  return `<button class="btn-chip" data-p2pstep="${escapeHtml(c.id)}" data-stage="${escapeHtml(stageId)}">${label}</button>`;
+}
+function procWire(tbody) {
+  tbody.querySelectorAll("[data-p2pstep]").forEach((b) => b.addEventListener("click", () => openP2PStep(b.dataset.p2pstep, b.dataset.stage)));
+  tbody.querySelectorAll("[data-p2pcase]").forEach((b) => b.addEventListener("click", () => { switchView("p2p"); openP2PCase(b.dataset.p2pcase); }));
+}
+
 function renderPRTable() {
   const tbody = document.querySelector("#prTable tbody");
   if (!tbody) return;
-  tbody.innerHTML = "";
-  const role = currentRole();
-  PR_LIST.forEach((pr) => {
+  const head = document.querySelector("#prTable thead tr");
+  if (head) head.innerHTML = "<th>เลขที่ PR</th><th>รายการ</th><th>ผู้ขอ</th><th>วันที่ขอ</th><th>ตอนนี้อยู่ที่</th><th>สถานะ</th><th>การดำเนินการ</th>";
+  tbody.innerHTML = PR_LIST.slice().reverse().map((pr) => {
+    const c = procCase("pr", pr.id);
+    const cur = c && typeof p2pCurrent === "function" ? p2pCurrent(c) : null;
     const status = PR_STATUS_META[pr.status] || "good";
     const pillClass = status === "critical" ? "pill-critical" : status === "warning" ? "pill-warning" : "pill-good";
-    const canAct = procCanApprove(role) && pr.status === "รออนุมัติ";
-    const actions = canAct
-      ? `<button class="btn-chip" data-action="approve" data-pr="${escapeHtml(pr.id)}">อนุมัติ</button>`
-        + `<button class="btn-chip" data-action="reject" data-pr="${escapeHtml(pr.id)}">ปฏิเสธ</button>`
+    const who = c && typeof p2pWhoCan === "function" ? p2pWhoCan(c).slice(0, 2).map((u) => u.name).join(" / ") : "";
+    const acts = c
+      ? `${procStepBtn(c, "approve", "✍ อนุมัติ / ไม่อนุมัติ")}<button class="btn-chip" data-p2pcase="${escapeHtml(c.id)}">ดูการติดตาม</button>`
       : "—";
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(pr.id)}</td>
-      <td>${escapeHtml(pr.item)}</td>
+    return `<tr>
+      <td class="mono-cell">${escapeHtml(pr.id)}</td>
+      <td>${escapeHtml(pr.item)}${c && c.value && (typeof authCanSeeCost !== "function" || authCanSeeCost()) ? `<div class="pilot-kpi-method">${Number(c.value).toLocaleString("th-TH")} บาท</div>` : ""}</td>
       <td>${escapeHtml(pr.requester)}</td>
       <td>${escapeHtml(pr.date)}</td>
+      <td>${cur ? `${escapeHtml(cur.label)}${who ? `<div class="p2p-who">👤 ${escapeHtml(who)}</div>` : ""}` : c ? "ครบทุกขั้น" : "—"}</td>
       <td><span class="pill ${pillClass}">${escapeHtml(pr.status)}</span></td>
-      <td class="wo-actions-cell">${actions}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  tbody.querySelectorAll("[data-action]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const pr = PR_LIST.find((p) => p.id === btn.getAttribute("data-pr"));
-      if (!pr) return;
-      if (btn.getAttribute("data-action") === "approve") {
-        pr.status = "อนุมัติแล้ว";
-        afterProcMutation();
-        showToast(`อนุมัติ ${pr.id} แล้ว`, "good");
-      } else {
-        pr.status = "ปฏิเสธ";
-        afterProcMutation();
-        showToast(`ปฏิเสธ ${pr.id} แล้ว`, "warn");
-      }
-    });
-  });
+      <td class="wo-actions-cell">${acts}</td></tr>`;
+  }).join("");
+  procWire(tbody);
 }
 
 function renderPOTable() {
   const tbody = document.querySelector("#poTable tbody");
   if (!tbody) return;
-  tbody.innerHTML = "";
-  const role = currentRole();
-  PO_LIST.forEach((po) => {
+  const seeCost = typeof authCanSeeCost !== "function" || authCanSeeCost();
+  tbody.innerHTML = PO_LIST.slice().reverse().map((po) => {
+    const c = procCase("po", po.id);
     const status = PO_STATUS_META[po.status] || "good";
     const pillClass = status === "critical" ? "pill-critical" : status === "warning" ? "pill-warning" : "pill-good";
-    const canReceive = procCanReceive(role) && (po.status === "รอส่งมอบ" || po.status === "ล่าช้า");
-    const actions = canReceive
-      ? `<button class="btn-chip" data-action="receive" data-po="${escapeHtml(po.id)}">รับของแล้ว</button>`
+    const acts = c
+      ? `${procStepBtn(c, "ack", "ผู้ขายยืนยันวันส่ง")}${procStepBtn(c, "grn", "📦 รับของ (GRN)")}${procStepBtn(c, "iqc", "ตรวจรับ (IQC)")}<button class="btn-chip" data-p2pcase="${escapeHtml(c.id)}">ดูการติดตาม</button>`
       : "—";
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(po.id)}</td>
-      <td>${escapeHtml(po.supplier)}</td>
+    return `<tr>
+      <td class="mono-cell">${escapeHtml(po.id)}</td>
+      <td><button type="button" class="bx-link" data-supname="${escapeHtml(po.supplier)}">${escapeHtml(po.supplier)}</button></td>
       <td>${escapeHtml(po.item)}</td>
-      <td>${fmtBaht(po.value)}</td>
+      <td>${seeCost ? fmtBaht(po.value) : "—"}</td>
       <td>${escapeHtml(po.orderDate)}</td>
       <td>${escapeHtml(po.dueDate)}</td>
       <td><span class="pill ${pillClass}">${escapeHtml(po.status)}</span></td>
-      <td class="wo-actions-cell">${actions}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-
-  tbody.querySelectorAll("[data-action='receive']").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const po = PO_LIST.find((p) => p.id === btn.getAttribute("data-po"));
-      if (!po) return;
-      po.status = "ส่งมอบแล้ว";
-      afterProcMutation();
-      showToast(`รับของ ${po.id} แล้ว`, "good");
-    });
-  });
+      <td class="wo-actions-cell">${acts}</td></tr>`;
+  }).join("");
+  procWire(tbody);
+  tbody.querySelectorAll("[data-supname]").forEach((b) => b.addEventListener("click", () => openSupplier(b.dataset.supname)));
 }
 
 function updateProcurementStats() {

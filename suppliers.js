@@ -38,13 +38,14 @@ function renderSupplierTable() {
   const addBtn = document.getElementById("supAddBtn");
   if (addBtn) addBtn.hidden = !supCanManage();
   const q = supSearch.trim().toLowerCase();
-  const list = SUPPLIER_LIST.filter((s) => !q || [s.name, s.category, s.contact, s.parts].some((v) => String(v || "").toLowerCase().includes(q)));
+  supToolbar();
+  const list = SUPPLIER_LIST.filter((s) => (!supStatusFilter || s.status === supStatusFilter || (supStatusFilter === "avl" && s.avl)) && (!q || [s.name, s.category, s.contact, s.parts, (s.prices || []).map((p) => p.code).join(" ")].some((v) => String(v || "").toLowerCase().includes(q))));
   tbody.innerHTML = list.map((s) => {
     const r = supRecord(s);
     const tone = s.status === "Active" ? "pill-good" : s.status === "On Hold" ? "pill-warning" : "pill-eliminate";
     const rating = r.evalScore !== null ? r.evalScore : Number(s.rating) || 0;
     return `<tr class="${s.status === "เลิกใช้" ? "row-muted" : ""}">
-      <td><button type="button" class="bx-link" data-sup="${escapeHtml(s.name)}"><strong>${escapeHtml(s.name)}</strong></button>${s.contact ? `<div class="pilot-kpi-method">${escapeHtml(s.contact)}${s.phone ? ` · ${escapeHtml(s.phone)}` : ""}</div>` : ""}</td>
+      <td><button type="button" class="bx-link" data-sup="${escapeHtml(s.name)}"><strong>${escapeHtml(s.name)}</strong></button>${s.avl ? ' <span class="pill pill-good" title="ทะเบียนผู้ขายที่อนุมัติ">AVL</span>' : ""}${supCertState(s) ? ` <span class="pill ${supCertState(s) === "หมดอายุ" ? "pill-critical" : "pill-warning"}" title="ใบรับรอง/ISO">${supCertState(s)}</span>` : ""}${s.contact ? `<div class="pilot-kpi-method">${escapeHtml(s.contact)}${s.phone ? ` · ${escapeHtml(s.phone)}` : ""}</div>` : ""}</td>
       <td>${escapeHtml(s.category || "")}</td>
       <td>${escapeHtml(String(s.leadTime ?? "—"))} วัน</td>
       <td>${rating ? `${rating.toFixed(1)} / 5.0${r.evalScore !== null ? ` <span class="muted-inline">(SE ${escapeHtml(r.lastEval.period || formatThaiDate(r.lastEval.date))})</span>` : ""}` : "—"}</td>
@@ -79,6 +80,10 @@ function openSupplier(name) {
         ${row("ที่อยู่", escapeHtml(s.address || ""))}
         ${row("เงื่อนไขชำระเงิน", escapeHtml(s.terms || ""))}
         ${row("Lead time ตกลง", `${escapeHtml(String(s.leadTime ?? "—"))} วัน`)}
+        ${row("ทะเบียนผู้ขายที่อนุมัติ (AVL)", s.avl ? "✓ อนุมัติแล้ว" : "ยังไม่อยู่ใน AVL")}
+        ${row("ใบรับรอง / ISO", s.certExp ? `${escapeHtml(formatThaiDate(s.certExp))}${supCertState(s) ? ` <span class="pill ${supCertState(s) === "หมดอายุ" ? "pill-critical" : "pill-warning"}">${supCertState(s)}</span>` : ""}` : "")}
+        ${supCanSeeMoney() ? row("บัญชีธนาคาร", escapeHtml(s.bank || "")) : ""}
+        ${s.status !== "Active" && s.holdReason ? row("เหตุผลที่" + escapeHtml(SUP_STATUS_TH[s.status]), escapeHtml(s.holdReason)) : ""}
         ${s.note ? row("หมายเหตุ", escapeHtml(s.note)) : ""}
       </tbody></table>
       <div>
@@ -93,6 +98,7 @@ function openSupplier(name) {
     </div>
     <h4 class="bx-h4">ชิ้นส่วนที่ซื้อจากผู้ขายรายนี้</h4>
     ${partRows || '<p class="muted-inline">ยังไม่ได้ระบุรหัสชิ้นส่วน — กด "แก้ไข" เพื่อเพิ่ม</p>'}
+    ${supCanSeeMoney() ? supPriceHtml(s, r) : ""}
     <h4 class="bx-h4">คำขอซื้อ / PO (${r.cases.length})</h4>
     ${r.cases.length ? `<div>${r.cases.map((c) => { const st = p2pCurrent(c); return `<button type="button" class="rel-chip" data-p2pcase="${escapeHtml(c.id)}">${escapeHtml(c.pr)}${c.po ? ` / ${escapeHtml(c.po)}` : ""} · ${escapeHtml(String(c.item).slice(0, 30))} <span class="rel-status">(${escapeHtml(c.status === "cancelled" ? "ยกเลิก" : st ? st.short || st.label : "ครบ")})</span></button>`; }).join("")}</div>` : '<p class="muted-inline">ยังไม่มี</p>'}
     ${r.claims.length ? `<h4 class="bx-h4">เคลมที่เกี่ยวข้อง</h4><div>${r.claims.map((d) => `<button type="button" class="rel-chip" data-docno="${escapeHtml(d.no)}">${escapeHtml(d.no)} — ${escapeHtml(String(d.title).slice(0, 34))} <span class="rel-status">(${escapeHtml(d.claimStatus || "ยังไม่ส่งเคลม")})</span></button>`).join("")}</div>` : ""}
@@ -116,6 +122,7 @@ function openSupplier(name) {
   });
   box.querySelectorAll("[data-docno]").forEach((b) => b.addEventListener("click", () => { close(); openDocViewByNo(b.dataset.docno); }));
   box.querySelectorAll("[data-p2pcase]").forEach((b) => b.addEventListener("click", () => { close(); switchView("p2p"); openP2PCase(b.dataset.p2pcase); }));
+  box.querySelectorAll("[data-supcmp]").forEach((b) => b.addEventListener("click", () => supCompare(b.dataset.supcmp)));
   box.querySelectorAll("[data-part]").forEach((b) => b.addEventListener("click", () => {
     close();
     const k = b.dataset.part;
@@ -146,6 +153,13 @@ function openSupplierEditor(name) {
     </div>
     ${f("address", "ที่อยู่", s.address)}
     <div class="form-field"><label for="sup_parts">รหัสชิ้นส่วนที่ซื้อจากผู้ขายนี้ (คั่นด้วย , )</label><input id="sup_parts" list="sup_partlist" value="${escapeHtml(s.parts || "")}" placeholder="เช่น GR-2001-03, GR-2001-04"><datalist id="sup_partlist">${codes.map((p) => `<option value="${escapeHtml(p.code)}">${escapeHtml(p.part)}</option>`).join("")}</datalist></div>
+    <div class="modal-grid">
+      ${f("bank", "บัญชีธนาคาร (โอนเงิน)", s.bank, "", "ธนาคาร · เลขบัญชี · ชื่อบัญชี")}
+      ${f("certExp", "ใบรับรอง / ISO หมดอายุ", s.certExp, "date")}
+      <div class="form-field"><label class="fs-check"><input type="checkbox" id="sup_avl"${s.avl ? " checked" : ""}> อยู่ในทะเบียนผู้ขายที่อนุมัติ (AVL)</label></div>
+      ${f("holdReason", "เหตุผลที่พักการสั่งซื้อ / เลิกใช้", s.holdReason, "", "ต้องใส่เมื่อสถานะไม่ใช่ ใช้งาน")}
+    </div>
+    <div class="form-field"><label for="sup_prices">ราคาตกลง (บรรทัดละรายการ: รหัส | ราคา | หน่วย | สั่งขั้นต่ำ)</label><textarea id="sup_prices" rows="4" placeholder="K01S0012-00 | 450 | ชิ้น | 10">${escapeHtml((s.prices || []).map((p) => [p.code, p.price, p.unit || "", p.moq || ""].join(" | ")).join("\n"))}</textarea></div>
     ${f("note", "หมายเหตุ", s.note)}
     <div class="modal-actions">
       <button type="button" class="btn-secondary" id="supCancel">ยกเลิก</button>
@@ -166,7 +180,11 @@ function saveSupplierEditor() {
     name, category: v("category"), contact: v("contact"), phone: v("phone"), email: v("email"), taxId: v("taxId"), terms: v("terms"),
     leadTime: Number(v("leadTime")) || 0, rating: Math.max(0, Math.min(5, Number(v("rating")) || 0)), status: v("status"),
     address: v("address"), parts: v("parts").split(/[,\s]+/).filter(Boolean).join(", "), note: v("note"),
+    bank: v("bank"), certExp: v("certExp"), avl: document.getElementById("sup_avl").checked, holdReason: v("holdReason"),
+    prices: document.getElementById("sup_prices").value.split("\n").map((l) => l.split("|").map((x) => x.trim())).filter((p) => p[0] && Number(p[1]) > 0)
+      .map((p) => ({ code: p[0], price: Number(p[1]), unit: p[2] || "", moq: Number(p[3]) || 0, at: new Date().toISOString().slice(0, 10) })),
   };
+  if (data.status !== "Active" && !data.holdReason) { showToast("ใส่เหตุผลที่พักการสั่งซื้อ / เลิกใช้", "warn"); document.getElementById("sup_holdReason").focus(); return; }
   if (supEditing) {
     const s = SUPPLIER_LIST.find((x) => x.name === supEditing);
     const before = Object.assign({}, s);
@@ -180,7 +198,7 @@ function saveSupplierEditor() {
       if (typeof saveP2P === "function") saveP2P();
       saveDeptDocs();
     }
-    const fields = [["name", "ชื่อ"], ["category", "ประเภท"], ["contact", "ผู้ติดต่อ"], ["phone", "โทร"], ["email", "อีเมล"], ["terms", "เงื่อนไข"], ["leadTime", "Lead time"], ["rating", "คะแนน"], ["status", "สถานะ"], ["parts", "ชิ้นส่วน"]].map(([key, label]) => ({ key, label }));
+    const fields = [["name", "ชื่อ"], ["category", "ประเภท"], ["contact", "ผู้ติดต่อ"], ["phone", "โทร"], ["email", "อีเมล"], ["terms", "เงื่อนไข"], ["leadTime", "Lead time"], ["rating", "คะแนน"], ["status", "สถานะ"], ["holdReason", "เหตุผล"], ["parts", "ชิ้นส่วน"], ["certExp", "ใบรับรองหมดอายุ"], ["bank", "บัญชีธนาคาร"]].map(([key, label]) => ({ key, label }));
     if (typeof auditLog === "function") auditLog("แก้ไขผู้ขาย", name, auditDiff(before, s, fields) || "ไม่มีการเปลี่ยนแปลง");
   } else {
     SUPPLIER_LIST.push(data);
@@ -191,6 +209,70 @@ function saveSupplierEditor() {
   renderProcurement();
   openSupplier(name);
   showToast(`บันทึกผู้ขาย "${name}" แล้ว`, "good");
+}
+
+let supStatusFilter = "";
+function supCanSeeMoney() { return typeof authCanSeeCost !== "function" || authCanSeeCost(); }
+// certificate state from its expiry date
+function supCertState(s) {
+  if (!s.certExp) return "";
+  const days = (Date.parse(s.certExp) - Date.now()) / 86400000;
+  return days < 0 ? "หมดอายุ" : days <= 60 ? "ใกล้หมดอายุ" : "";
+}
+// agreed prices + what was actually paid (from purchases) for this supplier
+function supPaid(name, code) {
+  return (typeof P2P_CASES !== "undefined" ? P2P_CASES : []).filter((c) => (!name || c.supplier === name) && c.value && Number(c.qty) > 0 && (!code || String(c.item || "").includes(code) || c.code === code))
+    .map((c) => ({ supplier: c.supplier, item: c.item, unit: c.unit, price: Math.round((Number(c.value) / Number(c.qty)) * 100) / 100, at: ((c.events || []).find((e) => e.stage === "po") || {}).at || "", pr: c.pr, po: c.po }));
+}
+function supPriceHtml(s, r) {
+  const paid = supPaid(s.name);
+  const codes = [...new Set((s.prices || []).map((p) => p.code).concat(r.parts))];
+  return `<h4 class="bx-h4">ราคาตกลง</h4>
+    ${(s.prices || []).length ? `<div class="table-scroll"><table class="data-table"><thead><tr><th>รหัส</th><th class="num">ราคา</th><th>หน่วย</th><th class="num">สั่งขั้นต่ำ</th><th>ปรับล่าสุด</th><th></th></tr></thead><tbody>${s.prices.map((p) => `<tr><td class="mono-cell">${escapeHtml(p.code)}</td><td class="num">${Number(p.price).toLocaleString("th-TH")}</td><td>${escapeHtml(p.unit || "")}</td><td class="num">${p.moq || "—"}</td><td>${p.at ? escapeHtml(formatThaiDate(p.at)) : ""}</td><td><button type="button" class="btn-link" data-supcmp="${escapeHtml(p.code)}">เทียบผู้ขาย</button></td></tr>`).join("")}</tbody></table></div>` : '<p class="muted-inline">ยังไม่มีราคาตกลง — กด "แก้ไข" เพื่อเพิ่ม</p>'}
+    ${!(s.prices || []).length && codes.length ? `<div>${codes.slice(0, 8).map((c) => `<button type="button" class="rel-chip" data-supcmp="${escapeHtml(c)}">เทียบผู้ขาย ${escapeHtml(c)}</button>`).join("")}</div>` : ""}
+    <h4 class="bx-h4">ราคาที่ซื้อจริง (จากใบสั่งซื้อ)</h4>
+    ${paid.length ? `<div class="table-scroll"><table class="data-table"><thead><tr><th>PR / PO</th><th>รายการ</th><th class="num">ราคาต่อหน่วย</th><th>วันที่สั่ง</th></tr></thead><tbody>${paid.map((p) => `<tr><td class="mono-cell">${escapeHtml(p.pr)}${p.po ? ` / ${escapeHtml(p.po)}` : ""}</td><td>${escapeHtml(String(p.item).slice(0, 50))}</td><td class="num">${p.price.toLocaleString("th-TH")} / ${escapeHtml(p.unit || "")}</td><td>${p.at ? escapeHtml(formatThaiDate(p.at)) : "—"}</td></tr>`).join("")}</tbody></table></div>` : '<p class="muted-inline">ยังไม่มีการสั่งซื้อที่บันทึกมูลค่า</p>'}`;
+}
+// every supplier that can supply one part: agreed price, lead time, on-time, rating — best first
+function supCompare(code) {
+  const rows = SUPPLIER_LIST.map((s) => {
+    const agreed = (s.prices || []).find((p) => p.code === code);
+    const inParts = String(s.parts || "").split(/[,\s]+/).includes(code);
+    const paid = supPaid(s.name, code);
+    if (!agreed && !inParts && !paid.length) return null;
+    const r = supRecord(s);
+    const price = agreed ? agreed.price : paid.length ? paid[paid.length - 1].price : null;
+    return { s, price, lead: Number(s.leadTime) || 0, onTime: r.onTimePct, rating: r.evalScore !== null ? r.evalScore : Number(s.rating) || 0, ok: s.status === "Active" };
+  }).filter(Boolean).sort((a, b) => (b.ok - a.ok) || ((a.price ?? 9e15) - (b.price ?? 9e15)) || a.lead - b.lead);
+  const best = rows.find((x) => x.ok && (x.onTime === null || x.onTime >= 80));
+  document.getElementById("supBody").innerHTML = `
+    <h3>เทียบผู้ขาย — ${escapeHtml(code)}</h3>
+    <p class="card-sub">เรียง: ใช้งานได้ก่อน · ราคาต่ำ · Lead time สั้น · ราคาจากราคาตกลง หรือราคาที่ซื้อครั้งล่าสุด</p>
+    ${rows.length ? `<div class="table-scroll"><table class="data-table"><thead><tr><th>ผู้ขาย</th><th class="num">ราคา/หน่วย</th><th class="num">Lead time</th><th class="num">ส่งตรงเวลา</th><th class="num">คะแนน</th><th>สถานะ</th></tr></thead><tbody>
+    ${rows.map((x) => `<tr${x === best ? ' class="sup-best"' : ""}><td><button type="button" class="bx-link" data-sup="${escapeHtml(x.s.name)}">${escapeHtml(x.s.name)}</button>${x === best ? ' <span class="pill pill-good">แนะนำ</span>' : ""}</td><td class="num">${x.price === null ? "—" : x.price.toLocaleString("th-TH")}</td><td class="num">${x.lead} วัน</td><td class="num">${x.onTime === null ? "—" : `${x.onTime}%`}</td><td class="num">${x.rating ? x.rating.toFixed(1) : "—"}</td><td>${escapeHtml(SUP_STATUS_TH[x.s.status] || x.s.status)}</td></tr>`).join("")}
+    </tbody></table></div>` : '<p class="muted-inline">ยังไม่มีผู้ขายที่ระบุรหัสนี้</p>'}
+    <div class="modal-actions"><button type="button" class="btn-secondary" id="supClose">ปิด</button></div>`;
+  document.getElementById("supClose").addEventListener("click", () => document.getElementById("supBackdrop").classList.remove("open"));
+  document.querySelectorAll("#supBody [data-sup]").forEach((b) => b.addEventListener("click", () => openSupplier(b.dataset.sup)));
+  document.getElementById("supBackdrop").classList.add("open");
+}
+// status filter + CSV beside the search box
+function supToolbar() {
+  const search = document.getElementById("supSearch");
+  if (!search || document.getElementById("supStatusFilter")) return;
+  search.insertAdjacentHTML("afterend", ` <label for="supStatusFilter">แสดง:</label><select id="supStatusFilter"><option value="">ทั้งหมด</option><option value="Active">ใช้งาน</option><option value="On Hold">พักการสั่งซื้อ</option><option value="เลิกใช้">เลิกใช้</option><option value="avl">เฉพาะ AVL</option></select> <button type="button" class="btn-secondary" id="supCsv">ส่งออก CSV</button>`);
+  document.getElementById("supStatusFilter").addEventListener("change", (e) => { supStatusFilter = e.target.value; renderSupplierTable(); });
+  document.getElementById("supCsv").addEventListener("click", () => {
+    const money = supCanSeeMoney();
+    const rows = [["ชื่อ", "ประเภท", "ผู้ติดต่อ", "โทร", "อีเมล", "เลขผู้เสียภาษี", "เงื่อนไขชำระ", "Lead time", "สถานะ", "AVL", "ใบรับรองหมดอายุ", "ส่งตรงเวลา %", "IQC ไม่ผ่าน"].concat(money ? ["บัญชีธนาคาร"] : [])]
+      .concat(SUPPLIER_LIST.map((s) => { const r = supRecord(s); return [s.name, s.category, s.contact, s.phone, s.email, s.taxId, s.terms, s.leadTime, SUP_STATUS_TH[s.status] || s.status, s.avl ? "ใช่" : "", s.certExp || "", r.onTimePct ?? "", r.stats.iqcFail || 0].concat(money ? [s.bank || ""] : []); }));
+    const csv = "\ufeff" + rows.map((r) => r.map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`).join(",")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = `suppliers-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
 }
 
 function initSuppliers() {

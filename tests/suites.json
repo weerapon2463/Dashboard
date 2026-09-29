@@ -10,5 +10,6 @@
   ["store", ["u-demo-admin"]],
   ["logins", ["u-demo-admin"]],
   ["overview", ["u-demo-admin"]],
-  ["orgchart", ["u-demo-admin"]]
+  ["orgchart", ["u-demo-admin"]],
+  ["procurement", ["u-demo-admin"]]
 ]

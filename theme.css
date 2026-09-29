@@ -621,3 +621,5 @@ tr.wo-group-row td { background: color-mix(in srgb, var(--accent, #f2a60d) 10%, 
 .og-meta { font-size: 12px; opacity: .8; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .og-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .og-imp textarea { width: 100%; min-width: 220px; font: inherit; }
+
+tr.sup-best td { background: color-mix(in srgb, var(--txt-good, #067647) 12%, transparent); }
