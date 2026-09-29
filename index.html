@@ -8,9 +8,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap">
-<link rel="stylesheet" href="style.css?v=20260930a">
-<link rel="stylesheet" href="theme.css?v=20260930a">
-<link rel="stylesheet" href="tv.css?v=20260930a">
+<link rel="stylesheet" href="style.css?v=20260930b">
+<link rel="stylesheet" href="theme.css?v=20260930b">
+<link rel="stylesheet" href="tv.css?v=20260930b">
 </head>
 <body>
   <div class="sync-overlay" id="syncOverlay" hidden><div class="sync-overlay-box"><div class="sync-spinner"></div>กำลังโหลดข้อมูลล่าสุดจาก Google Sheets…</div></div>
@@ -786,12 +786,12 @@
       <section class="view" id="view-capacity">
         <div class="card">
           <div class="card-header">
-            <h3>Capacity Planning — กำลังการผลิตต่อไลน์ (10 สัปดาห์ข้างหน้า)</h3>
-            <p class="card-sub">Utilization = ชั่วโมงที่วางแผนผลิต ÷ ชั่วโมงกำลังการผลิตที่มี</p>
+            <h3>กำลังการผลิตรายสถานี — ภาระงานจริงจาก Job Card (4 สัปดาห์ที่ผ่านมา + 8 สัปดาห์ข้างหน้า)</h3>
+            <p class="card-sub">ภาระงาน = ชั่วโมงตามแผนของ Job Card ที่ยังไม่เสร็จ (ลบที่ทำไปแล้ว) กระจายตามลำดับขั้นตอนจนถึงกำหนดส่ง · สัปดาห์ที่ผ่านมา = ชั่วโมงที่ทำจริง · กำลังการผลิต = คน × ชม./วัน × วัน/สัปดาห์ (ตั้งในตารางด้านล่าง)</p>
           </div>
           <div class="card-body">
             <div class="filter-row">
-              <label for="capacityLineFilter">ไลน์ผลิต:</label>
+              <label for="capacityLineFilter">สถานี:</label>
               <select id="capacityLineFilter"></select>
             </div>
             <div class="chart-wrap">
@@ -805,7 +805,7 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><h3>สรุปกำลังการผลิตรายไลน์</h3></div>
+          <div class="card-header"><h3>ทุกสถานี ทุกสัปดาห์ + ตั้งกำลังการผลิต</h3></div>
           <div class="card-body table-scroll">
             <table class="data-table" id="capacityTable">
               <thead>
@@ -926,9 +926,9 @@
       <section class="view" id="view-resource">
         <div class="stat-grid">
           <div class="stat-tile">
-            <div class="stat-label">ไลน์ที่ขาดกำลังคน</div>
+            <div class="stat-label">สถานีที่ขาดกำลังคน</div>
             <div class="stat-value" id="resStatLaborGap">-</div>
-            <div class="stat-note">จากทั้งหมด 8 แผนก/ไลน์ผลิต</div>
+            <div class="stat-note">คิดจากภาระงาน 4 สัปดาห์ข้างหน้า</div>
           </div>
           <div class="stat-tile">
             <div class="stat-label">เครื่องจักรที่ต้องดูแล</div>
@@ -946,8 +946,8 @@
 
         <div class="card">
           <div class="card-header">
-            <h3>กำลังคน (Labor) รายไลน์ผลิต</h3>
-            <p class="card-sub">เปรียบเทียบจำนวนที่ต้องการกับจำนวนพนักงานจริงในแต่ละไลน์ — หัวหน้าแผนก/ผู้จัดการโรงงานปรับจำนวนที่มีจริงวันนี้ได้ตรงในตาราง</p>
+            <h3>กำลังคนรายสถานี — จากภาระงานจริง</h3>
+            <p class="card-sub">ต้องการ = ชั่วโมงงานที่ยังต้องทำใน 4 สัปดาห์ข้างหน้า ÷ ชั่วโมงทำงานต่อคน (จากหน้ากำลังการผลิต) · มีจริง = จำนวนคนของสถานี แก้ได้ที่นี่หรือหน้ากำลังการผลิต (ใช้ตัวเลขเดียวกัน)</p>
           </div>
           <div class="card-body table-scroll">
             <table class="data-table" id="laborTable">
@@ -1708,53 +1708,53 @@
 
   <div class="toast-container" id="toastContainer" aria-live="polite"></div>
 
-  <script src="storage.js?v=20260930a"></script>
-  <script src="data.js?v=20260930a"></script>
-  <script src="partcode.js?v=20260930a"></script>
-  <script src="priority-matrix.js?v=20260930a"></script>
-  <script src="capacity-planning.js?v=20260930a"></script>
-  <script src="master-schedule.js?v=20260930a"></script>
-  <script src="make-or-buy.js?v=20260930a"></script>
-  <script src="resource.js?v=20260930a"></script>
-  <script src="procurement.js?v=20260930a"></script>
-  <script src="workorder.js?v=20260930a"></script>
-  <script src="jobcard.js?v=20260930a"></script>
-  <script src="alerts.js?v=20260930a"></script>
-  <script src="overview-charts.js?v=20260930a"></script>
-  <script src="pilot.js?v=20260930a"></script>
-  <script src="pilot-measure.js?v=20260930a"></script>
-  <script src="pilot-timer.js?v=20260930a"></script>
-  <script src="dept-data.js?v=20260930a"></script>
-  <script src="workflow.js?v=20260930a"></script>
-  <script src="dept-samples.js?v=20260930a"></script>
-  <script src="org.js?v=20260930a"></script>
-  <script src="dept.js?v=20260930a"></script>
-  <script src="bom.js?v=20260930a"></script>
-  <script src="bomx.js?v=20260930a"></script>
-  <script src="stockx.js?v=20260930a"></script>
-  <script src="stockops.js?v=20260930a"></script>
-  <script src="naming.js?v=20260930a"></script>
-  <script src="tv.js?v=20260930a"></script>
-  <script src="serial.js?v=20260930a"></script>
-  <script src="mytasks.js?v=20260930a"></script>
-  <script src="bomsheet.js?v=20260930a"></script>
-  <script src="service.js?v=20260930a"></script>
-  <script src="reports.js?v=20260930a"></script>
-  <script src="integrity.js?v=20260930a"></script>
-  <script src="overview.js?v=20260930a"></script>
-  <script src="rnd.js?v=20260930a"></script>
-  <script src="docview.js?v=20260930a"></script>
-  <script src="esign.js?v=20260930a"></script>
-  <script src="p2p-data.js?v=20260930a"></script>
-  <script src="p2p.js?v=20260930a"></script>
-  <script src="suppliers.js?v=20260930a"></script>
-  <script src="auth.js?v=20260930a"></script>
-  <script src="admin.js?v=20260930a"></script>
-  <script src="plans.js?v=20260930a"></script>
-  <script src="approval.js?v=20260930a"></script>
-  <script src="loginadmin.js?v=20260930a"></script>
-  <script src="glossary.js?v=20260930a"></script>
-  <script src="floor.js?v=20260930a"></script>
-  <script src="app.js?v=20260930a"></script>
+  <script src="storage.js?v=20260930b"></script>
+  <script src="data.js?v=20260930b"></script>
+  <script src="partcode.js?v=20260930b"></script>
+  <script src="priority-matrix.js?v=20260930b"></script>
+  <script src="capacity-planning.js?v=20260930b"></script>
+  <script src="master-schedule.js?v=20260930b"></script>
+  <script src="make-or-buy.js?v=20260930b"></script>
+  <script src="resource.js?v=20260930b"></script>
+  <script src="procurement.js?v=20260930b"></script>
+  <script src="workorder.js?v=20260930b"></script>
+  <script src="jobcard.js?v=20260930b"></script>
+  <script src="alerts.js?v=20260930b"></script>
+  <script src="overview-charts.js?v=20260930b"></script>
+  <script src="pilot.js?v=20260930b"></script>
+  <script src="pilot-measure.js?v=20260930b"></script>
+  <script src="pilot-timer.js?v=20260930b"></script>
+  <script src="dept-data.js?v=20260930b"></script>
+  <script src="workflow.js?v=20260930b"></script>
+  <script src="dept-samples.js?v=20260930b"></script>
+  <script src="org.js?v=20260930b"></script>
+  <script src="dept.js?v=20260930b"></script>
+  <script src="bom.js?v=20260930b"></script>
+  <script src="bomx.js?v=20260930b"></script>
+  <script src="stockx.js?v=20260930b"></script>
+  <script src="stockops.js?v=20260930b"></script>
+  <script src="naming.js?v=20260930b"></script>
+  <script src="tv.js?v=20260930b"></script>
+  <script src="serial.js?v=20260930b"></script>
+  <script src="mytasks.js?v=20260930b"></script>
+  <script src="bomsheet.js?v=20260930b"></script>
+  <script src="service.js?v=20260930b"></script>
+  <script src="reports.js?v=20260930b"></script>
+  <script src="integrity.js?v=20260930b"></script>
+  <script src="overview.js?v=20260930b"></script>
+  <script src="rnd.js?v=20260930b"></script>
+  <script src="docview.js?v=20260930b"></script>
+  <script src="esign.js?v=20260930b"></script>
+  <script src="p2p-data.js?v=20260930b"></script>
+  <script src="p2p.js?v=20260930b"></script>
+  <script src="suppliers.js?v=20260930b"></script>
+  <script src="auth.js?v=20260930b"></script>
+  <script src="admin.js?v=20260930b"></script>
+  <script src="plans.js?v=20260930b"></script>
+  <script src="approval.js?v=20260930b"></script>
+  <script src="loginadmin.js?v=20260930b"></script>
+  <script src="glossary.js?v=20260930b"></script>
+  <script src="floor.js?v=20260930b"></script>
+  <script src="app.js?v=20260930b"></script>
 </body>
 </html>

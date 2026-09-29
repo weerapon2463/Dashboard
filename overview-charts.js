@@ -74,12 +74,8 @@ function renderCapacitySnapshotChart() {
   const canvas = document.getElementById("capacitySnapshotChart");
   if (!canvas) return;
 
-  const rows = CAPACITY_LINES.map((line) => {
-    const weeks = CAPACITY_DATA[line];
-    const latest = weeks[weeks.length - 1];
-    const pct = Math.round((latest.demand / latest.capacity) * 100);
-    return { line, pct };
-  });
+  // real load per workstation, next 4 weeks (capacity-planning.js)
+  const rows = typeof capModel === "function" ? capModel().stations.map((s) => ({ line: `${s.id} ${s.name}`, pct: s.next4 })) : [];
   const colors = rows.map((r) => statusColor(capacityStatus(r.pct)));
 
   if (capacitySnapshotChartInstance) capacitySnapshotChartInstance.destroy();
@@ -105,7 +101,7 @@ function renderCapacitySnapshotChart() {
       plugins: {
         legend: { display: false },
         tooltip: {
-          callbacks: { label: (ctx) => `Utilization: ${ctx.raw}% (สัปดาห์ล่าสุด)` },
+          callbacks: { label: (ctx) => `ภาระงาน ${ctx.raw}% ของกำลัง (4 สัปดาห์ข้างหน้า)` },
         },
       },
     },

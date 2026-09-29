@@ -169,13 +169,11 @@ const OV_RENDER = {
       else if (left !== null && left <= 7 && pct < 80)
         add(80 - left, "warning", `${w.wo} ${w.model} ต้องส่งใน ${left} วัน แต่เบิกวัสดุได้ ${pct}%`, "เสี่ยงส่งไม่ทัน — ตรวจของขาดและเร่งเบิก", "workorder", "ดูใบสั่งผลิต");
     });
-    if (typeof CAPACITY_LINES !== "undefined") {
-      const over = CAPACITY_LINES.map((line) => {
-        const wk = CAPACITY_DATA[line]; const last = wk && wk[wk.length - 1];
-        return last && last.capacity ? { line, pct: Math.round((last.demand / last.capacity) * 100) } : null;
-      }).filter((x) => x && x.pct > 100).sort((a, b) => b.pct - a.pct);
-      const free = CAPACITY_LINES.map((line) => { const wk = CAPACITY_DATA[line]; const last = wk && wk[wk.length - 1]; return last && last.capacity ? { line, pct: Math.round((last.demand / last.capacity) * 100) } : null; })
-        .filter((x) => x && x.pct < 95).sort((a, b) => a.pct - b.pct)[0];
+    if (typeof capModel === "function") {
+      // real load per workstation over the next 4 weeks (capacity-planning.js)
+      const cm = capModel().stations.map((s) => ({ line: s.id, pct: s.next4 }));
+      const over = cm.filter((x) => x.pct > 100).sort((a, b) => b.pct - a.pct);
+      const free = cm.filter((x) => x.pct < 95).sort((a, b) => a.pct - b.pct)[0];
       if (over.length) add(60 + (over[0].pct - 100), over[0].pct >= 110 ? "critical" : "warning",
         over.length === 1 ? `${over[0].line} ใช้กำลังผลิต ${over[0].pct}%` : `${over.length} ไลน์ใช้กำลังผลิตเกิน 100% — สูงสุด ${over[0].line} ${over[0].pct}%`,
         `${over.map((x) => `${x.line} ${x.pct}%`).join(" · ")} — ${free ? `ย้ายงานไป${free.line} (ใช้ ${free.pct}%) ` : ""}เพิ่ม OT หรือเลื่อนงานที่ไม่ด่วน`, "capacity", "ดูกำลังการผลิต");

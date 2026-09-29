@@ -585,3 +585,15 @@ tr.wo-group-row td { background: color-mix(in srgb, var(--accent, #f2a60d) 10%, 
 .wo-steps-bar { width: 90px; height: 8px; border-radius: 4px; background: var(--gridline, #d0d5dd); overflow: hidden; }
 .wo-steps-bar span { display: block; height: 100%; background: var(--txt-good, #067647); }
 .wo-late-txt { color: var(--txt-bad, #b42318); }
+
+/* capacity heat map */
+.cap-heat td, .cap-heat th { text-align: center; white-space: nowrap; }
+.cap-heat td:first-child, .cap-heat th:first-child { text-align: left; }
+.cap-heat .cap-past { color: var(--text-muted); }
+.cap-heat .cap-ok { background: color-mix(in srgb, var(--txt-good, #067647) 16%, transparent); }
+.cap-heat .cap-warn { background: color-mix(in srgb, var(--txt-warn, #b54708) 22%, transparent); font-weight: 600; }
+.cap-heat .cap-over { background: color-mix(in srgb, var(--txt-bad, #b42318) 28%, transparent); font-weight: 700; }
+.cap-heat th.cap-now { color: var(--txt-bad, #b42318); }
+
+.res-live { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--gridline, #d0d5dd); font-size: 13px; }
+.res-live-bad { border-color: var(--txt-bad, #b42318); background: color-mix(in srgb, var(--txt-bad, #b42318) 8%, transparent); }

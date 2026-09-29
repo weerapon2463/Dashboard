@@ -86,46 +86,87 @@ function afterResourceMutation() {
 /* ---- rendering ---------------------------------------------------------- */
 
 function renderResource() {
+  TOOL_CALIBRATION.forEach((x) => { x.status = resToolStatus(x); });
   renderLaborTable();
+  renderMachineLive();
   renderMachineTable();
   renderToolTable();
   updateResourceStats();
 }
 
+// People per workstation: needed = the coming 4 weeks' load (capacity-planning.js) ÷ one person's week,
+// have = people set for the station (same number as Capacity), who = the people on its job cards (30 ก.ย.)
+function resStations() {
+  if (typeof capModel !== "function") return [];
+  const m = capModel();
+  const who = {};
+  (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []).forEach((w) => (w.jobs || []).forEach((j) => {
+    if (!j.station) return;
+    (who[j.station] = who[j.station] || new Set());
+    if (j.assignee) who[j.station].add(j.assignee);
+    (j.logs || []).forEach((l) => { if (l.by) who[j.station].add(l.by); });
+  }));
+  return m.stations.map((s) => {
+    const need = Math.ceil(s.needPeople);
+    return { s, need, have: s.people, gap: s.people - need, who: [...(who[s.id] || [])] };
+  });
+}
 function renderLaborTable() {
   const tbody = document.querySelector("#laborTable tbody");
   if (!tbody) return;
-  tbody.innerHTML = "";
-  const canEdit = laborCanEdit(currentRole());
-  LABOR_PLAN.forEach((row, index) => {
-    const gap = row.actual - row.required;
-    const status = laborStatus(gap);
-    const pillClass = status === "critical" ? "pill-critical" : status === "warning" ? "pill-warning" : "pill-good";
+  const head = document.querySelector("#laborTable thead tr");
+  if (head) head.innerHTML = "<th>สถานี</th><th>ต้องการ (คน)</th><th>มีจริง (คน)</th><th>ผลต่าง</th><th>คนที่ทำงานสถานีนี้ (จาก Job Card)</th><th>สถานะ</th>";
+  const canEdit = laborCanEdit(currentRole()) || currentRole() === "admin";
+  const rows = resStations();
+  tbody.innerHTML = rows.map((r, i) => {
+    const status = laborStatus(r.gap);
+    const pill = status === "critical" ? "pill-critical" : status === "warning" ? "pill-warning" : "pill-good";
     const label = status === "critical" ? "ขาดกำลังคนมาก" : status === "warning" ? "ขาดกำลังคน" : "เพียงพอ";
-    const gapText = gap > 0 ? `+${gap}` : `${gap}`;
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td>${escapeHtml(row.line)}</td>
-      <td>${row.required}</td>
-      <td>${canEdit ? `<input type="number" class="wo-search labor-actual-input" style="min-width:70px;width:80px;padding:5px 8px;" min="0" value="${row.actual}" data-index="${index}">` : row.actual}</td>
-      <td>${gapText}</td>
-      <td>${escapeHtml(row.shift)}</td>
-      <td><span class="pill ${pillClass}">${label}</span></td>
-    `;
-    tbody.appendChild(tr);
-  });
+    return `<tr><td><b>${escapeHtml(r.s.id)}</b> ${escapeHtml(r.s.name)}</td>
+      <td class="num">${r.need} <small class="muted-inline">(${r.s.next4}% ของ ${r.s.people} คน)</small></td>
+      <td>${canEdit ? `<input type="number" class="wo-search labor-actual-input" style="min-width:70px;width:80px;padding:5px 8px;" min="1" value="${r.have}" data-i="${i}">` : r.have}</td>
+      <td class="num">${r.gap > 0 ? `+${r.gap}` : r.gap}</td>
+      <td>${r.who.length ? escapeHtml(r.who.join(", ")) : `<span class="muted-inline">ยังไม่มีใครลงเวลา</span>`}</td>
+      <td><span class="pill ${pill}">${label}</span></td></tr>`;
+  }).join("") || `<tr><td colspan="6" class="muted-inline">ยังไม่มีสถานีงาน</td></tr>`;
+  if (canEdit) tbody.querySelectorAll(".labor-actual-input").forEach((input) => input.addEventListener("change", () => {
+    const r = rows[+input.dataset.i];
+    const val = Math.max(1, Math.round(Number(input.value) || 1));
+    r.s.w.people = val;
+    if (typeof bxSaveStock === "function") bxSaveStock();
+    if (typeof auditLog === "function") auditLog("ตั้งกำลังการผลิต", r.s.id, `คน: ${r.have} → ${val}`);
+    renderResource();
+    showToast(`${r.s.id}: ${val} คน — กำลังการผลิตอัปเดตตามแล้ว`, "good");
+  }));
+}
 
-  if (canEdit) {
-    tbody.querySelectorAll(".labor-actual-input").forEach((input) => {
-      input.addEventListener("change", () => {
-        const index = Number(input.getAttribute("data-index"));
-        const val = Math.max(0, Number(input.value) || 0);
-        LABOR_PLAN[index].actual = val;
-        afterResourceMutation();
-        showToast(`อัปเดตกำลังคน ${LABOR_PLAN[index].line} เป็น ${val} คนแล้ว`, "good");
-      });
-    });
-  }
+// machines stopped right now: job cards stopped for a machine reason, and open repair requests
+function renderMachineLive() {
+  const card = document.getElementById("machineTable");
+  if (!card) return;
+  let box = document.getElementById("resMachineLive");
+  if (!box) { box = document.createElement("div"); box.id = "resMachineLive"; card.parentElement.insertBefore(box, card); }
+  const stops = [];
+  (typeof WORK_ORDERS !== "undefined" ? WORK_ORDERS : []).forEach((w) => (w.jobs || []).forEach((j) => (j.downs || []).forEach((d) => {
+    if (!d.to && /เครื่อง|machine/i.test(d.reason || "")) stops.push(`${j.station} · ${w.wo} ${j.op}: ${d.reason} ตั้งแต่ ${new Date(d.from).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}${d.by ? ` (${d.by})` : ""}`);
+  })));
+  const mtDef = typeof DOC_TYPES !== "undefined" && DOC_TYPES.mt;
+  const mts = (typeof DEPT_DOCS !== "undefined" && DEPT_DOCS.mt || []).filter((d) => !(mtDef && (mtDef.closed || []).includes(d.status)) && !/เสร็จ|ปิด|ยกเลิก/.test(d.status || ""));
+  box.innerHTML = `<div class="res-live${stops.length || mts.length ? " res-live-bad" : ""}"><b>ตอนนี้จากระบบ:</b> ${stops.length ? `⚠ เครื่องจักรหยุด ${stops.length} งาน — ${escapeHtml(stops.join(" · "))}` : "ไม่มีงานที่หยุดเพราะเครื่องจักร"} · ใบแจ้งซ่อมที่ยังเปิด ${mts.length} ใบ${mts.length ? `: ${escapeHtml(mts.slice(0, 4).map((d) => `${d.no} ${d.title || ""} (${d.status})`).join(" · "))}` : ""}</div>`;
+}
+
+// calibration status from the due date itself (not a stored word that goes stale)
+function resParseThai(s) {
+  const m = String(s || "").match(/(\d{1,2})\s+(\S+)\s+(\d{4})/);
+  if (!m) return NaN;
+  const mi = TH_MONTHS_RES.indexOf(m[2]);
+  return mi < 0 ? NaN : new Date(Number(m[3]) - 543, mi, Number(m[1])).getTime();
+}
+function resToolStatus(t) {
+  const due = resParseThai(t.nextCal);
+  if (isNaN(due)) return t.status;
+  const days = (due - Date.now()) / 86400000;
+  return days < 0 ? "เกินกำหนด" : days <= 30 ? "ใกล้ครบกำหนด" : "ปกติ";
 }
 
 function renderMachineTable() {
@@ -203,7 +244,8 @@ function renderToolTable() {
 }
 
 function updateResourceStats() {
-  const laborGapCount = LABOR_PLAN.filter((l) => l.actual - l.required < 0).length;
+  TOOL_CALIBRATION.forEach((x) => { x.status = resToolStatus(x); });
+  const laborGapCount = resStations().filter((r) => r.gap < 0).length;
   const machineIssueCount = MACHINE_STATUS.filter((m) => m.status !== "ใช้งานปกติ").length;
   const toolOverdueCount = TOOL_CALIBRATION.filter((t) => t.status === "เกินกำหนด").length;
 
