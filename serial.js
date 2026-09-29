@@ -61,38 +61,58 @@ function snHistory(key) {
   const serial = wo ? wo.serial : key;
   const mc = snMachine(serial);
   const ev = [];
-  const add = (at, kind, title, detail, ref) => { if (at) ev.push({ at: String(at), kind, title, detail: detail || "", ref: ref || "" }); };
+  // every row says who did it / who is responsible (`who`)
+  const add = (at, kind, title, detail, ref, who) => { if (at) ev.push({ at: String(at), kind, title, detail: detail || "", ref: ref || "", who: who || "" }); };
+  const docWho = (d) => d.owner || d.requestedBy || d.requester || d.tech || (d.createdBy && typeof authUserName === "function" ? authUserName(d.createdBy) : "") || "";
   const keys = [wo && wo.wo, serial, mc && mc.no].filter(Boolean);
   if (wo) {
-    add(wo.createdAt || (wo.jobs && wo.jobs[0] && wo.jobs[0].logs && wo.jobs[0].logs[0] && wo.jobs[0].logs[0].from), "ผลิต", `ใบสั่งผลิต ${wo.wo}`, `${wo.model} · ${wo.department || ""} · กำหนดส่ง ${wo.dueDate || "-"}`, wo.wo);
+    const firstLog = (wo.jobs || []).map((j) => (j.logs || [])[0]).filter(Boolean).map((l) => l.from).sort()[0];
+    add(wo.createdAt || firstLog, "ผลิต", `ใบสั่งผลิต ${wo.wo}`, `${wo.model} · ${wo.department || ""} · กำหนดส่ง ${wo.dueDate || "-"}`, wo.wo,
+      (wo.createdBy && typeof authUserName === "function" ? authUserName(wo.createdBy) : "") || wo.assignee || "");
     (DEPT_DOCS.mreq || []).filter((d) => d.wo === wo.wo && Array.isArray(d.items)).forEach((d) => {
-      add(d.date, "เบิก", `ใบเบิก ${d.no} (${d.status})`, `${d.items.length} รายการ · ผู้ขอ ${d.owner || d.requester || "-"}`, d.no);
+      add(d.date, "เบิก", `ใบเบิก ${d.no} (${d.status})`, `${d.items.length} รายการ`, d.no, d.owner || d.requestedBy || docWho(d));
       const batches = {};
       d.items.forEach((it) => (it.log || []).forEach((g) => {
         const k = `${String(g.at).slice(0, 16)}|${g.kind}`;
         const b = batches[k] = batches[k] || { at: g.at, kind: g.kind, by: g.by, n: 0, qty: 0, names: [] };
         b.n++; b.qty += Number(g.qty) || 0; if (b.names.length < 4) b.names.push(it.part || it.code);
       }));
-      Object.values(batches).forEach((b) => add(b.at, b.kind === "คืนคลัง" ? "คืน" : "จ่าย", `${b.kind} ${b.n} รายการ ตาม ${d.no}`, `${b.names.join(", ")}${b.n > b.names.length ? ` และอีก ${b.n - b.names.length} รายการ` : ""} · โดย ${b.by || "-"}`, d.no));
-      if (d.ackAt) add(d.ackAt, "จ่าย", `ผู้รับยืนยันรับของ ${d.no}`, d.ackBy || "", d.no);
+      Object.values(batches).forEach((b) => add(b.at, b.kind === "คืนคลัง" ? "คืน" : "จ่าย", `${b.kind} ${b.n} รายการ ตาม ${d.no}`, `${b.names.join(", ")}${b.n > b.names.length ? ` และอีก ${b.n - b.names.length} รายการ` : ""}`, d.no, b.by));
+      if (d.ackAt) add(d.ackAt, "จ่าย", `ผู้รับยืนยันรับของ ${d.no}`, "ยืนยันด้วยรหัสผ่าน", d.no, d.ackBy);
     });
+    // one row per production step (not one per work session): started by whom, how many sessions, then done
     (wo.jobs || []).forEach((j) => {
-      (j.logs || []).forEach((l) => add(l.from, "Job Card", `${j.op} (${j.station})`, `${l.by || j.assignee || "-"} · ${l.to ? `ถึง ${new Date(l.to).toLocaleString("th-TH", { dateStyle: "short", timeStyle: "short" })}` : "กำลังทำ"}`, j.no));
-      (j.downs || []).forEach((d) => add(d.from, "หยุด", `หยุด ${j.op}: ${d.reason}`, d.to ? `${jcFmtMins(jcDownMins(d))}` : "ยังหยุดอยู่", j.no));
-      if (j.doneAt) add(j.doneAt, "เสร็จ", `เสร็จขั้นตอน ${j.op}`, `ใช้เวลา ${jcFmtMins(jcMinutes(j))}`, j.no);
+      const logs = (j.logs || []).slice().sort((x, y) => String(x.from).localeCompare(String(y.from)));
+      const people = [...new Set(logs.map((l) => l.by).filter(Boolean))];
+      if (logs.length) {
+        const open = logs.some((l) => !l.to);
+        add(logs[0].from, "Job Card", `เริ่ม ${j.op} (${j.station})`,
+          `${logs.length} ช่วงเวลา${open ? " · กำลังทำ" : ""}${j.status === "hold" ? " · หยุดอยู่" : ""}${people.length > 1 ? ` · ร่วมกับ ${people.slice(1).join(", ")}` : ""}`, j.no, people[0] || j.assignee);
+      }
+      (j.downs || []).forEach((d) => add(d.from, "หยุด", `หยุด ${j.op}: ${d.reason}`, d.to ? `นาน ${jcFmtMins(jcDownMins(d))}` : "ยังหยุดอยู่", j.no, d.by || j.assignee));
+      if (j.doneAt) add(j.doneAt, "เสร็จ", `เสร็จขั้นตอน ${j.op}`, `ใช้เวลาทำงาน ${jcFmtMins(jcMinutes(j))}${j.planMins ? ` (แผน ${jcFmtMins(j.planMins)})` : ""}`, j.no, (logs[logs.length - 1] || {}).by || j.assignee);
     });
-    (typeof SX_ENTRIES !== "undefined" ? SX_ENTRIES : []).filter((e) => e.wo === wo.wo || e.ref === wo.wo).forEach((e) => add(e.at, "คลัง", `${(SX_PURPOSES[e.purpose] || {}).label || e.purpose} ${e.no}${e.status === "ยกเลิก" ? " (ยกเลิก)" : ""}`, e.items.map((i) => `${i.key} × ${i.qty}`).join(", "), e.no));
+    (typeof SX_ENTRIES !== "undefined" ? SX_ENTRIES : []).filter((e) => e.wo === wo.wo || e.ref === wo.wo).forEach((e) => add(e.at, "คลัง", `${(SX_PURPOSES[e.purpose] || {}).label || e.purpose} ${e.no}${e.status === "ยกเลิก" ? " (ยกเลิก)" : ""}`, e.items.map((i) => `${i.key} × ${i.qty}`).join(", "), e.no, e.by));
   }
   // any document (QC, NCR, FI, ECR, service…) that names this work order, serial or machine record
   Object.keys(DEPT_DOCS).forEach((t) => (DEPT_DOCS[t] || []).forEach((d) => {
     if (t === "mreq" && d.wo && wo && d.wo === wo.wo) return;
-    if (mc && t === "mc" && d.no === mc.no) return;
+    if (t === "mc" && (d.no === (mc && mc.no) || d.title !== serial)) return; // another machine's record is not this machine's history
     const hit = keys.some((k) => Object.keys(d).some((f) => typeof d[f] === "string" && f !== "log" && (d[f] === k || (d[f].length < 400 && d[f].includes(k)))));
-    if (hit) add(d.date || d.created || "", DOC_TYPES[t] ? DOC_TYPES[t].abbr || t : t, `${d.no} ${d.title || ""}`, `${DOC_TYPES[t] ? DOC_TYPES[t].name.split(" (")[0] : t} · ${d.status || ""}`, d.no);
+    if (hit) add(d.date || d.created || "", DOC_TYPES[t] ? DOC_TYPES[t].abbr || t : t, `${d.no} ${d.title || ""}`, `${DOC_TYPES[t] ? DOC_TYPES[t].name.split(" (")[0] : t} · ${d.status || ""}`, d.no, docWho(d));
   }));
-  if (mc) add(mc.delivered || mc.date, "ทะเบียน", `ทะเบียนเครื่อง ${mc.no}`, `${mc.customer ? `ลูกค้า ${mc.customer} · ` : ""}${mc.status}${mc.hours ? ` · ${mc.hours} ชม.` : ""}`, mc.no);
+  if (mc) add(mc.delivered || mc.date, "ทะเบียน", `ทะเบียนเครื่อง ${mc.no}`, `${mc.customer ? `ลูกค้า ${mc.customer} · ` : ""}${mc.status}${mc.hours ? ` · ${mc.hours} ชม.` : ""}`, mc.no, mc.owner || "");
   ev.sort((a, b) => a.at.localeCompare(b.at));
   return { wo, serial, mc, ev };
+}
+
+// who is responsible for each step now — the machine's route with the person on it
+function snSteps(w) {
+  const label = { done: "เสร็จ", wip: "กำลังทำ", hold: "หยุด", open: "รอ" };
+  return (w.jobs || []).map((j) => {
+    const st = j.status === "done" ? "done" : (j.logs || []).some((l) => !l.to) ? "wip" : j.status === "hold" ? "hold" : "open";
+    return { j, st, text: label[st] || j.status };
+  });
 }
 
 function snOpenHistory(key) {
@@ -101,15 +121,20 @@ function snOpenHistory(key) {
   const icon = { "ผลิต": "🏭", "เบิก": "📋", "จ่าย": "📦", "คืน": "↩", "Job Card": "🛠", "หยุด": "⏸", "เสร็จ": "✅", "คลัง": "🏬", "ทะเบียน": "🚜" };
   const w = h.wo;
   const cost = w && typeof jcCost === "function" ? jcCost(w) : null;
+  const steps = w ? snSteps(w) : [];
+  const noOwner = steps.filter((s) => s.st !== "done" && !s.j.assignee);
   const body = `
     <div class="sn-head">
       <div><div class="sn-serial">${snEsc(h.serial)}</div>
         <div class="muted-inline">${w ? `${snEsc(w.wo)} · ${snEsc(w.model)} · ${snEsc(w.status)}` : snEsc(h.mc.model)}${h.mc ? ` · ทะเบียน ${snEsc(h.mc.no)}${h.mc.customer ? ` · ${snEsc(h.mc.customer)}` : ""}` : ""}</div>
+        ${w ? `<div class="sn-owner">ผู้รับผิดชอบงาน: ${w.assignee ? `<b>${snEsc(w.assignee)}</b>` : `<span class="pill pill-critical">ยังไม่มีผู้รับผิดชอบ</span>`}${w.customer ? ` · ลูกค้า ${snEsc(w.customer)}` : ""}</div>` : ""}
         ${cost && authCanSeeMgmtCost() ? `<div class="sn-cost">ต้นทุนถึงตอนนี้ <b>${jcBaht(cost.total)}</b> (ค่าดำเนินการ ${jcBaht(cost.actOp)} · วัสดุ ${jcBaht(cost.mat)})</div>` : ""}</div>
       <div class="sn-qr" id="snQr"></div>
     </div>
+    ${steps.length ? `<div class="sn-steps">${steps.map((s) => `<div class="sn-step sn-st-${s.st}"><b>${snEsc(s.j.station)}</b><span>${snEsc(s.j.op)}</span><span class="sn-who">${s.j.assignee ? `👤 ${snEsc(s.j.assignee)}` : `<span class="bx-low">⚠ ยังไม่มอบหมาย</span>`}</span><small>${snEsc(s.text)}</small></div>`).join("")}</div>
+      ${noOwner.length ? `<p class="muted-note">⚠ ${noOwner.length} ขั้นตอนยังไม่มีผู้รับผิดชอบ — มอบหมายได้ที่ Job Card</p>` : ""}` : ""}
     <div class="sn-actions"><button type="button" class="btn-secondary" id="snPrint">🏷 พิมพ์ป้าย QR ติดรถ</button>${w ? ` <button type="button" class="btn-secondary" id="snGoJc">🛠 เปิด Job Card</button>` : ""}</div>
-    <ol class="sn-timeline">${h.ev.length ? h.ev.map((e) => `<li><span class="sn-ic">${icon[e.kind] || "📄"}</span><div><div class="sn-t"><b>${snEsc(e.title)}</b><span class="muted-inline">${snEsc(snWhen(e.at))}</span></div><div class="muted-inline">${snEsc(e.detail)}</div></div></li>`).join("") : `<li class="muted-inline">ยังไม่มีประวัติ</li>`}</ol>`;
+    <ol class="sn-timeline">${h.ev.length ? h.ev.map((e) => `<li><span class="sn-ic">${icon[e.kind] || "📄"}</span><div><div class="sn-t"><b>${snEsc(e.title)}</b><span class="muted-inline">${snEsc(snWhen(e.at))}</span></div><div class="muted-inline">${e.who ? `<span class="sn-by">👤 ${snEsc(e.who)}</span>` : `<span class="sn-by sn-by-none">👤 ไม่ระบุ</span>`}${e.detail ? ` · ${snEsc(e.detail)}` : ""}</div></div></li>`).join("") : `<li class="muted-inline">ยังไม่มีประวัติ</li>`}</ol>`;
   snModal(`ประวัติรายคัน — ${h.serial}`, body);
   snQrInto(document.getElementById("snQr"), snLink({ serial: h.serial }), 4);
   document.getElementById("snPrint").addEventListener("click", () => snPrintLabels([{ code: h.serial, line1: w ? `${w.model} · ${w.wo}` : h.mc.model, line2: "Y2J — ประวัติรายคัน", link: snLink({ serial: h.serial }) }]));

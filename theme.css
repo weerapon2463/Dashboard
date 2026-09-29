@@ -520,3 +520,15 @@ html[data-floor="1"] .floor-toggle { display: none; }
 .apv-trail li.done { color: var(--txt-good, #067647); }
 .apv-trail li.now { font-weight: 600; color: var(--txt-warn, #b54708); }
 .paper-apv { margin-top: 14px; font-size: 10pt; }
+
+/* ประวัติรายคัน: responsible people */
+.sn-owner { margin-top: 4px; }
+.sn-steps { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 6px; margin: 10px 0 4px; }
+.sn-step { display: flex; flex-direction: column; gap: 1px; padding: 6px 8px; border: 1px solid var(--gridline, #d0d5dd); border-left-width: 4px; border-radius: 6px; font-size: 12.5px; }
+.sn-step small { opacity: .75; }
+.sn-st-done { border-left-color: var(--txt-good, #067647); }
+.sn-st-wip { border-left-color: var(--link, #1570ef); }
+.sn-st-hold { border-left-color: var(--txt-bad, #b42318); }
+.sn-st-open { border-left-color: var(--gridline, #98a2b3); }
+.sn-by { font-weight: 600; }
+.sn-by-none { opacity: .6; font-weight: 400; }
