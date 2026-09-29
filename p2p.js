@@ -96,8 +96,38 @@ function p2pHolder(c) {
   const st = p2pCurrent(c);
   if (!st) return "—";
   if (st.id === "ship") return `ผู้ขาย: ${c.supplier || "?"}`;
-  if (st.id === "approve") return (c.value || 0) > 100000 ? "ผู้จัดการโรงงาน" : `หัวหน้า${c.requester}`;
+  if (st.id === "approve") {
+    if (typeof apvMulti === "function" && apvMulti("pr", c)) return `ผู้อนุมัติ${apvProgress("pr", c) ? ` (${apvProgress("pr", c)})` : ""}`;
+    const op = p2pOpener(c);
+    const reqDept = typeof DEPT_WORKSPACES !== "undefined" ? DEPT_WORKSPACES.find((w) => c.requester && String(c.requester).includes(authDeptName(w.id))) : null;
+    return (c.value || 0) > 100000 ? "ผู้จัดการโรงงาน" : `หัวหน้า${reqDept ? authDeptName(reqDept.id) : op && op.dept ? authDeptName(op.dept) : c.requester}`;
+  }
   return st.holder;
+}
+// what the person holding the current step does next (plain words, per stage)
+const P2P_NEXT = {
+  pr: "กรอกสเปก จำนวน วันที่ต้องใช้ แล้วส่งขออนุมัติ",
+  approve: "ตรวจความจำเป็นและงบ แล้วกดอนุมัติ หรือไม่อนุมัติพร้อมเหตุผล",
+  rfq: "ขอราคา เลือกผู้ขาย บันทึกมูลค่าที่ตกลง",
+  po: "ออกใบสั่งซื้อ (PO) ส่งให้ผู้ขาย",
+  ack: "ให้ผู้ขายยืนยัน PO และวันส่ง แล้วบันทึกวันที่นัด",
+  ship: "ติดตามผู้ขายให้ส่งตามนัด — จัดซื้อเป็นผู้ติดตาม",
+  grn: "รับของ นับจำนวน บันทึกใบรับของ (GRN)",
+  iqc: "ตรวจคุณภาพ บันทึกผ่าน/ไม่ผ่าน (ผ่านแล้วของเข้าคลังหลัก)",
+  issue: "จ่ายของให้ไลน์ตามใบเบิก",
+  pay: "ตรวจ PO–ใบรับของ–ใบแจ้งหนี้ให้ตรงกัน แล้วส่งจ่าย",
+};
+// the people who can take the current step (names, not only a role)
+function p2pWhoCan(c) {
+  const st = p2pCurrent(c);
+  if (!st || typeof AUTH === "undefined" || !AUTH) return [];
+  const users = AUTH.users.filter((u) => u.active !== false && u.role !== "admin" && u.role !== "group");
+  let list;
+  if (st.id === "approve") list = users.filter((u) => p2pInboxTo(c, u));
+  else if (st.id === "ship") list = users.filter((u) => u.dept === "pur");
+  else if (st.who === "any") { const o = p2pOpener(c); list = o ? [o] : []; }
+  else list = users.filter((u) => u.dept === st.who);
+  return list.sort((a, b) => (b.role === "depthead") - (a.role === "depthead"));
 }
 function p2pWaitDays(c) {
   const since = p2pEnteredAt(c);
@@ -222,6 +252,7 @@ function p2pHolderStats() {
     if (p2pState(c) === "late") row.late++;
     row.oldest = Math.max(row.oldest, p2pWaitDays(c));
     row.cases.push(c.pr);
+    row.names = [...new Set((row.names || []).concat(p2pWhoCan(c).map((u) => u.name)))];
     map.set(h, row);
   });
   return [...map.values()].sort((a, b) => b.late - a.late || b.oldest - a.oldest);
@@ -317,7 +348,7 @@ function renderP2P() {
 
   // Who is holding work
   document.querySelector("#p2pHolderTable tbody").innerHTML = p2pHolderStats().map((h) => `<tr>
-    <td>${escapeHtml(h.holder)}</td>
+    <td>${escapeHtml(h.holder)}${(h.names || []).length ? `<div class="p2p-who">👤 ${escapeHtml(h.names.slice(0, 4).join(" / "))}</div>` : ""}</td>
     <td class="num">${h.count}</td>
     <td class="num">${h.late ? `<strong class="p2p-late-num">${h.late}</strong>` : "0"}</td>
     <td class="num">${h.oldest} วัน</td>
@@ -376,7 +407,13 @@ function renderP2PCaseTable() {
       <td>${escapeHtml(c.requester)}</td>
       <td>${escapeHtml(c.supplier || "—")}</td>
       <td>${p2pStepper(c)}<div class="pilot-kpi-method">${cur ? escapeHtml(cur.label) : meta.label}</div></td>
-      <td>${escapeHtml(cur ? p2pHolder(c) : "—")}</td>
+      <td>${cur ? (() => {
+        const who = p2pWhoCan(c);
+        const can = p2pCanRecord(cur, c) && cur.id !== "pr";
+        return `${escapeHtml(p2pHolder(c))}${who.length ? `<div class="p2p-who">👤 ${escapeHtml(who.slice(0, 3).map((u) => u.name).join(" / "))}${who.length > 3 ? ` +${who.length - 3}` : ""}</div>` : ""}
+          <div class="pilot-kpi-method">ต่อไป: ${escapeHtml(P2P_NEXT[cur.id] || cur.control || "")}</div>
+          ${can ? `<button type="button" class="btn-chip" data-p2pstep="${escapeHtml(c.id)}" data-stage="${escapeHtml(cur.id)}">▶ บันทึก${escapeHtml(cur.short || cur.label)}</button>` : ""}`;
+      })() : "—"}</td>
       <td class="num">${cur ? `${p2pWaitDays(c)} วัน` : "—"}</td>
       <td>${cur ? p2pDate(p2pDeadline(c, cur)) : "—"}</td>
       <td>${p2pDate(c.needBy)}</td>
@@ -385,6 +422,7 @@ function renderP2PCaseTable() {
   }).join("");
   document.getElementById("p2pCaseEmpty").hidden = rows.length > 0;
   document.querySelectorAll("#p2pCaseTable [data-case]").forEach((b) => b.addEventListener("click", () => openP2PCase(b.dataset.case)));
+  document.querySelectorAll("#p2pCaseTable [data-p2pstep]").forEach((b) => b.addEventListener("click", () => openP2PStep(b.dataset.p2pstep, b.dataset.stage)));
 }
 
 /* ---- permissions ------------------------------------------------------------ */
@@ -415,7 +453,10 @@ function p2pInboxTo(c, u) {
   if (typeof apvMulti === "function" && apvMulti("pr", c)) { const o = p2pOpener(c); return apvRoutesTo(u, "pr", o ? o.id : "", null, c); }
   const heads = (typeof AUTH !== "undefined" ? AUTH.users : []).filter((x) => x.active !== false && x.role === "depthead" && p2pMayApprove(c, x));
   if (u.role === "admin" || u.role === "plant") return (Number(c.value) || 0) > P2P_HEAD_LIMIT || !heads.length;
-  const own = heads.filter((x) => c.requester && c.requester === authDeptName(x.dept));
+  // the requesting department: the opener's own department, else the requester text (a department name)
+  const op = p2pOpener(c);
+  const byReq = heads.filter((x) => c.requester && (c.requester === authDeptName(x.dept) || String(c.requester).includes(authDeptName(x.dept))));
+  const own = byReq.length ? byReq : heads.filter((x) => op && op.dept && x.dept === op.dept);
   return own.length ? own.some((x) => x.id === u.id) : true;
 }
 function p2pCanRecord(stage, c) {
@@ -475,7 +516,7 @@ function openP2PCase(id) {
       <div class="paper-row"><div class="paper-label">เลขที่ PO / มูลค่า</div><div class="paper-value">${escapeHtml(c.po || "—")}${c.value && authCanSeeCost() ? ` · ${Number(c.value).toLocaleString("th-TH")} บาท` : ""}</div></div>
       <div class="paper-row"><div class="paper-label">วันที่ต้องใช้</div><div class="paper-value">${p2pDate(c.needBy)}</div></div>
       <div class="paper-row"><div class="paper-label">ผู้ขายนัดส่ง</div><div class="paper-value">${p2pDate(p2pPromised(c))}</div></div>
-      <div class="paper-row paper-row-wide"><div class="paper-label">ตอนนี้อยู่ที่</div><div class="paper-value"><strong>${cur ? `${escapeHtml(cur.label)} — ${escapeHtml(cur.id === "approve" && typeof apvMulti === "function" && apvMulti("pr", c) ? apvWaitingFor("pr", (p2pOpener(c) || {}).id || "", null, c) : p2pHolder(c))}` : meta.label}</strong>${cur ? ` · รอมาแล้ว ${p2pWaitDays(c)} วัน · กำหนด ${p2pDate(p2pDeadline(c, cur))}` : ""}</div></div>
+      <div class="paper-row paper-row-wide"><div class="paper-label">ตอนนี้อยู่ที่</div><div class="paper-value"><strong>${cur ? `${escapeHtml(cur.label)} — ${escapeHtml(cur.id === "approve" && typeof apvMulti === "function" && apvMulti("pr", c) ? apvWaitingFor("pr", (p2pOpener(c) || {}).id || "", null, c) : p2pHolder(c))}` : meta.label}</strong>${cur ? ` · รอมาแล้ว ${p2pWaitDays(c)} วัน · กำหนด ${p2pDate(p2pDeadline(c, cur))}` : ""}${cur && p2pWhoCan(c).length ? `<br>👤 ${escapeHtml(p2pWhoCan(c).map((u) => u.name).join(" / "))}` : ""}${cur ? `<br>ต่อไป: ${escapeHtml(P2P_NEXT[cur.id] || cur.control || "")}` : ""}</div></div>
     </div>
     ${ex.length ? `<div class="paper-section-title">ประเด็นที่ต้องจัดการ</div><div class="paper-textbox">${ex.map((x) => `<div class="p2p-sheet-issue ${x.sev}">● ${escapeHtml(x.text)}<br><span>ผู้รับผิดชอบ: ${escapeHtml(x.owner)} · ควรทำ: ${escapeHtml(x.action)}</span></div>`).join("")}</div>` : ""}
     ${typeof apvMulti === "function" && apvMulti("pr", c) && ((c.apv || []).length || (cur && cur.id === "approve")) ? `<div class="paper-section-title">ลำดับขั้นอนุมัติ</div>${apvHistoryHtml("pr", c)}` : ""}

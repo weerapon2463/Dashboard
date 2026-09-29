@@ -27,7 +27,10 @@ async function run(ctx) {
   as("demo-prod");
   esStartSign(type, idx);
   step("หัวหน้าผลิต", "หน้าลงนามแสดงครบ 3 ช่อง", document.querySelectorAll('#esBody input[name="esSlot"]').length === 3, radios());
-  step("หัวหน้าผลิต", "ช่องผู้จัดทำ = ลงนามแทนได้ · ผู้อนุมัติยังไม่ถึงคิว (บอกเหตุผล)", /p0/.test(radios()) && /2×/.test(radios()) && /รอ/.test(document.getElementById("esBody").textContent));
+  step("หัวหน้าผลิต", "ลงช่องไหนก่อนก็ได้: ผู้จัดทำ = ลงนามแทนได้ · ผู้ตรวจสอบ/ผู้อนุมัติเลือกได้ทันที", /p0/.test(radios()) && !/1×/.test(radios()) && !/2×/.test(radios()), radios());
+  { const fsx = JSON.parse(localStorage.getItem("y2j-form-settings-v1") || "{}"); fsx.signOrder = true; localStorage.setItem("y2j-form-settings-v1", JSON.stringify(fsx)); esStartSign(type, idx);
+    step("บริษัท", "เปิด \"บังคับลงตามลำดับ\" → ผู้อนุมัติต้องรอ (บอกเหตุผล)", /2×/.test(radios()) && /ตามลำดับ/.test(document.getElementById("esBody").textContent), radios());
+    fsx.signOrder = false; localStorage.setItem("y2j-form-settings-v1", JSON.stringify(fsx)); esStartSign(type, idx); }
   await sign("p0", "", "");
   step("หัวหน้าผลิต", "ลงนามแทนต้องเลือกว่าแทนใคร", !(doc.signatures || {})[0], toasts[toasts.length - 1]);
   await sign("p0", "u-demo-weld", "");

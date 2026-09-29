@@ -139,7 +139,8 @@ function esPolicy() {
   try { s = JSON.parse(localStorage.getItem("y2j-form-settings-v1") || "{}") || {}; } catch (e) { /* defaults */ }
   // selfApprove (the person who made it may also approve it) is OFF unless a company turns it on:
   // requester and approver are two people by default (separation of duties, 29 ก.ย.)
-  return { multiSign: s.multiSign !== false, selfApprove: s.selfApprove === true, proxySign: s.proxySign !== false };
+  // signOrder: boxes must be signed left to right — OFF by default (any box, any order; rights still apply)
+  return { multiSign: s.multiSign !== false, selfApprove: s.selfApprove === true, proxySign: s.proxySign !== false, signOrder: s.signOrder === true };
 }
 
 // Signature images live once on the user (current + history); a signed box stores only a short key.
@@ -167,7 +168,7 @@ function esWhyNot(type, doc, slot) {
   const pol = esPolicy();
   if (!pol.multiSign && Object.values(sigs).some((s) => s && s.uid === me.id)) return "คุณลงนามในเอกสารนี้แล้ว — นโยบายบริษัท: หนึ่งคนลงนามได้หนึ่งช่อง";
   if (me.signature && Object.values(sigs).some((s) => s && s.uid !== me.id && (s.sig ? s.sig === esSigKey(me.signature) : s.img === me.signature))) return "ลายเซ็นนี้ถูกใช้ในเอกสารนี้แล้ว (บัญชีอื่น)";
-  if (slot > 0 && !sigs[slot - 1]) return `ต้องรอ "${esSlots()[slot - 1]}" ลงนามก่อน`;
+  if (pol.signOrder && slot > 0 && !sigs[slot - 1]) return `ต้องรอ "${esSlots()[slot - 1]}" ลงนามก่อน (บริษัทกำหนดให้ลงตามลำดับ)`;
   if (slot === 2 && doc.createdBy === me.id && me.role !== "admin" && !pol.selfApprove) return "ผู้จัดทำลงนามอนุมัติเอกสารของตัวเองไม่ได้ — ให้หัวหน้าคนอื่นหรือผู้จัดการอนุมัติ";
   const role = currentRole();
   if (slot === 0) {
@@ -199,7 +200,7 @@ function esProxyWhyNot(type, doc, slot) {
   const sigs = doc.signatures || {};
   if (sigs[slot]) return "ช่องนี้ลงนามแล้ว";
   if (!esWhyNot(type, doc, slot)) return "ลงนามเองได้";
-  if (slot > 0 && !sigs[slot - 1]) return `ต้องรอ "${esSlots()[slot - 1]}" ลงนามก่อน`;
+  if (pol.signOrder && slot > 0 && !sigs[slot - 1]) return `ต้องรอ "${esSlots()[slot - 1]}" ลงนามก่อน (บริษัทกำหนดให้ลงตามลำดับ)`;
   if (!pol.multiSign && Object.values(sigs).some((s) => s && s.uid === me.id)) return "คุณลงนามในเอกสารนี้แล้ว — นโยบายบริษัท: หนึ่งคนลงนามได้หนึ่งช่อง";
   if (slot === 2 && doc.createdBy === me.id && me.role !== "admin" && !pol.selfApprove) return "ผู้จัดทำลงนามแทนผู้อนุมัติไม่ได้";
   if (["admin", "plant", "group"].includes(me.role)) return "";
@@ -217,8 +218,8 @@ function esPaperBoxes(type, doc) {
     const s = (doc.signatures || {})[i];
     if (!s) {
       const name = i === 0 ? doc.owner || doc.requester || "" : "";
-      const can = typeof authCurrentUser === "function" && authCurrentUser() && (esCanSign(type, doc, i) || esCanProxy(type, doc, i));
-      return `<div class="sig-box${can ? " sig-can" : ""}"${can ? ` data-essign="${i}" role="button" tabindex="0" title="กดเพื่อลงนามช่องนี้"` : ""}><div class="sig-line">${can ? "✍ กดเพื่อลงนาม" : name ? escapeHtml(name) : "&nbsp;"}</div><div class="sig-label">${escapeHtml(slots[i])}</div><div class="sig-date">วันที่ ____/____/______</div></div>`;
+      const can = typeof authCurrentUser === "function" && !!authCurrentUser();
+      return `<div class="sig-box${can ? " sig-can" : ""}"${can ? ` data-essign="${i}" role="button" tabindex="0" title="กดเพื่อลงนามช่องนี้"` : ""}><div class="sig-line">${can && (esCanSign(type, doc, i) || esCanProxy(type, doc, i)) ? "✍ กดเพื่อลงนาม" : name ? escapeHtml(name) : "&nbsp;"}</div><div class="sig-label">${escapeHtml(slots[i])}</div><div class="sig-date">วันที่ ____/____/______</div></div>`;
     }
     const changed = s.hash && s.hash !== hash;
     return `<div class="sig-box sig-signed${changed ? " sig-changed" : ""}">
@@ -240,7 +241,7 @@ function esStartSign(type, index, want) {
   if (!doc || !me) return;
   const slots = esSignable(type, doc);
   const proxies = [0, 1, 2].filter((s) => esCanProxy(type, doc, s));
-  if (!slots.length && !proxies.length) { showToast(esWhyNot(type, doc, [0, 1, 2].find((s) => !(doc.signatures || {})[s]) ?? 0) || "ไม่มีช่องที่คุณลงนามได้ในเอกสารนี้", "warn"); return; }
+  if (!slots.length && !proxies.length) { const at = want !== undefined && !(doc.signatures || {})[want] ? want : [0, 1, 2].find((s) => !(doc.signatures || {})[s]) ?? 0; showToast(`${esSlots()[at]}: ${esWhyNot(type, doc, at) || "ลงนามไม่ได้"}`, "warn"); return; }
   if (!me.signature) { closeDocView(); esOpenPad(() => esStartSign(type, index)); showToast("ตั้งลายเซ็นก่อน แล้วค่อยลงนาม", "warn"); return; }
   esPending = { type, index };
   const labels = esSlots();
@@ -325,7 +326,7 @@ function esWithdraw(type, index, slot) {
   const me = authCurrentUser();
   const s = (doc.signatures || {})[slot];
   if (!s || !me || (s.uid !== me.id && me.role !== "admin")) return;
-  if ((doc.signatures || {})[slot + 1]) { showToast(`ถอนไม่ได้ — "${esSlots()[slot + 1]}" ลงนามต่อจากช่องนี้แล้ว ต้องถอนช่องถัดไปก่อน`, "warn"); return; }
+  if (esPolicy().signOrder && (doc.signatures || {})[slot + 1]) { showToast(`ถอนไม่ได้ — "${esSlots()[slot + 1]}" ลงนามต่อจากช่องนี้แล้ว ต้องถอนช่องถัดไปก่อน`, "warn"); return; }
   if (!confirm(`ถอนลายเซ็นช่อง "${esSlots()[slot]}" ของ ${s.name}?`)) return;
   delete doc.signatures[slot];
   saveDeptDocs();

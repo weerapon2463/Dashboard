@@ -597,3 +597,5 @@ tr.wo-group-row td { background: color-mix(in srgb, var(--accent, #f2a60d) 10%, 
 
 .res-live { margin: 0 0 12px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--gridline, #d0d5dd); font-size: 13px; }
 .res-live-bad { border-color: var(--txt-bad, #b42318); background: color-mix(in srgb, var(--txt-bad, #b42318) 8%, transparent); }
+
+.p2p-who { font-weight: 600; margin-top: 2px; }
