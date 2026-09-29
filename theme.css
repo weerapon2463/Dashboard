@@ -532,3 +532,20 @@ html[data-floor="1"] .floor-toggle { display: none; }
 .sn-st-open { border-left-color: var(--gridline, #98a2b3); }
 .sn-by { font-weight: 600; }
 .sn-by-none { opacity: .6; font-weight: 400; }
+
+/* signing: pick the box */
+.es-slots { border: 0; padding: 0; margin: 0 0 12px; display: grid; gap: 6px; }
+.es-slots legend { font-weight: 600; margin-bottom: 6px; }
+.es-slot { display: flex; gap: 10px; align-items: flex-start; padding: 8px 10px; border: 1px solid var(--gridline, #d0d5dd); border-radius: 8px; cursor: pointer; }
+.es-slot span { display: flex; flex-direction: column; }
+.es-slot small { opacity: .75; }
+.es-slot:has(input:checked) { border-color: var(--link, #1570ef); box-shadow: 0 0 0 1px var(--link, #1570ef); }
+.es-slot-off { opacity: .6; cursor: not-allowed; }
+.sig-box.sig-can { cursor: pointer; border-radius: 8px; outline: 2px dashed var(--link, #1570ef); outline-offset: 4px; }
+.sig-box.sig-can .sig-line { color: var(--link, #1570ef); font-weight: 600; }
+@media print { .sig-box.sig-can { outline: 0; } .sig-box.sig-can .sig-line { color: transparent; } }
+.pdf-capture .sig-box.sig-can { outline: 0; } .pdf-capture .sig-box.sig-can .sig-line { color: transparent; }
+
+.es-slot-proxy { border-style: dashed; }
+.es-proxy { margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--txt-warn, #b54708) 8%, transparent); }
+.sig-proxy { font-size: 11px; color: var(--txt-warn, #b54708); }

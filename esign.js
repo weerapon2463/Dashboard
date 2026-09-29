@@ -139,7 +139,7 @@ function esPolicy() {
   try { s = JSON.parse(localStorage.getItem("y2j-form-settings-v1") || "{}") || {}; } catch (e) { /* defaults */ }
   // selfApprove (the person who made it may also approve it) is OFF unless a company turns it on:
   // requester and approver are two people by default (separation of duties, 29 ก.ย.)
-  return { multiSign: s.multiSign !== false, selfApprove: s.selfApprove === true };
+  return { multiSign: s.multiSign !== false, selfApprove: s.selfApprove === true, proxySign: s.proxySign !== false };
 }
 
 // Signature images live once on the user (current + history); a signed box stores only a short key.
@@ -187,6 +187,28 @@ function esWhyNot(type, doc, slot) {
 function esCanSign(type, doc, slot) { return !esWhyNot(type, doc, slot); }
 function esSignable(type, doc) { return [0, 1, 2].filter((s) => esCanSign(type, doc, s)); }
 
+// ลงนามแทน — a senior person signs a box for someone else (absent, on leave…), naming who and why.
+// Never overrides: the box order, one box per person (policy), the maker signing the approver box.
+// Heads of department (level ≥ หัวหน้าแผนก, managing this kind of document) may sign for the maker or the
+// checker; the approver box only the plant manager / executives / admin.
+function esProxyWhyNot(type, doc, slot) {
+  const me = authCurrentUser();
+  if (!me) return "ยังไม่ได้เข้าระบบ";
+  const pol = esPolicy();
+  if (!pol.proxySign) return "บริษัทไม่เปิดให้ลงนามแทน";
+  const sigs = doc.signatures || {};
+  if (sigs[slot]) return "ช่องนี้ลงนามแล้ว";
+  if (!esWhyNot(type, doc, slot)) return "ลงนามเองได้";
+  if (slot > 0 && !sigs[slot - 1]) return `ต้องรอ "${esSlots()[slot - 1]}" ลงนามก่อน`;
+  if (!pol.multiSign && Object.values(sigs).some((s) => s && s.uid === me.id)) return "คุณลงนามในเอกสารนี้แล้ว — นโยบายบริษัท: หนึ่งคนลงนามได้หนึ่งช่อง";
+  if (slot === 2 && doc.createdBy === me.id && me.role !== "admin" && !pol.selfApprove) return "ผู้จัดทำลงนามแทนผู้อนุมัติไม่ได้";
+  if (["admin", "plant", "group"].includes(me.role)) return "";
+  if (slot === 2) return "ลงนามแทนผู้อนุมัติได้เฉพาะผู้จัดการโรงงาน / ผู้บริหาร";
+  const lvl = typeof apvLevelOf === "function" ? apvLevelOf(me) : (me.role === "depthead" ? 3 : 1);
+  return lvl >= 3 && deptCanManage(me.role, type) ? "" : "ลงนามแทนได้เฉพาะหัวหน้าแผนกขึ้นไปที่ดูแลเอกสารชนิดนี้";
+}
+function esCanProxy(type, doc, slot) { return !esProxyWhyNot(type, doc, slot); }
+
 // Boxes for the paper form (replaces the blank lines when the document has signatures or can be signed)
 function esPaperBoxes(type, doc) {
   const slots = esSlots();
@@ -195,12 +217,13 @@ function esPaperBoxes(type, doc) {
     const s = (doc.signatures || {})[i];
     if (!s) {
       const name = i === 0 ? doc.owner || doc.requester || "" : "";
-      return `<div class="sig-box"><div class="sig-line">${name ? escapeHtml(name) : "&nbsp;"}</div><div class="sig-label">${escapeHtml(slots[i])}</div><div class="sig-date">วันที่ ____/____/______</div></div>`;
+      const can = typeof authCurrentUser === "function" && authCurrentUser() && (esCanSign(type, doc, i) || esCanProxy(type, doc, i));
+      return `<div class="sig-box${can ? " sig-can" : ""}"${can ? ` data-essign="${i}" role="button" tabindex="0" title="กดเพื่อลงนามช่องนี้"` : ""}><div class="sig-line">${can ? "✍ กดเพื่อลงนาม" : name ? escapeHtml(name) : "&nbsp;"}</div><div class="sig-label">${escapeHtml(slots[i])}</div><div class="sig-date">วันที่ ____/____/______</div></div>`;
     }
     const changed = s.hash && s.hash !== hash;
     return `<div class="sig-box sig-signed${changed ? " sig-changed" : ""}">
       <div class="sig-line"><img class="sig-img" src="${esSigImg(s)}" alt="ลายเซ็น ${escapeHtml(s.name)}"></div>
-      <div class="sig-name">(${escapeHtml(s.name)})</div>
+      <div class="sig-name">(${escapeHtml(s.name)})${s.onBehalf ? `<br><span class="sig-proxy">ลงนามแทน ${escapeHtml(s.onBehalf.name)}${s.reason ? ` · ${escapeHtml(s.reason)}` : ""}</span>` : ""}</div>
       <div class="sig-label">${escapeHtml(slots[i])}${s.position ? ` · ${escapeHtml(s.position)}` : ""}</div>
       <div class="sig-date">ลงนาม ${fmtDateTime(s.at)}</div>
       ${changed ? `<div class="sig-warn">⚠ เอกสารถูกแก้ไขหลังลงนาม</div>` : `<div class="sig-ok">✓ ลงนามอิเล็กทรอนิกส์</div>`}
@@ -209,19 +232,34 @@ function esPaperBoxes(type, doc) {
   return `<div class="paper-sigs">${box(0)}${box(1)}${box(2)}</div>${(doc.apv || []).length && typeof apvHistoryHtml === "function" ? `<div class="paper-apv"><b>ลำดับขั้นอนุมัติ</b>${apvHistoryHtml(type, doc)}</div>` : ""}`;
 }
 
-function esStartSign(type, index) {
+// `want` = the box the signer picked (on the paper or in the list); every box is listed, the ones
+// this person cannot sign say why
+function esStartSign(type, index, want) {
   const doc = DEPT_DOCS[type][index];
   const me = authCurrentUser();
   if (!doc || !me) return;
   const slots = esSignable(type, doc);
-  if (!slots.length) { showToast(esWhyNot(type, doc, [0, 1, 2].find((s) => !(doc.signatures || {})[s]) ?? 0) || "ไม่มีช่องที่คุณลงนามได้ในเอกสารนี้", "warn"); return; }
+  const proxies = [0, 1, 2].filter((s) => esCanProxy(type, doc, s));
+  if (!slots.length && !proxies.length) { showToast(esWhyNot(type, doc, [0, 1, 2].find((s) => !(doc.signatures || {})[s]) ?? 0) || "ไม่มีช่องที่คุณลงนามได้ในเอกสารนี้", "warn"); return; }
   if (!me.signature) { closeDocView(); esOpenPad(() => esStartSign(type, index)); showToast("ตั้งลายเซ็นก่อน แล้วค่อยลงนาม", "warn"); return; }
   esPending = { type, index };
   const labels = esSlots();
   document.getElementById("esBody").innerHTML = `
     <h3>ลงนาม ${escapeHtml(doc.no)}</h3>
     <p class="card-sub">${escapeHtml(String(doc.title || ""))}</p>
-    <div class="form-field"><label for="esSlot">ลงนามในฐานะ</label><select id="esSlot">${slots.map((s) => `<option value="${s}">${escapeHtml(labels[s])}</option>`).join("")}</select></div>
+    <fieldset class="es-slots"><legend>เลือกช่องที่จะลงนาม</legend>${[0, 1, 2].map((s) => {
+      const signed = (doc.signatures || {})[s];
+      const why = signed ? `ลงนามแล้วโดย ${signed.name}${signed.onBehalf ? ` (แทน ${signed.onBehalf.name})` : ""}` : esWhyNot(type, doc, s);
+      const proxy = !signed && why && proxies.includes(s);
+      const pick = slots.includes(want) ? String(want) : proxies.includes(want) ? `p${want}` : slots.length ? String(slots[0]) : `p${proxies[0]}`;
+      const val = proxy ? `p${s}` : String(s);
+      return `<label class="es-slot${why && !proxy ? " es-slot-off" : ""}${proxy ? " es-slot-proxy" : ""}"><input type="radio" name="esSlot" value="${val}"${why && !proxy ? " disabled" : ""}${val === pick ? " checked" : ""}>
+        <span><b>${escapeHtml(labels[s])}${proxy ? " — ลงนามแทน" : ""}</b><small>${escapeHtml(proxy ? `ปกติ: ${why}` : why || "ลงนามได้")}</small></span></label>`;
+    }).join("")}</fieldset>
+    <div class="es-proxy" id="esProxyBox" hidden>
+      <div class="form-field"><label for="esProxyFor">ลงนามแทนใคร *</label><select id="esProxyFor"><option value="">— เลือก —</option>${AUTH.users.filter((u) => u.active !== false && u.id !== me.id).map((u) => `<option value="${escapeHtml(u.id)}"${u.id === doc.createdBy ? " data-maker=\"1\"" : ""}>${escapeHtml(u.name)}${u.position ? ` — ${escapeHtml(u.position)}` : ""}</option>`).join("")}</select></div>
+      <div class="form-field"><label for="esProxyWhy">เหตุผล *</label><input id="esProxyWhy" maxlength="120" placeholder="เช่น ลาพักร้อน / ไปต่างจังหวัด / ได้รับมอบหมาย"></div>
+    </div>
     <div class="es-preview"><img src="${me.signature}" alt="ลายเซ็นของฉัน"><div>(${escapeHtml(me.name)})${me.position ? ` · ${escapeHtml(me.position)}` : ""}</div></div>
     <div class="form-field"><label for="esPin">ยืนยันด้วยรหัสผ่าน</label><input type="password" id="esPin" autocomplete="current-password" maxlength="32"></div>
     <p class="muted-note">การลงนามบันทึกชื่อ วันเวลา และลายนิ้วมือของเนื้อหาเอกสาร — ถ้ามีการแก้ไขเนื้อหาภายหลัง ลายเซ็นจะแสดงว่า "ถูกแก้ไขหลังลงนาม"</p>
@@ -231,8 +269,19 @@ function esStartSign(type, index) {
       <button type="button" class="btn-primary" id="esConfirm">ลงนาม</button>
     </div>`;
   document.getElementById("esCancel2").addEventListener("click", () => document.getElementById("esBackdrop").classList.remove("open"));
-  document.getElementById("esChange").addEventListener("click", () => esOpenPad(() => esStartSign(type, index)));
+  document.getElementById("esChange").addEventListener("click", () => esOpenPad(() => esStartSign(type, index, want)));
   document.getElementById("esConfirm").addEventListener("click", esConfirmSign);
+  // signing for someone else: ask who and why (the maker is the usual one for the first box)
+  const syncProxy = () => {
+    const v = (document.querySelector('#esBody input[name="esSlot"]:checked') || {}).value || "";
+    const on = v.startsWith("p");
+    document.getElementById("esProxyBox").hidden = !on;
+    const who = document.getElementById("esProxyFor");
+    if (on && v === "p0" && !who.value) { const m = who.querySelector("[data-maker]"); if (m) who.value = m.value; }
+    document.getElementById("esConfirm").textContent = on ? "ลงนามแทน" : "ลงนาม";
+  };
+  document.querySelectorAll('#esBody input[name="esSlot"]').forEach((r) => r.addEventListener("change", syncProxy));
+  syncProxy();
   document.getElementById("esPin").addEventListener("keydown", (e) => { if (e.key === "Enter") esConfirmSign(); });
   closeDocView(true);
   document.getElementById("esBackdrop").classList.add("open");
@@ -246,12 +295,23 @@ async function esConfirmSign() {
   const me = authCurrentUser();
   const pin = document.getElementById("esPin").value;
   if (!(await authCheckSecret(me, pin))) { showToast("รหัสผ่านไม่ถูกต้อง", "warn"); document.getElementById("esPin").select(); return; }
-  const slot = Number(document.getElementById("esSlot").value);
-  if (!esCanSign(type, doc, slot)) { showToast("ลงนามช่องนี้ไม่ได้", "warn"); return; }
+  const picked = document.querySelector('#esBody input[name="esSlot"]:checked');
+  if (!picked) { showToast("เลือกช่องที่จะลงนามก่อน", "warn"); return; }
+  const proxy = picked.value.startsWith("p");
+  const slot = Number(picked.value.replace("p", ""));
+  let onBehalf = null, reason = "";
+  if (proxy) {
+    const who = authUserById(document.getElementById("esProxyFor").value);
+    reason = document.getElementById("esProxyWhy").value.trim();
+    if (!who) { showToast("เลือกว่าลงนามแทนใคร", "warn"); document.getElementById("esProxyFor").focus(); return; }
+    if (!reason) { showToast("ใส่เหตุผลที่ลงนามแทน", "warn"); document.getElementById("esProxyWhy").focus(); return; }
+    if (!esCanProxy(type, doc, slot)) { showToast(esProxyWhyNot(type, doc, slot) || "ลงนามแทนช่องนี้ไม่ได้", "warn"); return; }
+    onBehalf = { uid: who.id, name: who.name };
+  } else if (!esCanSign(type, doc, slot)) { showToast("ลงนามช่องนี้ไม่ได้", "warn"); return; }
   doc.signatures = doc.signatures || {};
-  doc.signatures[slot] = { uid: me.id, name: me.name, position: me.position || "", at: new Date().toISOString(), sig: esSigKey(me.signature), hash: esDocHash(type, doc) };
+  doc.signatures[slot] = Object.assign({ uid: me.id, name: me.name, position: me.position || "", at: new Date().toISOString(), sig: esSigKey(me.signature), hash: esDocHash(type, doc) }, onBehalf ? { onBehalf, reason } : {});
   saveDeptDocs();
-  auditLog("ลงนามเอกสาร", doc.no, `${esSlots()[slot]} · ${me.name}`);
+  auditLog("ลงนามเอกสาร", doc.no, `${esSlots()[slot]} · ${me.name}${onBehalf ? ` · ลงนามแทน ${onBehalf.name} (${reason})` : ""}`);
   document.getElementById("esBackdrop").classList.remove("open");
   esPending = null;
   if (typeof renderDept === "function") renderDept();

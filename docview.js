@@ -363,7 +363,7 @@ function openDocView(type, index) {
   const role = currentRole();
   const actions = paperOutputActions();
   if (hasAuth && typeof esSignable === "function") {
-    if (esSignable(type, doc).length) actions.push({ label: "✍ ลงนาม", primary: true, onClick: () => esStartSign(type, index) });
+    if (esSignable(type, doc).length || (typeof esCanProxy === "function" && [0, 1, 2].some((s) => esCanProxy(type, doc, s)))) actions.push({ label: "✍ ลงนาม", primary: true, onClick: () => esStartSign(type, index) });
     const me = authCurrentUser();
     Object.keys(doc.signatures || {}).forEach((slot) => {
       const s = doc.signatures[slot];
@@ -379,6 +379,12 @@ function openDocView(type, index) {
   const paper = document.getElementById("docPaper");
   paper.querySelectorAll("[data-docno]").forEach((b) => b.addEventListener("click", () => openDocViewByNo(b.dataset.docno)));
   paper.querySelectorAll("[data-bommodel]").forEach((b) => b.addEventListener("click", () => openBomSheet(b.dataset.bommodel)));
+  // tap an empty signature box to sign that box
+  paper.querySelectorAll("[data-essign]").forEach((b) => {
+    const go = () => esStartSign(type, index, Number(b.dataset.essign));
+    b.addEventListener("click", go);
+    b.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+  });
   renderDocAttachments(type, doc);
 }
 
@@ -513,6 +519,7 @@ function openFormDesigner() {
   const pol = typeof esPolicy === "function" ? esPolicy() : { multiSign: true, selfApprove: true };
   document.getElementById("fs_multiSign").checked = pol.multiSign;
   document.getElementById("fs_selfApprove").checked = pol.selfApprove;
+  if (document.getElementById("fs_proxySign")) document.getElementById("fs_proxySign").checked = pol.proxySign !== false;
   const apv = document.getElementById("fs_approvalMode");
   if (apv && typeof APV_MODES !== "undefined") apv.innerHTML = APV_MODES.map((m) => `<option value="${m[0]}"${m[0] === apvMode() ? " selected" : ""}>${escapeHtml(m[1])}</option>`).join("");
   formDesignerLogo = fs.logo || "";
@@ -551,6 +558,7 @@ function saveFormDesigner() {
   try { prevFs = JSON.parse(localStorage.getItem(FORM_SETTINGS_KEY) || "{}") || {}; } catch (e) { /* none */ }
   const next = Object.assign({}, prevFs, { logo: formDesignerLogo, showFlow: document.getElementById("fs_showFlow").checked,
     multiSign: document.getElementById("fs_multiSign").checked, selfApprove: document.getElementById("fs_selfApprove").checked,
+    proxySign: document.getElementById("fs_proxySign") ? document.getElementById("fs_proxySign").checked : true,
     approvalMode: (document.getElementById("fs_approvalMode") || {}).value || "rights" });
   ["companyTh", "companyEn", "address", "sig1", "sig2", "sig3", "footer"].forEach((k) => {
     next[k] = document.getElementById(`fs_${k}`).value.trim();
