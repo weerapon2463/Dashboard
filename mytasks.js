@@ -57,6 +57,12 @@ function mtCollect() {
       add({ group: "ติดตาม", icon: "⏳", title: `ใบเบิกของฉัน ${d.no} — ${d.status}`, detail: `อยู่ที่: ${bxReqHolder(d)} · รอมา ${age} วัน`, tone: age >= 2 ? "warning" : "neutral", score: 20 + age, age, act: () => { switchView("bomx"); bxOpenReq(d.no); } });
   });
 
+  /* stock counts waiting for the store head (not the counter) */
+  if (typeof stCounts === "function" && typeof BX_SETTINGS !== "undefined") stCounts().filter((c) => c.status === "รออนุมัติ" && stMayApproveCount(c)).forEach((c) => {
+    const v = stCountVar(c);
+    add({ group: "อนุมัติ", icon: "📋", title: `ผลตรวจนับ ${c.no}`, detail: `คลัง ${c.wh} · ผลต่าง ${v.diff.length} รายการ · นับโดย ${c.countedBy || "-"}`, tone: v.diff.length ? "warning" : "neutral", score: 50, age: mtDays(c.submittedAt), act: () => { bxTab = "sx"; sxSub = "count"; stCountOpen = c.no; switchView("bomx"); } });
+  });
+
   /* purchase requests I opened that were turned down (last 7 days) */
   if (typeof P2P_CASES !== "undefined" && typeof p2pEvent === "function") P2P_CASES.forEach((c) => {
     const opened = p2pEvent(c, "pr"), ap = p2pEvent(c, "approve");

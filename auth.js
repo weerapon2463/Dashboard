@@ -139,14 +139,21 @@ async function authSetSecret(user, secret) {
   delete user.mustChange;
 }
 function authSecretProblem(s) {
-  if (typeof s !== "string" || s.length < 4) return "รหัสผ่านต้องยาวอย่างน้อย 4 ตัว";
+  if (s === DEMO_PIN && authTrialDefault()) return ""; // trial period: 1234 is the agreed password
+  const min = Math.max(4, Number(typeof AUTH !== "undefined" && AUTH && AUTH.loginPolicy && AUTH.loginPolicy.minLen) || 4); // Admin › การเข้าสู่ระบบ
+  if (typeof s !== "string" || s.length < min) return `รหัสผ่านต้องยาวอย่างน้อย ${min} ตัว`;
   if (s.length > 32) return "รหัสผ่านยาวได้ไม่เกิน 32 ตัว";
-  if (s === DEMO_PIN) return "ห้ามใช้ 1234 — ตั้งรหัสของตัวเอง";
+  if (s === DEMO_PIN && !authTrialDefault()) return "ห้ามใช้ 1234 — ตั้งรหัสของตัวเอง";
   return "";
 }
+// trial period (Admin › การเข้าสู่ระบบ): everyone may sign in with 1234 without being asked to change it
+function authTrialDefault() { return !!(typeof AUTH !== "undefined" && AUTH && AUTH.loginPolicy && AUTH.loginPolicy.trial1234); }
 function authNeedsNewSecret(user) {
   const demo = typeof Y2JStore !== "undefined" && Y2JStore.config().demo;
-  return !demo && (user.mustChange || (!user.pw && user.pin === pinHash(DEMO_PIN, user.id)));
+  if (demo) return false;
+  const onDefault = !user.pw && user.pin === pinHash(DEMO_PIN, user.id);
+  if (authTrialDefault() && onDefault) return false;
+  return !!(user.mustChange || onDefault);
 }
 // Password dialog (masked fields, show/hide) — resolves { cur, next } or null when cancelled.
 // check(cur) may reject the current password before the dialog closes.
@@ -766,7 +773,10 @@ function renderLoginScreen() {
     document.querySelectorAll(".login-mode").forEach((b) => { b.onclick = () => setMode(b.dataset.mode); });
     let saved = "";
     try { saved = localStorage.getItem(MODE_KEY) || ""; } catch (e) { /* ignore */ }
-    setMode(saved === "pick" || saved === "pass" ? saved : isDemo ? "pick" : "pass");
+    // company policy (Admin › การเข้าสู่ระบบ): employee no. + password only — the people list is not offered (DEMO always shows it)
+    const passOnly = !isDemo && AUTH.loginPolicy && AUTH.loginPolicy.modes === "pass";
+    document.querySelectorAll('.login-mode[data-mode="pick"]').forEach((b) => { b.hidden = passOnly; });
+    setMode(passOnly ? "pass" : saved === "pick" || saved === "pass" ? saved : isDemo ? "pick" : "pass");
     const empGo = async () => {
       const id = document.getElementById("loginEmpNo").value.trim().toLowerCase();
       const pw = document.getElementById("loginEmpPw").value;

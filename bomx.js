@@ -278,7 +278,7 @@ function bxRefs() {
     const model = d.model || (m && m.model) || "";
     return { ref: d.no, model, qty: 1, kind: "บริการ", line: "", label: `${d.no} · ${model} ${m ? m.title : ""} · ${d.title}` };
   }) : [];
-  return wos.concat(svcs);
+  return wos.concat(svcs).concat(typeof stGenRefs === "function" ? stGenRefs() : []);
 }
 function bxRefInfo(ref) { return bxRefs().find((r) => r.ref === ref) || null; }
 
@@ -832,8 +832,13 @@ function renderBxPick(pane) {
   const users = typeof AUTH !== "undefined" && AUTH ? AUTH.users.filter((u) => u.active) : [];
   const me = bxUser();
   const allowedReceivers = users.filter((u) => !BX_SETTINGS.requesters.length || BX_SETTINGS.requesters.includes(u.id) || u.role === "depthead" || u.role === "plant");
+  const recvHtml = `<div class="form-field"><label for="bxReceiver">ผู้รับของ / ช่างที่ได้รับมอบหมาย</label>
+          <select id="bxReceiver">${allowedReceivers.map((u) => `<option value="${bxEsc(u.id)}"${me && u.id === me.id ? " selected" : ""}>${bxEsc(u.name)}${u.position ? ` (${bxEsc(u.position)})` : ""}</option>`).join("") || `<option value="">${bxEsc(bxUserName())}</option>`}</select></div>`;
+  const gen = typeof stIsGen === "function" && stIsGen(ctx);
   let body = "";
-  if (!ctx) {
+  if (gen) {
+    body = stGenPickBody(ctx, canReq, recvHtml);
+  } else if (!ctx) {
     body = `<p class="muted-note">เลือกใบสั่งผลิตหรือใบงานบริการด้านบน — ระบบจะแสดงรายการตาม BOM ของรุ่นนั้นพร้อมจำนวนที่ต้องใช้ ที่เบิกไปแล้ว และที่ยังค้าง</p>`;
   } else if (!MASTER_BOM[ctx.model]) {
     body = `<p class="muted-note">ไม่พบ BOM ของรุ่น ${bxEsc(ctx.model || "(ไม่ระบุรุ่น)")} — ระบุรุ่นในใบงานก่อน</p>`;
@@ -910,9 +915,10 @@ function renderBxPick(pane) {
           <select id="bxRefSel"><option value="">— เลือกใบสั่งผลิต / ใบงานบริการ —</option>
             <optgroup label="ใบสั่งผลิต (ยังไม่เสร็จ)">${refs.filter((r) => r.kind === "ผลิต").map((r) => `<option value="${bxEsc(r.ref)}"${r.ref === bxRef ? " selected" : ""}>${bxEsc(r.label)}</option>`).join("")}</optgroup>
             <optgroup label="งานบริการหลังการขาย (ยังไม่ปิด)">${refs.filter((r) => r.kind === "บริการ").map((r) => `<option value="${bxEsc(r.ref)}"${r.ref === bxRef ? " selected" : ""}>${bxEsc(r.label)}</option>`).join("")}</optgroup>
+            <optgroup label="เบิกทั่วไป (ไม่อ้างใบสั่งผลิต)">${refs.filter((r) => r.kind === "ทั่วไป").map((r) => `<option value="${bxEsc(r.ref)}"${r.ref === bxRef ? " selected" : ""}>${bxEsc(r.label)}</option>`).join("")}</optgroup>
           </select>
-          ${ctx ? `<label for="bxPickSearch">ค้นหา:</label><input type="text" id="bxPickSearch" class="wo-search" placeholder="รหัส / ชื่อ / สถานี" value="${bxEsc(bxPickSearch)}">` : ""}
-          ${ctx && ctx.kind !== "บริการ" ? `<label for="bxPickLevel">เบิกระดับ:</label><select id="bxPickLevel"><option value="kit"${bxPickLevel === "kit" ? " selected" : ""}>ชุดประกอบย่อย (ทั้งชุด)</option><option value="leaf"${bxPickLevel === "leaf" ? " selected" : ""}>ชิ้นย่อย (ทีละชิ้น)</option></select>` : ""}
+          ${ctx && !gen ? `<label for="bxPickSearch">ค้นหา:</label><input type="text" id="bxPickSearch" class="wo-search" placeholder="รหัส / ชื่อ / สถานี" value="${bxEsc(bxPickSearch)}">` : ""}
+          ${ctx && !gen && ctx.kind !== "บริการ" ? `<label for="bxPickLevel">เบิกระดับ:</label><select id="bxPickLevel"><option value="kit"${bxPickLevel === "kit" ? " selected" : ""}>ชุดประกอบย่อย (ทั้งชุด)</option><option value="leaf"${bxPickLevel === "leaf" ? " selected" : ""}>ชิ้นย่อย (ทีละชิ้น)</option></select>` : ""}
           ${ctx && MASTER_BOM[ctx.model] ? (() => { const st = [...new Set(bxTree(ctx.model).filter((r) => r.line && r.line.station).map((r) => r.line.station))].sort(); return st.length ? `<label for="bxPickStation">ใช้ที่:</label><select id="bxPickStation"><option value="">ทุกสถานี</option>${st.map((s) => `<option${s === bxPickStation ? " selected" : ""}>${bxEsc(s)}</option>`).join("")}</select>` : ""; })() : ""}
         </div>
         ${body}
@@ -957,14 +963,18 @@ function renderBxPick(pane) {
   });
   const sub = document.getElementById("bxSubmitReq");
   if (sub) sub.addEventListener("click", () => bxSubmitReq(ctx, pane));
+  if (gen) stWireGenPick(pane);
   bxWireCommon(pane);
 }
 
 function bxSubmitReq(ctx, pane) {
   if (!ctx || !bxCanRequest()) return;
-  const tree = bxTree(ctx.model);
-  const items = [];
-  pane.querySelectorAll(".bx-qty").forEach((inp) => {
+  // not tied to a work order: any stock item, a reason and the department that pays
+  const gen = typeof stIsGen === "function" && stIsGen(ctx);
+  const genUse = gen ? ((document.getElementById("stGenWhy") || {}).value || "").trim() : "";
+  const tree = gen ? [] : bxTree(ctx.model);
+  const items = gen ? stGenItems(pane) : [];
+  if (!gen) pane.querySelectorAll(".bx-qty").forEach((inp) => {
     const qty = Number(inp.value);
     if (!(qty > 0)) return;
     const r = tree.find((x) => x.line && bxKey(x.line) === inp.dataset.key);
@@ -972,6 +982,7 @@ function bxSubmitReq(ctx, pane) {
     items.push({ key: bxKey(r.line), code: r.line.code || "", part: r.line.part, unit: r.line.unit || "", item: r.no, lineId: r.line.id, req: qty, issued: 0, ret: 0, log: [] });
   });
   if (!items.length) { showToast("ยังไม่ได้เลือกรายการหรือใส่จำนวน", "warn"); return; }
+  if (gen && !genUse) { showToast("ใส่ว่าเบิกไปใช้ทำอะไร / เครื่องไหน", "warn"); document.getElementById("stGenWhy").focus(); return; }
   const recvSel = document.getElementById("bxReceiver");
   // no receiver picked (or asked from the floor screen): the person asking receives — so the store's
   // hand-over comes back to them to confirm
@@ -983,13 +994,14 @@ function bxSubmitReq(ctx, pane) {
     no: deptNextNumber("mreq"),
     status: "รออนุมัติ",
     title: `${items[0].part}${items.length > 1 ? ` และอีก ${items.length - 1} รายการ` : ""}`,
-    wo: ctx.ref, model: ctx.model, purpose: ctx.kind, qty: items.reduce((s, it) => s + it.req, 0),
+    wo: gen ? "" : ctx.ref, model: ctx.model, purpose: gen ? ctx.label : ctx.kind, qty: items.reduce((s, it) => s + it.req, 0),
+    ...(gen ? { genUse, costDept: (document.getElementById("stGenDept") || {}).value || "" } : {}),
     line: ctx.line, owner: recv ? recv.name : bxUserName(), receiver: recvId, requestedBy: bxUserName(),
     date: bxToday(), note: note.trim(), items,
     log: [{ at: new Date().toISOString(), by: bxUserName(), kind: "สั่งเบิก", note: recv && me && recv.id !== me.id ? `มอบหมายให้ ${recv.name} รับของ` : "" }],
   };
   if (me) stampRecord(doc, true);
-  if (typeof auditLog === "function") auditLog("สร้างเอกสาร", doc.no, `MR: ${ctx.ref} · ${items.length} รายการ${recv ? ` · ผู้รับ ${recv.name}` : ""}`);
+  if (typeof auditLog === "function") auditLog("สร้างเอกสาร", doc.no, `MR: ${gen ? `${ctx.label} · ${genUse}` : ctx.ref} · ${items.length} รายการ${recv ? ` · ผู้รับ ${recv.name}` : ""}`);
   DEPT_DOCS.mreq = DEPT_DOCS.mreq || [];
   DEPT_DOCS.mreq.push(doc);
   saveDeptDocs();
@@ -1028,12 +1040,12 @@ function bxRenderReqModal() {
   const logs = [].concat(d.log || []).concat(...d.items.map((it) => (it.log || []).map((g) => Object.assign({ part: `${it.code || ""} ${it.part}` }, g))))
     .sort((a, b) => String(b.at).localeCompare(String(a.at)));
   const age = open ? bxDaysBetween(d.date, bxToday()) : null;
-  const ref = d.wo || "";
+  const ref = d.wo || d.purpose || "";
   box.innerHTML = `
     <div class="bx-req-head">
       <div>
         <h3>${bxEsc(d.no)} ${bxStatusPill("mreq", d.status)}</h3>
-        <p class="card-sub">งาน <strong>${bxEsc(ref)}</strong> · รุ่น ${bxEsc(d.model || "—")} · ${bxEsc(d.purpose || "")} · สั่งเบิกโดย ${bxEsc(d.requestedBy || authUserName(d.createdBy))} · ผู้รับของ <strong>${bxEsc(d.owner || "—")}</strong> · ${formatThaiDate(d.date)}${age !== null ? ` · รอมา ${age} วัน · อยู่ที่: ${bxEsc(bxReqHolder(d))}` : ""}</p>
+        <p class="card-sub">งาน <strong>${bxEsc(ref)}</strong> · รุ่น ${bxEsc(d.model || "—")} · ${bxEsc(d.wo ? d.purpose || "" : "ไม่อ้างใบสั่งผลิต")}${d.genUse ? ` · ใช้ทำ: <strong>${bxEsc(d.genUse)}</strong>` : ""}${d.costDept && typeof authDeptName === "function" ? ` · ลงแผนก ${bxEsc(authDeptName(d.costDept))}` : ""} · สั่งเบิกโดย ${bxEsc(d.requestedBy || authUserName(d.createdBy))} · ผู้รับของ <strong>${bxEsc(d.owner || "—")}</strong> · ${formatThaiDate(d.date)}${age !== null ? ` · รอมา ${age} วัน · อยู่ที่: ${bxEsc(bxReqHolder(d))}` : ""}</p>
         ${d.note ? `<p class="muted-note">หมายเหตุ: ${bxEsc(d.note)}</p>` : ""}
       </div>
     </div>
@@ -1498,7 +1510,7 @@ function bxAllParts() {
     if (!e.models.includes(m)) e.models.push(m);
     map.set(k, e);
   }));
-  Object.keys(BX_STOCK).forEach((k) => { if (!map.has(k)) map.set(k, { key: k, line: { code: k, part: k, unit: "" }, models: [] }); });
+  Object.keys(BX_STOCK).forEach((k) => { if (!map.has(k)) { const st = BX_STOCK[k] || {}; map.set(k, { key: k, line: { code: st.code || k, part: st.name || k, unit: st.unit || "" }, models: [] }); } });
   return [...map.values()].sort((a, b) => String(a.line.code || a.key).localeCompare(String(b.line.code || b.key)));
 }
 
@@ -1529,18 +1541,19 @@ function renderBxStockTab(pane) {
       <div class="card-body table-scroll">
         <div class="filter-row"><label for="bxStockSearch">ค้นหา:</label><input type="text" id="bxStockSearch" class="wo-search" placeholder="รหัส / ชื่อ / ที่เก็บ" value="${bxEsc(bxStockSearch)}">
           <button type="button" class="btn-secondary" id="bxLabels">🏷 พิมพ์ป้าย QR (${Math.min(parts.length, 90)} รายการที่แสดง)</button></div>
+        ${typeof stAddItemHtml === "function" ? stAddItemHtml() : ""}
         <table class="data-table">
-          <thead><tr><th>รหัส</th><th>ชื่อชิ้นส่วน</th><th>ใช้ในรุ่น</th><th>ที่เก็บ</th><th class="num">คงคลัง</th><th class="num">จุดสั่งซื้อ</th><th class="num">ค้างจ่าย</th><th class="num">หลังจ่ายครบ</th><th>สถานะ</th></tr></thead>
+          <thead><tr><th>รหัส</th><th>ชื่อชิ้นส่วน</th><th>ใช้ในรุ่น</th><th>ที่เก็บ</th><th class="num">คงคลัง</th><th class="num">Min (จุดสั่งซื้อ)</th><th class="num">Max</th><th class="num">ค้างจ่าย</th><th class="num">หลังจ่ายครบ</th><th>สถานะ</th></tr></thead>
           <tbody>${parts.map((p) => {
             const st = bxStock(p.key) || {};
             const dem = s.demand[p.key] || 0;
             const after = bxNum(st.qty) - dem;
-            const status = !bxStock(p.key) ? bxPill("ยังไม่ตั้งยอด", "neutral") : after < 0 ? bxPill("ไม่พอจ่าย", "critical") : st.min && after <= bxNum(st.min) ? bxPill("ถึงจุดสั่งซื้อ", "warning") : bxPill("ปกติ", "good");
+            const status = typeof stLevelPill === "function" ? stLevelPill(bxStock(p.key), after) : !bxStock(p.key) ? bxPill("ยังไม่ตั้งยอด", "neutral") : after < 0 ? bxPill("ไม่พอจ่าย", "critical") : st.min && after <= bxNum(st.min) ? bxPill("ถึงจุดสั่งซื้อ", "warning") : bxPill("ปกติ", "good");
             const inp = (f, v, type) => can ? `<input class="bom-inline bx-stock-in" data-key="${bxEsc(p.key)}" data-f="${f}" ${type === "n" ? `type="number" step="any"` : ""} value="${bxEsc(v ?? "")}" aria-label="${f} ${bxEsc(p.line.part)}">` : bxEsc(v ?? "—");
             return `<tr>
               <td class="mono-cell"><button type="button" class="bx-link" data-stockdetail="${bxEsc(p.key)}" data-model="${bxEsc(p.models[0] || "")}">${bxEsc(p.line.code || "—")}</button></td>
-              <td>${bxEsc(p.line.part)}</td><td class="muted-inline">${bxEsc(p.models.join(", "))}</td>
-              <td>${inp("loc", st.loc)}</td><td class="num">${inp("qty", st.qty, "n")}${typeof sxWhBreakdown === "function" ? sxWhBreakdown(p.key) : ""}</td><td class="num">${inp("min", st.min, "n")}</td>
+              <td>${bxEsc(p.line.part)}</td><td class="muted-inline">${bxEsc(p.models.join(", ") || st.group || "นอก BOM")}</td>
+              <td>${inp("loc", st.loc)}</td><td class="num">${inp("qty", st.qty, "n")}${typeof sxWhBreakdown === "function" ? sxWhBreakdown(p.key) : ""}</td><td class="num">${inp("min", st.min, "n")}</td><td class="num">${inp("max", st.max, "n")}</td>
               <td class="num">${dem ? bxFmt(dem) : "0"}</td><td class="num">${bxStock(p.key) ? `<span class="${after < 0 ? "bx-neg" : ""}">${bxFmt(after)}</span>` : "—"}</td>
               <td>${status}</td>
             </tr>`;
@@ -1554,6 +1567,7 @@ function renderBxStockTab(pane) {
     renderBomx();
     const el = document.getElementById("bxStockSearch"); el.focus(); el.setSelectionRange(pos, pos);
   });
+  if (typeof stWireAddItem === "function") stWireAddItem();
   const lab = document.getElementById("bxLabels");
   if (lab) lab.addEventListener("click", () => snPrintLabels(parts.slice(0, 90).map((p) => ({ code: p.key, line1: p.line.part, line2: (bxStock(p.key) || {}).loc ? `ที่เก็บ ${(bxStock(p.key) || {}).loc}` : "", link: snLink({ item: p.key }) }))));
   pane.querySelectorAll("[data-bxset]").forEach((c) => c.addEventListener("change", () => {

@@ -145,13 +145,14 @@ function sxNextNo() {
 /* ---- tab ------------------------------------------------------------------------- */
 
 function renderSxTab(pane) {
-  const subs = [["entry", "บันทึกเคลื่อนไหว (Stock Entry)"], ["ledger", "สมุดคุมคลัง (Stock Ledger)"], ["wh", "คลังสินค้า (Warehouse)"], ["reorder", "จุดสั่งซื้อซ้ำ (Reorder)"]];
+  const subs = [["entry", "บันทึกเคลื่อนไหว (Stock Entry)"], ["ledger", "สมุดคุมคลัง (Stock Ledger)"], ["wh", "คลังสินค้า (Warehouse)"], ["reorder", "จุดสั่งซื้อซ้ำ (Reorder)"], ["count", "ตรวจนับสต็อก (Stock Count)"]];
   pane.innerHTML = `<div class="dept-tabs sx-subtabs">${subs.map(([k, l]) => `<button type="button" class="dept-tab${sxSub === k ? " active" : ""}" data-sxsub="${k}">${l}</button>`).join("")}</div><div id="sxPane"></div>`;
   pane.querySelectorAll("[data-sxsub]").forEach((b) => b.addEventListener("click", () => { sxSub = b.dataset.sxsub; renderSxTab(pane); }));
   const p = document.getElementById("sxPane");
   if (sxSub === "ledger") sxRenderLedger(p);
   else if (sxSub === "wh") sxRenderWh(p);
   else if (sxSub === "reorder") sxRenderReorder(p);
+  else if (sxSub === "count" && typeof stRenderCounts === "function") stRenderCounts(p);
   else sxRenderEntry(p);
 }
 
@@ -391,15 +392,15 @@ function sxRenderReorder(p) {
     const onOrder = bxP2POnOrder(x.line);
     const dem = s.demand[x.key] || 0;
     const projected = bxNum(st.qty) - dem + onOrder;
-    const suggest = projected <= bxNum(st.min) ? Math.max(bxNum(st.rq) || 0, bxNum(st.min) * 2 - projected) : 0;
+    const suggest = typeof stSuggest === "function" ? stSuggest(st, projected) : projected <= bxNum(st.min) ? Math.max(bxNum(st.rq) || 0, bxNum(st.min) * 2 - projected) : 0;
     return { x, st, onOrder, dem, projected, suggest };
   }).filter(Boolean).sort((a, b) => (b.suggest > 0) - (a.suggest > 0) || a.projected - b.projected);
   const need = rows.filter((r) => r.suggest > 0);
   p.innerHTML = `<div class="card"><div class="card-header"><h3>จุดสั่งซื้อซ้ำ (Reorder) — ต้องสั่ง ${need.length} รายการ</h3>
-      <p class="card-sub">ยอดคาดการณ์ = คงคลัง − ค้างจ่ายตามใบเบิก + กำลังสั่งซื้อ · ถ้าไม่เกินจุดสั่งซื้อ ระบบเสนอให้สั่ง "จำนวนสั่งซ้ำ" (ถ้าไม่ตั้ง จะเสนอให้กลับไปที่ 2 เท่าของจุดสั่งซื้อ) · ตั้งจุดสั่งซื้อได้ที่แท็บคงคลัง</p></div>
-    <div class="card-body table-scroll">${rows.length ? `<table class="data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th class="num">คงคลัง</th><th class="num">ค้างจ่าย</th><th class="num">กำลังสั่ง</th><th class="num">คาดการณ์</th><th class="num">จุดสั่งซื้อ</th><th class="num">จำนวนสั่งซ้ำ</th><th class="num">เสนอสั่ง</th><th></th></tr></thead><tbody>
+      <p class="card-sub">ยอดคาดการณ์ = คงคลัง − ค้างจ่ายตามใบเบิก + กำลังสั่งซื้อ · ถ้าไม่เกินจุดสั่งซื้อ (Min) ระบบเสนอให้สั่งจนถึง Max · ถ้าไม่ได้ตั้ง Max ใช้ "จำนวนสั่งซ้ำ" (หรือ 2 เท่าของ Min) · ตั้งจุดสั่งซื้อได้ที่แท็บคงคลัง</p></div>
+    <div class="card-body table-scroll">${rows.length ? `<table class="data-table"><thead><tr><th>รหัส</th><th>ชื่อ</th><th class="num">คงคลัง</th><th class="num">ค้างจ่าย</th><th class="num">กำลังสั่ง</th><th class="num">คาดการณ์</th><th class="num">Min</th><th class="num">Max</th><th class="num">จำนวนสั่งซ้ำ</th><th class="num">เสนอสั่ง</th><th></th></tr></thead><tbody>
       ${rows.map((r) => `<tr><td class="mono-cell">${bxEsc(r.x.key)}</td><td>${bxEsc(r.x.line.part)}</td><td class="num">${bxFmt(r.st.qty)}</td><td class="num">${bxFmt(r.dem)}</td><td class="num">${bxFmt(r.onOrder)}</td>
-        <td class="num"><span class="${r.projected < 0 ? "bx-neg" : ""}">${bxFmt(r.projected)}</span></td><td class="num">${bxFmt(r.st.min)}</td>
+        <td class="num"><span class="${r.projected < 0 ? "bx-neg" : ""}">${bxFmt(r.projected)}</span></td><td class="num">${bxFmt(r.st.min)}</td><td class="num">${r.st.max ? bxFmt(r.st.max) : "—"}</td>
         <td class="num">${can ? `<input class="bom-inline sx-rq" type="number" min="0" step="any" data-key="${bxEsc(r.x.key)}" value="${bxEsc(r.st.rq || "")}">` : bxFmt(r.st.rq || 0)}</td>
         <td class="num">${r.suggest > 0 ? `<b>${bxFmt(r.suggest)}</b>` : "—"}</td>
         <td>${r.suggest > 0 ? `<button type="button" class="btn-link" data-sxpr="${bxEsc(r.x.key)}" data-n="${r.suggest}">เปิด PR</button>` : ""}</td></tr>`).join("")}

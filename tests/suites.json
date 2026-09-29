@@ -6,5 +6,7 @@
   ["tv", ["u-demo-admin"]],
   ["roles", ["u-demo-admin"]],
   ["levels", ["u-demo-admin"]],
-  ["sign", ["u-demo-admin"]]
+  ["sign", ["u-demo-admin"]],
+  ["store", ["u-demo-admin"]],
+  ["logins", ["u-demo-admin"]]
 ]
