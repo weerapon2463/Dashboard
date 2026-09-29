@@ -8,5 +8,6 @@
   ["levels", ["u-demo-admin"]],
   ["sign", ["u-demo-admin"]],
   ["store", ["u-demo-admin"]],
-  ["logins", ["u-demo-admin"]]
+  ["logins", ["u-demo-admin"]],
+  ["overview", ["u-demo-admin"]]
 ]

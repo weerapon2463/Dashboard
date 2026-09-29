@@ -39,6 +39,27 @@ const OV_PRESETS = [
   { id: "svc", name: "บริการหลังการขาย", widgets: ["hero", "service", "flow", "stockHealth", "activity"] },
 ];
 
+// Each widget shows only to people who may open what it summarises (a page, or the cost right).
+// The board is built from these automatically — nobody has to pick a view (29 ก.ย.).
+// pages this person may open (from their rights, not from what the menu happens to show yet)
+function ovMay(view) { const u = typeof authCurrentUser === "function" ? authCurrentUser() : null; return u && typeof authAllowedModules === "function" ? authAllowedModules(u).includes(view) : ovCan(view); }
+function ovMgr() { const u = typeof authCurrentUser === "function" ? authCurrentUser() : null; return !u || ["admin", "plant", "group"].includes(u.role); }
+const OV_NEED = {
+  execCost: () => typeof authCanSeeMgmtCost !== "function" || authCanSeeMgmtCost(),
+  flow: ["workorder", "service", "p2p"], woProgress: ["workorder", "bomx"], woStatus: ["workorder"],
+  reqAging: ["bomx"], stockHealth: ["bomx"], p2pPipeline: ["p2p"], service: ["service"],
+  rndProjects: ["rnd"], rndChanges: ["rnd"], docsLoad: ["dept"], pilot: ["pilot"], capacity: ["capacity"],
+  health: () => ovMgr() || ovMay("reports"), activity: () => ovMgr() || ovMay("reports"),
+  legacyStats: ["priority", "capacity", "schedule", "makeorbuy", "resource"], about: () => false,
+};
+const OV_ORDER = ["decide", "execCost", "hero", "flow", "woProgress", "reqAging", "stockHealth", "p2pPipeline", "woStatus", "capacity", "service", "rndProjects", "rndChanges", "health", "docsLoad", "pilot", "activity", "alerts", "legacyStats"];
+function ovAllowed(id) {
+  const n = OV_NEED[id];
+  if (!n) return !!OV_WIDGETS[id];
+  return typeof n === "function" ? !!n() : n.some((v) => ovMay(v));
+}
+function ovAuto() { return { preset: "auto", v2: true, v3: true, v4: true, items: OV_ORDER.filter(ovAllowed).map((id) => ({ id, size: OV_WIDGETS[id].size })) }; }
+
 let ovLayout = null;   // { preset, items: [{ id, size }] }
 let ovEditing = false;
 
@@ -59,7 +80,7 @@ function ovFromPreset(id) {
 function ovLoad() {
   try {
     const p = JSON.parse(localStorage.getItem(OV_STORAGE_PREFIX + ovUserId()) || "null");
-    if (p && Array.isArray(p.items)) {
+    if (p && Array.isArray(p.items) && p.v4 && p.preset === "custom") {
       p.items = p.items.filter((i) => OV_WIDGETS[i.id]);
       // one-time: layouts saved before "decide" existed get it on top
       if (!p.v2 && !p.items.some((i) => i.id === "decide")) p.items.unshift({ id: "decide", size: "full" });
@@ -69,8 +90,8 @@ function ovLoad() {
       p.v3 = true;
       return p;
     }
-  } catch (e) { /* use preset */ }
-  return ovFromPreset(ovDefaultPreset());
+  } catch (e) { /* use the automatic board */ }
+  return ovAuto();
 }
 function ovSave() { try { localStorage.setItem(OV_STORAGE_PREFIX + ovUserId(), JSON.stringify(ovLayout)); } catch (e) { /* per-device convenience only */ } }
 
@@ -488,11 +509,8 @@ function initOverview() {
   });
   grid.addEventListener("mouseleave", () => { tip.hidden = true; });
   document.getElementById("ovEditBtn").addEventListener("click", () => { ovEditing = !ovEditing; renderOverview(); });
-  document.getElementById("ovPreset").addEventListener("change", (e) => {
-    ovLayout = ovFromPreset(e.target.value);
-    ovSave();
-    renderOverview();
-  });
+  const ps = document.getElementById("ovPreset");
+  if (ps) ps.addEventListener("change", (e) => { ovLayout = e.target.value === "auto" ? ovAuto() : ovLayout; ovSave(); renderOverview(); });
 }
 
 function ovGoTo(view, extra) {
@@ -508,8 +526,15 @@ function ovGoTo(view, extra) {
 function renderOverview() {
   const grid = document.getElementById("ovGrid");
   if (!grid || !ovLayout) return;
+  // never show what this person may not open — also in a layout they arranged before their rights changed
+  ovLayout.items = ovLayout.items.filter((it) => ovAllowed(it.id));
   const sel = document.getElementById("ovPreset");
-  sel.innerHTML = OV_PRESETS.map((p) => `<option value="${p.id}"${p.id === ovLayout.preset ? " selected" : ""}>${p.name}</option>`).join("") + (ovLayout.preset === "custom" ? `<option value="custom" selected>กำหนดเอง</option>` : "");
+  if (sel) {
+    const lab = sel.closest("label");
+    if (lab) lab.innerHTML = `<span class="ov-auto-note">แสดงตามสิทธิ์ของคุณ · ${ovLayout.items.length} ส่วน${ovLayout.preset === "custom" ? ` · จัดเอง <button type="button" class="btn-link" id="ovAutoBtn">กลับเป็นอัตโนมัติ</button>` : ""}</span><select id="ovPreset" hidden></select>`;
+    const ab = document.getElementById("ovAutoBtn");
+    if (ab) ab.addEventListener("click", () => { ovLayout = ovAuto(); ovSave(); renderOverview(); });
+  }
   const btn = document.getElementById("ovEditBtn");
   btn.textContent = ovEditing ? "✓ เสร็จสิ้นการปรับแต่ง" : "⚙ ปรับแต่งหน้านี้";
   btn.classList.toggle("btn-primary", ovEditing);
@@ -533,9 +558,9 @@ function renderOverview() {
       <div class="card-body">${body}</div>
     </div>`;
   }).join("") + (ovEditing ? `<div class="card ov-w ov-full ov-add">
-      <div class="card-header"><h3>เพิ่มวิดเจ็ต</h3><p class="card-sub">กดเพื่อเพิ่มท้ายหน้า · เปลี่ยนมุมมองสำเร็จรูปได้ที่ปุ่มด้านบน · การจัดวางจำไว้ในเครื่องนี้สำหรับผู้ใช้แต่ละคน</p></div>
-      <div class="card-body ov-add-list">${Object.keys(OV_WIDGETS).filter((id) => !ovLayout.items.some((x) => x.id === id)).map((id) => `<button type="button" class="btn-secondary" data-ovadd="${id}">+ ${OV_WIDGETS[id].title}</button>`).join("") || '<span class="muted-inline">แสดงครบทุกวิดเจ็ตแล้ว</span>'}
-        <button type="button" class="btn-secondary" id="ovReset">คืนค่าตามมุมมองสำเร็จรูป</button></div>
+      <div class="card-header"><h3>เพิ่มวิดเจ็ต</h3><p class="card-sub">กดเพื่อเพิ่มท้ายหน้า · แสดงเฉพาะส่วนที่คุณมีสิทธิ์ · การจัดวางจำไว้ในเครื่องนี้สำหรับผู้ใช้แต่ละคน</p></div>
+      <div class="card-body ov-add-list">${Object.keys(OV_WIDGETS).filter((id) => ovAllowed(id) && !ovLayout.items.some((x) => x.id === id)).map((id) => `<button type="button" class="btn-secondary" data-ovadd="${id}">+ ${OV_WIDGETS[id].title}</button>`).join("") || '<span class="muted-inline">แสดงครบทุกวิดเจ็ตแล้ว</span>'}
+        <button type="button" class="btn-secondary" id="ovReset">คืนค่าอัตโนมัติ (ตามสิทธิ์)</button></div>
     </div>` : "");
 
   grid.querySelectorAll("[data-go]").forEach((b) => b.addEventListener("click", () => ovGoTo(b.dataset.go, b.dataset.extra)));
@@ -549,18 +574,18 @@ function renderOverview() {
     if (b.dataset.ovact === "down" && i < items.length - 1) [items[i + 1], items[i]] = [items[i], items[i + 1]];
     if (b.dataset.ovact === "size") items[i].size = items[i].size === "full" ? "half" : "full";
     if (b.dataset.ovact === "hide") items.splice(i, 1);
-    ovLayout.preset = "custom";
+    ovLayout.preset = "custom"; ovLayout.v4 = true;
     ovSave();
     renderOverview();
   }));
   grid.querySelectorAll("[data-ovadd]").forEach((b) => b.addEventListener("click", () => {
     ovLayout.items.push({ id: b.dataset.ovadd, size: OV_WIDGETS[b.dataset.ovadd].size });
-    ovLayout.preset = "custom";
+    ovLayout.preset = "custom"; ovLayout.v4 = true;
     ovSave();
     renderOverview();
   }));
   const reset = document.getElementById("ovReset");
-  if (reset) reset.addEventListener("click", () => { ovLayout = ovFromPreset(ovDefaultPreset()); ovSave(); renderOverview(); });
+  if (reset) reset.addEventListener("click", () => { ovLayout = ovAuto(); ovSave(); renderOverview(); });
 
   // widgets drawn by the older modules fill themselves in by element id
   const has = (id) => ovLayout.items.some((x) => x.id === id);

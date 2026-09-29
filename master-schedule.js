@@ -175,47 +175,75 @@ function renderMasterSchedule() {
 
   let html = `<div class="gantt-header"><div class="ms-corner">แผน / ใบสั่งผลิต</div><div>${monthRow}${weekTicks}</div></div>`;
 
-  // planned lots
-  html += `<div class="ms-section">แผนการผลิต (กำหนดเอง)</div>`;
+  // planned lots, each with its real machines (work orders of the same sales order) right under it
   const first = (row) => Math.min(...(row.phases || []).map((p) => msParse(p.from)));
   const last = (row) => Math.max(...(row.phases || []).map((p) => msParse(p.to)));
   const sortMode = msView.sort || "manual";
   const planned = MASTER_SCHEDULE.map((row, index) => ({ row, index }));
   if (sortMode === "start") planned.sort((a, b) => first(a.row) - first(b.row));
   if (sortMode === "end") planned.sort((a, b) => last(a.row) - last(b.row));
+  const woRows = showWo ? msWoRows() : [];
+  const ws = msView.woSort || "due";
+  const startOf = (x) => { const a = x.steps.filter((s) => s.from).map((s) => s.from); return a.length ? Math.min(...a) : (isNaN(x.created) ? 9e15 : x.created); };
+  const sortWo = (list) => list.sort((a, b) => ws === "wo" ? a.w.wo.localeCompare(b.w.wo) : ws === "start" ? startOf(a) - startOf(b) : (isNaN(a.due) ? 9e15 : a.due) - (isNaN(b.due) ? 9e15 : b.due));
+  const used = new Set();
+  const woHtml = (x, child) => {
+    const { w, due, created, steps, late } = x;
+    const done = (w.jobs || []).filter((j) => j.status === "done").length;
+    let bars = "";
+    const firstAct = steps.filter((s) => s.from).map((s) => s.from);
+    const spanFrom = !isNaN(created) ? created : firstAct.length ? Math.min(...firstAct) : NaN;
+    if (!isNaN(spanFrom) && !isNaN(due)) bars += msBar(spanFrom, due + MS_DAY, r, "ms-span", "", "", `${w.wo}: สั่งผลิต ${msThai(spanFrom, true)} → กำหนดส่ง ${msThai(due, true)}`);
+    steps.filter((s) => s.from).forEach(({ j, from, to }) => {
+      bars += msBar(from, Math.max(to, from + MS_DAY / 3), r, `ms-step ms-${j.status}`, `background:${MS_STATION_COLOR[j.station] || "#888"}`, j.station, `${w.wo} ${j.op} (${j.station}) · ${j.assignee || ""} · ${j.status === "done" ? "เสร็จ" : j.status === "hold" ? "หยุดอยู่" : "กำลังทำ"} · ${msThai(from, true)} – ${j.status === "done" ? msThai(to, true) : "ปัจจุบัน"}`);
+    });
+    const dueMark = !isNaN(due) && due >= r.start && due < r.end ? `<div class="ms-due${late ? " ms-due-late" : ""}" style="left:${msPct(due + MS_DAY / 2, r)}%" title="กำหนดส่ง ${msThai(due, true)}">◆</div>` : "";
+    const now = (w.jobs || []).find((j) => j.status !== "done");
+    return `<div class="gantt-row ms-wo${child ? " ms-child" : ""}${late ? " ms-late" : ""}${w.status === "เสร็จสมบูรณ์" ? " ms-finished" : ""}">
+      <div class="gantt-row-label"><button type="button" class="ms-wo-link" data-mswo="${escapeHtml(w.wo)}"><b>${child ? "↳ " : ""}${escapeHtml(w.serial || w.wo)}</b><small>${escapeHtml(w.wo)} · ${done}/${(w.jobs || []).length || "–"} ขั้น · ${w.status === "เสร็จสมบูรณ์" ? "เสร็จแล้ว" : late ? "เลยกำหนดส่ง" : now ? `ตอนนี้ ${escapeHtml(now.station)}` : escapeHtml(w.status)}</small></button></div>
+      <div class="gantt-track">${bars}${dueMark}${todayLine}</div></div>`;
+  };
+
+  html += `<div class="ms-section">แผนการผลิตตามคำสั่งซื้อ ${showWo ? "— ใต้แต่ละแผนคือคันจริงของคำสั่งซื้อนั้น (แท่งสี = เวลาทำจริงจาก Job Card · ลายขีด = ช่วงสั่งผลิต → กำหนดส่ง · ◆ = กำหนดส่ง)" : ""}</div>`;
   html += planned.map(({ row, index }, pos) => {
-    const bars = (row.phases || []).map((p) => msBar(msParse(p.from), msParse(p.to) + MS_DAY, r, "", `background:${msColor(p)}`, p.phase, `${row.model} — ${p.phase}: ${msThai(msParse(p.from), true)} – ${msThai(msParse(p.to), true)}`)).join("");
-    const first = Math.min(...(row.phases || []).map((p) => msParse(p.from)));
-    const last = Math.max(...(row.phases || []).map((p) => msParse(p.to)));
+    // overlapping phases (e.g. buying while assembly starts) go on a second lane instead of hiding each other
+    const phases = (row.phases || []).map((p) => ({ p, from: msParse(p.from), to: msParse(p.to) + MS_DAY })).sort((x, y) => x.from - y.from);
+    const laneEnd = [];
+    phases.forEach((x) => { let l = laneEnd.findIndex((e) => e <= x.from); if (l < 0) { l = laneEnd.length; laneEnd.push(0); } laneEnd[l] = x.to; x.lane = l; });
+    const lanes = Math.max(1, Math.min(3, laneEnd.length));
+    const h = lanes === 1 ? "" : `top:${3 + 0}px;`;
+    const bars = phases.map((x) => {
+      const style = lanes === 1 ? "" : `top:${2 + (x.lane % lanes) * (22 / lanes + 1)}px;height:${22 / lanes}px;font-size:${lanes > 1 ? 9.5 : 10.5}px;`;
+      return msBar(x.from, x.to, r, "", `background:${msColor(x.p)};${style}`, x.p.phase, `${row.model} — ${x.p.phase}: ${msThai(x.from, true)} – ${msThai(x.to - MS_DAY, true)}`);
+    }).join("");
+    const f = first(row), l = last(row);
     const cur = (row.phases || []).find((p) => today >= msParse(p.from) && today < msParse(p.to) + MS_DAY);
-    return `<div class="gantt-row">
-      <div class="gantt-row-label"><span><b>${escapeHtml(row.model)}</b><small>${isFinite(first) ? `${msThai(first)} – ${msThai(last, true)}` : ""}${cur ? ` · ตอนนี้: ${escapeHtml(cur.phase)}` : ""}</small></span>
+    const [title, ...restParts] = String(row.model).split(" — ");
+    const rest = restParts.join(" — ");
+    const so = row.so || (String(row.model).match(/SO-\d{4}-\d{3,}/) || [])[0] || "";
+    const mine = so ? sortWo(woRows.filter((x) => (x.w.so || x.w.po) === so)) : [];
+    mine.forEach((x) => used.add(x.w.wo));
+    // actual progress against the plan: machines finished, and behind plan when the assembly window has
+    // passed (or a machine is past its due date) while machines are still being built
+    const fin = mine.filter((x) => x.w.status === "เสร็จสมบูรณ์").length;
+    const asm = (row.phases || []).find((p) => /ประกอบ/.test(p.phase));
+    const behind = mine.some((x) => x.late) || (asm && today > msParse(asm.to) + MS_DAY && fin < mine.length);
+    const actual = so && showWo ? (mine.length ? `จริง: ${mine.length} คัน · เสร็จ ${fin}${behind ? ` · <span class="ms-behind">⚠ ช้ากว่าแผน</span>` : ""}` : `<span class="muted-inline">ยังไม่เปิดใบสั่งผลิต</span>`) : "";
+    return `<div class="gantt-row ms-lot${lanes > 1 ? " ms-lanes" : ""}">
+      <div class="gantt-row-label"><span title="${escapeHtml(row.model)}"><b>${escapeHtml(title)}</b><small class="ms-cust">${escapeHtml(rest)}</small><small>${isFinite(f) ? `${msThai(f)} – ${msThai(l, true)}` : ""}${cur ? ` · แผน: ${escapeHtml(cur.phase)}` : ""}</small>${actual ? `<small class="ms-actual">${actual}</small>` : ""}</span>
         ${canEdit && sortMode === "manual" ? `<span class="ms-ord"><button type="button" class="ord-btn" data-msmove="${index}" data-dir="-1"${pos === 0 ? " disabled" : ""} aria-label="เลื่อนขึ้น">▲</button><button type="button" class="ord-btn" data-msmove="${index}" data-dir="1"${pos === planned.length - 1 ? " disabled" : ""} aria-label="เลื่อนลง">▼</button></span>` : ""}
         ${canEdit ? `<button type="button" class="ms-row-edit ms-edit-ic" data-msedit="${index}" title="แก้ไขวันที่" aria-label="แก้ไข ${escapeHtml(row.model)}">✎</button>` : ""}</div>
-      <div class="gantt-track">${bars}${todayLine}</div></div>`;
+      <div class="gantt-track"${lanes > 1 ? ` style="height:${lanes === 2 ? 34 : 44}px"` : ""}>${bars}${todayLine}</div></div>
+      ${mine.map((x) => woHtml(x, true)).join("")}`;
   }).join("") || `<div class="gantt-row"><div class="gantt-row-label muted-inline">ยังไม่มีแผน</div><div class="gantt-track">${todayLine}</div></div>`;
 
-  // live work orders
+  // machines whose sales order has no plan row
   if (showWo) {
-    const rows = msWoRows();
-    const ws = msView.woSort || "due";
-    const startOf = (x) => { const a = x.steps.filter((s) => s.from).map((s) => s.from); return a.length ? Math.min(...a) : (isNaN(x.created) ? 9e15 : x.created); };
-    rows.sort((a, b) => ws === "wo" ? a.w.wo.localeCompare(b.w.wo) : ws === "start" ? startOf(a) - startOf(b) : (isNaN(a.due) ? 9e15 : a.due) - (isNaN(b.due) ? 9e15 : b.due));
-    html += `<div class="ms-section">ใบสั่งผลิตจริง — 1 แถว = 1 คัน (แท่งเข้ม = เวลาทำจริงจาก Job Card · ◆ = กำหนดส่ง)</div>`;
-    html += rows.map(({ w, due, created, steps, late }) => {
-      const done = (w.jobs || []).filter((j) => j.status === "done").length;
-      let bars = "";
-      const firstAct = steps.filter((s) => s.from).map((s) => s.from);
-      const spanFrom = !isNaN(created) ? created : firstAct.length ? Math.min(...firstAct) : NaN;
-      if (!isNaN(spanFrom) && !isNaN(due)) bars += msBar(spanFrom, due + MS_DAY, r, "ms-span", "", "", `${w.wo}: สั่งผลิต ${msThai(spanFrom, true)} → กำหนดส่ง ${msThai(due, true)}`);
-      steps.filter((s) => s.from).forEach(({ j, from, to }) => {
-        bars += msBar(from, Math.max(to, from + MS_DAY / 3), r, `ms-step ms-${j.status}`, `background:${MS_STATION_COLOR[j.station] || "#888"}`, j.station, `${w.wo} ${j.op} (${j.station}) · ${j.status === "done" ? "เสร็จ" : j.status === "hold" ? "หยุดอยู่" : "กำลังทำ"} · ${msThai(from, true)} – ${j.status === "done" ? msThai(to, true) : "ปัจจุบัน"}`);
-      });
-      const dueMark = !isNaN(due) && due >= r.start && due < r.end ? `<div class="ms-due${late ? " ms-due-late" : ""}" style="left:${msPct(due + MS_DAY / 2, r)}%" title="กำหนดส่ง ${msThai(due, true)}">◆</div>` : "";
-      return `<div class="gantt-row ms-wo${late ? " ms-late" : ""}${w.status === "เสร็จสมบูรณ์" ? " ms-finished" : ""}">
-        <div class="gantt-row-label"><button type="button" class="ms-wo-link" data-mswo="${escapeHtml(w.wo)}"><b>${escapeHtml(w.serial || w.wo)}</b><small>${escapeHtml(w.wo)} · ${done}/${(w.jobs || []).length || "–"} ขั้น · ${late ? "ล่าช้า" : escapeHtml(w.status)}</small></button></div>
-        <div class="gantt-track">${bars}${dueMark}${todayLine}</div></div>`;
-    }).join("") || `<div class="gantt-row"><div class="gantt-row-label muted-inline">ยังไม่มีใบสั่งผลิต</div><div class="gantt-track">${todayLine}</div></div>`;
+    const rest = sortWo(woRows.filter((x) => !used.has(x.w.wo)));
+    if (rest.length) {
+      html += `<div class="ms-section">ใบสั่งผลิตที่ยังไม่อยู่ในแผน — 1 แถว = 1 คัน</div>`;
+      html += rest.map((x) => woHtml(x, false)).join("");
+    }
   }
   container.innerHTML = html;
   container.querySelectorAll("[data-msedit]").forEach((b) => b.addEventListener("click", () => openScheduleModal(Number(b.dataset.msedit))));

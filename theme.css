@@ -568,3 +568,13 @@ tr.st-var td { background: color-mix(in srgb, var(--txt-warn, #b54708) 8%, trans
 
 .la-trial { margin-top: 10px; padding: 10px 12px; border-radius: 8px; border: 1px dashed var(--gridline, #d0d5dd); display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
 .la-trial.on { border: 1px solid var(--txt-warn, #b54708); background: color-mix(in srgb, var(--txt-warn, #b54708) 10%, transparent); }
+
+/* master schedule: lots with their machines */
+.ms-lot { border-top: 1px solid var(--gridline); padding-top: 4px; margin-top: 4px; }
+.ms-lot .gantt-row-label small.ms-cust { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
+.ms-child .gantt-row-label { padding-left: 14px; }
+.ms-child { min-height: 38px; }
+.ms-behind { color: var(--txt-bad, #b42318); font-weight: 700; }
+@media (min-width: 900px) { #view-schedule .gantt-row, #view-schedule .gantt-header { grid-template-columns: 310px 1fr; } .ms-lot .gantt-row-label small.ms-cust { max-width: 210px; } }
+#view-schedule .gantt-row-label small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#view-schedule .gantt-row-label small.ms-actual { white-space: normal; }
