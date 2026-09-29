@@ -40,7 +40,7 @@ function mtCollect() {
     const age = mtDays(d.date);
     const mineReq = d.createdBy === u.id || d.receiver === u.id;
     // those who may decide get it; managers only when nobody else qualifies (they can still approve from the list)
-    if (typeof bxMayDecide === "function" ? bxMayDecide(d) && (typeof apvRoutesTo !== "function" || apvRoutesTo(u, "mreq", d.createdBy)) : d.status === "รออนุมัติ" && bxCanApprove() && (d.createdBy !== u.id || selfOk || u.role === "admin"))
+    if (typeof bxMayDecide === "function" ? bxMayDecide(d) && (typeof apvRoutesTo !== "function" || apvRoutesTo(u, "mreq", d.createdBy, null, d)) : d.status === "รออนุมัติ" && bxCanApprove() && (d.createdBy !== u.id || selfOk || u.role === "admin"))
       add({ group: "อนุมัติ", icon: "✍", title: `อนุมัติใบเบิก ${d.no}`, detail: `${d.wo} · ${d.items.length} รายการ · ขอโดย ${d.owner || "-"}`, tone: age >= 1 ? "warning" : "neutral", score: 70 + age, age, act: () => { switchView("bomx"); bxOpenReq(d.no); } });
     const storeMan = u.dept === "wh" || (BX_SETTINGS.issuers || []).includes(u.id) || (typeof authHasAbility === "function" && authHasAbility("issue"));
     if ((d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && storeMan && bxCanIssue() && !(d.receiver === u.id && !selfOk && u.role !== "admin")) {
@@ -84,7 +84,7 @@ function mtCollect() {
     (DEPT_DOCS[t] || []).forEach((d) => {
       if (typeof authCanSeeDoc === "function" && !authCanSeeDoc(t, d)) return;
       if (!deptIsOpen(t, d)) return;
-      const waiting = /^รอ/.test(d.status || "") && d.createdBy !== u.id && deptCanManage(u.role, t) && (typeof apvRoutesTo !== "function" || apvRoutesTo(u, t, d.createdBy));
+      const waiting = /^รอ/.test(d.status || "") && d.createdBy !== u.id && (typeof apvMulti === "function" && apvMulti(t, d) ? apvRoutesTo(u, t, d.createdBy, null, d) : deptCanManage(u.role, t) && (typeof apvRoutesTo !== "function" || apvRoutesTo(u, t, d.createdBy)));
       // a status that waits on another department ("รอ QC ตรวจ", "รออะไหล่") goes to that department too
       const handoff = !waiting && d.createdBy !== u.id && mtWaitsOn(t, d.status).includes(u.dept);
       const mine = d.createdBy === u.id || d.owner === u.name || d.tech === u.name;

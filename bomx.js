@@ -283,7 +283,7 @@ function bxRefs() {
 function bxRefInfo(ref) { return bxRefs().find((r) => r.ref === ref) || null; }
 
 function bxReqHolder(d) {
-  if (d.status === "รออนุมัติ") return typeof apvWaitingFor === "function" ? `ผู้อนุมัติ: ${apvWaitingFor("mreq", d.createdBy)}` : "ผู้อนุมัติ";
+  if (d.status === "รออนุมัติ") return typeof apvWaitingFor === "function" ? `ผู้อนุมัติ: ${apvWaitingFor("mreq", d.createdBy, null, d)}` : "ผู้อนุมัติ";
   if (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") {
     const short = d.items.some((it) => { const a = bxSxAvail(it.key); return a !== null && a < bxItemOutstanding(d, it); });
     return short ? "คลังสินค้า (ของไม่พอ)" : "คลังสินค้า";
@@ -1022,7 +1022,7 @@ function bxRenderReqModal() {
   const canApprove = bxMayDecide(d);
   const canIssue = bxMayIssue(d);
   const sodNote = d.status === "รออนุมัติ" && !canApprove && bxCanApprove()
-    ? (own ? "ใบเบิกนี้คุณเป็นผู้ขอเบิก — ต้องให้ผู้อนุมัติคนอื่นอนุมัติ" : `ตามวิธีอนุมัติของบริษัท (${apvModeLabel().split(" — ")[0]}) ใบนี้รอ: ${apvWaitingFor("mreq", d.createdBy)}`) : "";
+    ? (own ? "ใบเบิกนี้คุณเป็นผู้ขอเบิก — ต้องให้ผู้อนุมัติคนอื่นอนุมัติ" : `ตามวิธีอนุมัติของบริษัท (${apvModeLabel().split(" — ")[0]}) ใบนี้รอ: ${apvWaitingFor("mreq", d.createdBy, null, d)}`) : "";
   const isReceiver = me && (d.receiver === me.id || d.createdBy === me.id);
   const canReturn = (bxCanIssue() || isReceiver) && d.items.some((it) => bxNum(it.issued) - bxNum(it.ret) > 0);
   const logs = [].concat(d.log || []).concat(...d.items.map((it) => (it.log || []).map((g) => Object.assign({ part: `${it.code || ""} ${it.part}` }, g))))
@@ -1078,6 +1078,7 @@ function bxRenderReqModal() {
         }).join("")}</ul></div>`;
     })()}
     ${canApprove || canIssue || canReturn ? `<div class="form-field"><label for="bxReqActNote">หมายเหตุการดำเนินการ</label><input id="bxReqActNote" placeholder="เช่น เหตุผลที่ปฏิเสธ / จ่ายแทนด้วยรหัสใหม่"></div>` : ""}
+    ${typeof apvHistoryHtml === "function" && ((d.apv || []).length || d.status === "รออนุมัติ") ? `<div class="bx-docgroup-title">ลำดับขั้นอนุมัติ</div>${apvHistoryHtml("mreq", d)}` : ""}
     <div class="bx-log">
       <div class="bx-docgroup-title">ประวัติ: ใครทำอะไร เมื่อไร</div>
       ${logs.length ? `<ul class="bx-list">${logs.map((g) => `<li>${fmtDateTime(g.at)} · <strong>${bxEsc(g.by)}</strong> · ${bxEsc(g.kind)}${g.part ? ` ${bxEsc(g.part)}` : ""}${g.qty ? ` × ${bxFmt(g.qty)}` : ""}${g.note ? ` — ${bxEsc(g.note)}` : ""}${g.signed ? ` <span class="pill pill-good" title="ยืนยันด้วยรหัสผ่านของผู้รับ">✍ ลงนามด้วยรหัสผ่าน</span>` : ""}${g.proof ? ` <code class="bx-proof" title="รหัสตรวจสอบ: คำนวณจากรายการ จำนวน ผู้ทำ และเวลา ณ ตอนนั้น">#${bxEsc(g.proof)}</code>` : ""}</li>`).join("")}</ul>` : `<p class="muted-inline">ยังไม่มีการดำเนินการ</p>`}
@@ -1180,7 +1181,7 @@ function bxSelfOk() { const me = bxUser(); return !me || me.role === "admin" || 
 // chain of command; managers and admins may always decide.
 function bxMayApproveFor(d, me) {
   if (typeof apvAllows !== "function") return bxCanApprove();
-  return apvAllows(me, d.createdBy, bxCanApprove(), "mreq");
+  return apvAllows(me, d.createdBy, bxCanApprove(), "mreq", d);
 }
 function bxMayDecide(d) { const me = bxUser(); return d.status === "รออนุมัติ" && bxMayApproveFor(d, me) && !(me && d.createdBy === me.id && !bxSelfOk()); }
 function bxMayIssue(d) { const me = bxUser(); return bxCanIssue() && (d.status === "อนุมัติ" || d.status === "จ่ายบางส่วน") && !(me && d.receiver === me.id && !bxSelfOk()); }
@@ -1189,6 +1190,20 @@ function bxReqAction(d, status, note) {
   const deciding = status === "อนุมัติ" || status === "ปฏิเสธ";
   if (deciding ? !bxMayDecide(d) : !bxMayIssue(d)) { showToast(`${d.no}: บัญชีนี้${deciding ? "อนุมัติ/ปฏิเสธ" : "ปิดใบเบิก"}ไม่ได้`, "warn"); return; }
   if (status === "ปฏิเสธ" && !String(note || "").trim()) { showToast("ปฏิเสธต้องใส่เหตุผล", "warn"); return; }
+  // approval steps (Admin › ลำดับขั้น): each approval records one step; the requisition stays waiting until the last
+  if (status === "อนุมัติ" && bxUser() && typeof apvMulti === "function" && apvMulti("mreq", d)) {
+    const r = apvRecord("mreq", d, bxUser(), note);
+    if (!r.complete) {
+      d.log = d.log || [];
+      d.log.push({ at: new Date().toISOString(), by: bxUserName(), kind: r.label, note });
+      if (typeof auditLog === "function") auditLog("อนุมัติตามขั้น", d.no, `${r.label}${note ? ` · ${note}` : ""}`);
+      bxAfterReqChange(d);
+      showToast(`${d.no}: ${r.label} — ส่งต่อ ${apvWaitingFor("mreq", d.createdBy, null, d)}`, "good");
+      return;
+    }
+    note = [r.label, note].filter(Boolean).join(" · ");
+  }
+  if (status === "ปฏิเสธ" && typeof apvReset === "function") apvReset(d);
   const before = d.status;
   d.status = status;
   d.log = d.log || [];

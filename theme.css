@@ -495,3 +495,28 @@ html[data-floor="1"] .floor-toggle { display: none; }
 .bx-short { margin: 10px 0; padding: 10px 12px; border: 1px solid var(--txt-warn); border-radius: var(--radius-sm); }
 .bx-short ul { margin: 6px 0 0; padding-left: 18px; } .bx-short li { margin: 4px 0; }
 .bx-proof { font-family: var(--font-mono); font-size: 0.8em; color: var(--text-secondary); }
+
+/* ---- ลำดับขั้น & การอนุมัติ (approval.js) ---- */
+.apv-grid { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(320px, 2fr); gap: 14px; margin-bottom: 14px; }
+@media (max-width: 900px) { .apv-grid { grid-template-columns: 1fr; } }
+.apv-card { padding: 14px 16px; }
+.apv-card h3 { margin: 0 0 10px; font-size: 1rem; }
+.apv-levels { margin: 0 0 8px; padding-left: 22px; }
+.apv-levels li { display: flex; gap: 8px; align-items: center; margin: 6px 0; flex-wrap: wrap; }
+.apv-levels .apv-lvname { flex: 1 1 160px; min-width: 0; }
+.apv-users { max-height: 420px; overflow: auto; }
+.apv-users select { max-width: 220px; }
+.apv-kind { border-top: 1px solid var(--border, #d0d5dd); padding: 10px 0; }
+.apv-kind-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+.apv-step { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; padding: 6px 8px; margin: 4px 0; border-radius: var(--radius-sm, 6px); background: color-mix(in srgb, currentColor 5%, transparent); }
+.apv-step label { display: inline-flex; gap: 6px; align-items: center; }
+.apv-step input[type=number] { width: 120px; }
+.apv-stepno { font-weight: 700; min-width: 48px; }
+.apv-stepbtns { margin-left: auto; display: inline-flex; gap: 4px; }
+.apv-preview { margin-top: 6px; font-size: .9em; line-height: 1.9; }
+.apv-chip { display: inline-block; padding: 1px 8px; border: 1px solid var(--border, #d0d5dd); border-radius: 999px; }
+.apv-trail { margin: 6px 0 10px; padding-left: 20px; font-size: .92em; }
+.apv-trail li { margin: 3px 0; }
+.apv-trail li.done { color: var(--txt-good, #067647); }
+.apv-trail li.now { font-weight: 600; color: var(--txt-warn, #b54708); }
+.paper-apv { margin-top: 14px; font-size: 10pt; }

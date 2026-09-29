@@ -398,6 +398,8 @@ function p2pMayApprove(c, u) {
   if (!u || !c) return false;
   const opener = (p2pEvent(c, "pr") || {}).by;
   if (opener && opener === u.name && u.role !== "admin") return false;
+  // approval steps by amount (Admin › ลำดับขั้น) replace the 100,000 ฿ rule
+  if (typeof apvMulti === "function" && apvMulti("pr", c)) { const o = p2pOpener(c); return apvMayAct(u, "pr", c, o ? o.id : ""); }
   if (u.role === "admin" || u.role === "plant") return true;
   if (u.role !== "depthead" || (Number(c.value) || 0) > P2P_HEAD_LIMIT) return false;
   const mode = typeof apvMode === "function" ? apvMode() : "dept";
@@ -410,6 +412,7 @@ function p2pMayApprove(c, u) {
 // has none); managers when it is above the heads' limit or nobody else may approve
 function p2pInboxTo(c, u) {
   if (!p2pMayApprove(c, u)) return false;
+  if (typeof apvMulti === "function" && apvMulti("pr", c)) { const o = p2pOpener(c); return apvRoutesTo(u, "pr", o ? o.id : "", null, c); }
   const heads = (typeof AUTH !== "undefined" ? AUTH.users : []).filter((x) => x.active !== false && x.role === "depthead" && p2pMayApprove(c, x));
   if (u.role === "admin" || u.role === "plant") return (Number(c.value) || 0) > P2P_HEAD_LIMIT || !heads.length;
   const own = heads.filter((x) => c.requester && c.requester === authDeptName(x.dept));
@@ -472,9 +475,10 @@ function openP2PCase(id) {
       <div class="paper-row"><div class="paper-label">เลขที่ PO / มูลค่า</div><div class="paper-value">${escapeHtml(c.po || "—")}${c.value && authCanSeeCost() ? ` · ${Number(c.value).toLocaleString("th-TH")} บาท` : ""}</div></div>
       <div class="paper-row"><div class="paper-label">วันที่ต้องใช้</div><div class="paper-value">${p2pDate(c.needBy)}</div></div>
       <div class="paper-row"><div class="paper-label">ผู้ขายนัดส่ง</div><div class="paper-value">${p2pDate(p2pPromised(c))}</div></div>
-      <div class="paper-row paper-row-wide"><div class="paper-label">ตอนนี้อยู่ที่</div><div class="paper-value"><strong>${cur ? `${escapeHtml(cur.label)} — ${escapeHtml(p2pHolder(c))}` : meta.label}</strong>${cur ? ` · รอมาแล้ว ${p2pWaitDays(c)} วัน · กำหนด ${p2pDate(p2pDeadline(c, cur))}` : ""}</div></div>
+      <div class="paper-row paper-row-wide"><div class="paper-label">ตอนนี้อยู่ที่</div><div class="paper-value"><strong>${cur ? `${escapeHtml(cur.label)} — ${escapeHtml(cur.id === "approve" && typeof apvMulti === "function" && apvMulti("pr", c) ? apvWaitingFor("pr", (p2pOpener(c) || {}).id || "", null, c) : p2pHolder(c))}` : meta.label}</strong>${cur ? ` · รอมาแล้ว ${p2pWaitDays(c)} วัน · กำหนด ${p2pDate(p2pDeadline(c, cur))}` : ""}</div></div>
     </div>
     ${ex.length ? `<div class="paper-section-title">ประเด็นที่ต้องจัดการ</div><div class="paper-textbox">${ex.map((x) => `<div class="p2p-sheet-issue ${x.sev}">● ${escapeHtml(x.text)}<br><span>ผู้รับผิดชอบ: ${escapeHtml(x.owner)} · ควรทำ: ${escapeHtml(x.action)}</span></div>`).join("")}</div>` : ""}
+    ${typeof apvMulti === "function" && apvMulti("pr", c) && ((c.apv || []).length || (cur && cur.id === "approve")) ? `<div class="paper-section-title">ลำดับขั้นอนุมัติ</div>${apvHistoryHtml("pr", c)}` : ""}
     <div class="paper-section-title">ลำดับขั้นตอน — ใครทำ เมื่อไร ใช้เวลากี่วัน (จริง / เป้าหมาย)</div>
     <table class="paper-table paper-table-compact">
       <thead><tr><th>ขั้นตอน</th><th>สถานะ</th><th>ผู้ดำเนินการ</th><th>วันที่</th><th class="num">วัน</th><th>รายละเอียด / เอกสาร</th></tr></thead>
@@ -560,6 +564,21 @@ function saveP2PStep() {
   if (stage === "approve") {
     ev.result = val("p2pStepResult");
     if (ev.result === "reject" && !ev.note) { showToast("ไม่อนุมัติต้องใส่เหตุผลในช่องหมายเหตุ — ผู้ขอจะเห็นเหตุผลนี้", "warn"); document.getElementById("p2pStepNote").focus(); return; }
+    if (ev.result === "reject" && typeof apvReset === "function") apvReset(c);
+    if (ev.result !== "reject" && typeof apvMulti === "function" && apvMulti("pr", c)) {
+      const r = apvRecord("pr", c, authCurrentUser(), ev.note);
+      if (!r.complete) {
+        // not the last step: the PR stays at "approve" and moves to the next approver
+        saveP2P();
+        if (typeof auditLog === "function") auditLog("อนุมัติตามขั้น", c.pr, `${r.label}${ev.note ? ` · ${ev.note}` : ""}`);
+        document.getElementById("p2pStepBackdrop").classList.remove("open");
+        renderP2P();
+        openP2PCase(c.id);
+        showToast(`${c.pr}: ${r.label} — ส่งต่อ ${apvWaitingFor("pr", "", null, c)}`, "good");
+        return;
+      }
+      ev.note = [r.label, ev.note].filter(Boolean).join(" · ");
+    }
     if (ev.result === "reject") { c.status = "cancelled"; auditDetail = "ไม่อนุมัติ PR"; }
     const pr = PR_LIST.find((p) => p.id === c.pr);
     if (pr) pr.status = ev.result === "reject" ? "ปฏิเสธ" : "อนุมัติแล้ว";

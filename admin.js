@@ -32,6 +32,7 @@ function renderAdmin() {
   if (adminTab === "org" && typeof renderAdminOrg === "function") renderAdminOrg();
   if (adminTab === "naming" && typeof renderAdminNaming === "function") renderAdminNaming();
   if (adminTab === "workflow" && typeof renderAdminWorkflow === "function") renderAdminWorkflow();
+  if (adminTab === "levels" && typeof renderAdminLevels === "function") renderAdminLevels();
 }
 
 /* ---- storage location ------------------------------------------------------ */

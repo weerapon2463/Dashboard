@@ -444,6 +444,7 @@ function deptRefreshOtherPages() {
 
 function saveDeptModal() {
   if (!deptEditing) return;
+  let stepMsg = "";
   const { type, index } = deptEditing;
   const def = DOC_TYPES[type];
   const entry = {};
@@ -469,28 +470,37 @@ function saveDeptModal() {
     Object.assign(doc, entry);
     const nextStatus = document.getElementById("deptDocStatus").value;
     const meNow = hasAuth ? authCurrentUser() : null;
+    // approval steps (Admin › ลำดับขั้น): the person at the current step may approve even without the manage right
+    const stepApv = !!meNow && nextStatus !== before.status && deptIsApproval(nextStatus) && typeof apvMulti === "function" && apvMulti(type, doc);
+    const stepMay = stepApv && apvMayAct(meNow, type, doc, doc.createdBy);
     // status changes need the right to manage this kind of document and the workflow's "who may set it"
-    if (meNow && nextStatus !== before.status && (!deptCanManage(meNow.role, type) || (typeof wfCanSet === "function" && !wfCanSet(type, nextStatus)))) {
+    if (meNow && nextStatus !== before.status && ((!deptCanManage(meNow.role, type) && !stepMay) || (typeof wfCanSet === "function" && !wfCanSet(type, nextStatus)))) {
       Object.assign(doc, before);
       showToast(`เปลี่ยนสถานะเป็น "${nextStatus}" ไม่ได้ — ไม่ใช่หน้าที่ของบัญชีนี้`, "warn");
       return;
     }
     // an approving status follows the company's approval rule (by right / department / chain of command)
-    if (meNow && nextStatus !== before.status && deptIsApproval(nextStatus) && typeof apvAllows === "function" && !apvAllows(meNow, doc.createdBy, true, type)) {
+    if (meNow && nextStatus !== before.status && deptIsApproval(nextStatus) && typeof apvAllows === "function" && !apvAllows(meNow, doc.createdBy, true, type, doc)) {
       Object.assign(doc, before);
-      showToast(`อนุมัติ ${doc.no} ไม่ได้ — ตามวิธีอนุมัติของบริษัท ผู้อนุมัติคือ ${apvWaitingFor(type, doc.createdBy)}`, "warn");
+      showToast(`อนุมัติ ${doc.no} ไม่ได้ — ตามวิธีอนุมัติของบริษัท ผู้อนุมัติคือ ${apvWaitingFor(type, doc.createdBy, null, doc)}`, "warn");
       return;
     }
     // editing someone else's document needs the manage right too
-    if (meNow && !deptCanManage(meNow.role, type) && doc.createdBy !== meNow.id) { Object.assign(doc, before); showToast("แก้ไขเอกสารของผู้อื่นไม่ได้", "warn"); return; }
+    if (meNow && !deptCanManage(meNow.role, type) && doc.createdBy !== meNow.id && !stepMay) { Object.assign(doc, before); showToast("แก้ไขเอกสารของผู้อื่นไม่ได้", "warn"); return; }
     if (meNow && doc.createdBy === meNow.id && meNow.role !== "admin" && !(typeof esPolicy === "function" && esPolicy().selfApprove) && nextStatus !== before.status && deptIsApproval(nextStatus)) {
       showToast("ผู้สร้างเอกสารอนุมัติเอกสารของตัวเองไม่ได้ — ให้หัวหน้าหรือผู้มีอำนาจอนุมัติ", "warn");
       return;
     }
-    doc.status = nextStatus;
+    let stepLabel = "";
+    if (stepApv) {
+      const r = apvRecord(type, doc, meNow, "");
+      stepLabel = r.label;
+      if (!r.complete) stepMsg = `${doc.no}: ${r.label} — ส่งต่อ ${apvWaitingFor(type, doc.createdBy, null, doc)}`;
+    } else if (nextStatus !== before.status && /ไม่อนุมัติ|ปฏิเสธ|ยกเลิก|ร่าง|ส่งกลับ|แก้ไข/.test(nextStatus) && typeof apvReset === "function") apvReset(doc);
+    doc.status = stepMsg ? before.status : nextStatus; // stays waiting until the last step is approved
     if (vis) doc.visibility = vis;
     if (hasAuth) {
-      const changes = [auditDiff(before, doc, def.fields.concat([{ key: "status", label: "สถานะ" }]))];
+      const changes = [auditDiff(before, doc, def.fields.concat([{ key: "status", label: "สถานะ" }])), stepLabel];
       if (vis && JSON.stringify(before.visibility || { mode: "all" }) !== JSON.stringify(vis)) changes.push(`การมองเห็น → ${visLabel(vis)}`);
       stampRecord(doc, false);
       auditLog("แก้ไขเอกสาร", doc.no, changes.filter(Boolean).join(" · ") || "บันทึกโดยไม่มีการเปลี่ยนแปลง");
@@ -500,6 +510,7 @@ function saveDeptModal() {
   closeDeptModal();
   renderDept();
   deptRefreshOtherPages();
+  if (stepMsg) { showToast(stepMsg, "good"); return; }
   showToast(index === null ? `สร้าง ${entry.no} แล้ว` : `บันทึก ${DEPT_DOCS[type][index].no} แล้ว`, "good");
 }
 

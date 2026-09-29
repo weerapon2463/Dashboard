@@ -174,11 +174,14 @@ function esWhyNot(type, doc, slot) {
     if (doc.createdBy) return doc.createdBy === me.id ? "" : "ช่องผู้จัดทำ ลงนามได้เฉพาะผู้สร้างเอกสาร";
     return deptCanCreate(role, type) ? "" : "ไม่มีสิทธิ์จัดทำเอกสารชนิดนี้";
   }
+  // with approval steps the approver box belongs to the people who approve the steps
+  if (slot === 2 && typeof apvMulti === "function" && apvMulti(type, doc))
+    return apvMayAct(me, type, doc, doc.createdBy) || (doc.apv || []).some((a) => a.uid === me.id) ? "" : `ตามลำดับขั้นอนุมัติ ${apvWaitingFor(type, doc.createdBy, null, doc)}`;
   const manage = deptCanManage(role, type) || (type === "mreq" && typeof authHasAbility === "function" && authHasAbility("approve"));
   if (slot === 1) return manage ? "" : "ไม่มีสิทธิ์ตรวจสอบเอกสารชนิดนี้";
   const approver = ["admin", "plant", "group", "depthead"].includes(me.role) || (typeof authHasAbility === "function" && authHasAbility("approve"));
   if (!(manage && approver)) return "ช่องผู้อนุมัติ ลงนามได้เฉพาะผู้มีอำนาจอนุมัติ (หัวหน้าแผนกขึ้นไป)";
-  if (typeof apvAllows === "function" && !apvAllows(me, doc.createdBy, true, type)) return `ตามวิธีอนุมัติของบริษัท ผู้อนุมัติเอกสารนี้คือ ${apvWaitingFor(type, doc.createdBy)}`;
+  if (typeof apvAllows === "function" && !apvAllows(me, doc.createdBy, true, type, doc)) return `ตามวิธีอนุมัติของบริษัท ผู้อนุมัติเอกสารนี้คือ ${apvWaitingFor(type, doc.createdBy, null, doc)}`;
   return "";
 }
 function esCanSign(type, doc, slot) { return !esWhyNot(type, doc, slot); }
@@ -203,7 +206,7 @@ function esPaperBoxes(type, doc) {
       ${changed ? `<div class="sig-warn">⚠ เอกสารถูกแก้ไขหลังลงนาม</div>` : `<div class="sig-ok">✓ ลงนามอิเล็กทรอนิกส์</div>`}
     </div>`;
   };
-  return `<div class="paper-sigs">${box(0)}${box(1)}${box(2)}</div>`;
+  return `<div class="paper-sigs">${box(0)}${box(1)}${box(2)}</div>${(doc.apv || []).length && typeof apvHistoryHtml === "function" ? `<div class="paper-apv"><b>ลำดับขั้นอนุมัติ</b>${apvHistoryHtml(type, doc)}</div>` : ""}`;
 }
 
 function esStartSign(type, index) {
