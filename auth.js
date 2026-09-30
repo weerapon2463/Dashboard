@@ -600,6 +600,12 @@ function authUserName(id) {
 
 // Which data this device shows: the shared Google Sheet, or only its own sample data.
 // A device that was never connected lists the built-in sample users — say so, and let it connect here.
+// Company devices get a link that opens the DEMO in a separate tab with its own storage (demo-tab.js)
+function loginDemoTabLink(box) {
+  if (window.FORGE_DEMO_TAB || document.getElementById("loginDemoTab")) return;
+  box.insertAdjacentHTML("beforeend", `<a class="btn-chip login-demo-tab" id="loginDemoTab" href="./?demo=1" target="_blank" rel="noopener">🧪 ลองระบบทดลอง (เปิดแท็บใหม่ — ไม่ปนกับข้อมูลบริษัท)</a>`);
+}
+
 function renderLoginConn() {
   const box = document.getElementById("loginConn");
   if (!box || typeof Y2JStore === "undefined") return;
@@ -613,10 +619,11 @@ function renderLoginConn() {
   if (Y2JStore.isRemote() && Y2JStore.config().demo) {
     box.className = "login-conn login-conn-demo";
     box.innerHTML = `<span>🧪 ระบบทดลอง (ข้อมูลจำลอง) — เลือกผู้ใช้ด้านล่าง PIN 1234</span>
-      <button type="button" class="btn-chip login-code-toggle" id="loginCodeToggle">พนักงาน Y2J: ใส่รหัสบริษัท</button>
+      ${window.FORGE_DEMO_TAB ? `<span class="muted-inline">แท็บทดลอง — ข้อมูลแยกจากบริษัทในเครื่องนี้ · ปิดแท็บนี้เพื่อกลับไปใช้ข้อมูลบริษัท</span>` : `<button type="button" class="btn-chip login-code-toggle" id="loginCodeToggle">พนักงาน Y2J: ใส่รหัสบริษัท</button>`}
       <div class="login-conn-row" id="loginCodeRow" hidden><input id="loginCode" type="password" autocomplete="off" autocapitalize="characters" placeholder="รหัสบริษัท เช่น Y2J-XXXX-XXXX" aria-label="รหัสบริษัท"><button type="button" class="btn-primary" id="loginCodeBtn">เข้าข้อมูลบริษัท</button></div>
       <span class="login-conn-err" id="loginCodeErr" hidden></span>`;
     const row = document.getElementById("loginCodeRow");
+    if (window.FORGE_DEMO_TAB) return;
     document.getElementById("loginCodeToggle").addEventListener("click", () => { row.hidden = !row.hidden; if (!row.hidden) document.getElementById("loginCode").focus(); });
     const go = async () => {
       const err = document.getElementById("loginCodeErr");
@@ -634,16 +641,19 @@ function renderLoginConn() {
     box.innerHTML = Y2JStore.roster()
       ? "🔒 ตรวจรหัสผ่านที่เซิร์ฟเวอร์ — ผิด 5 ครั้งระงับ 15 นาที · ออกจากระบบอัตโนมัติเมื่อไม่ได้ใช้ 6 ชั่วโมง"
       : "⚠ ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจอินเทอร์เน็ตแล้วโหลดหน้านี้ใหม่";
+    loginDemoTabLink(box);
     return;
   }
   if (Y2JStore.isRemote()) {
     const st = Y2JStore.status();
     box.className = "login-conn login-conn-ok";
     box.innerHTML = `☁ เชื่อมข้อมูลกลาง (Google Sheets) แล้ว${st.at ? ` · อัปเดต ${escapeHtml(String(st.at).slice(11, 16))}` : ""} — ทุกเครื่องที่เชื่อมเห็นข้อมูลชุดเดียวกัน`;
+    loginDemoTabLink(box);
     return;
   }
   box.className = "login-conn login-conn-warn";
   box.innerHTML = "⚠ เครื่องนี้ใช้ข้อมูลเฉพาะในเครื่อง — กด \"ล้างข้อมูลในเครื่องนี้\" ด้านล่างเพื่อเข้าระบบทดลอง หรือเปิดลิงก์ตั้งค่าจากผู้ดูแลระบบเพื่อใช้ข้อมูลบริษัท";
+  loginDemoTabLink(box);
 }
 
 function renderLoginScreen() {

@@ -45,7 +45,7 @@ const Y2JStore = (() => {
   try {
     const rq = new URLSearchParams(location.search);
     if (rq.get("reset") === "1") {
-      ls.clear();
+      if (window.FORGE_LS_CLEAR) window.FORGE_LS_CLEAR(); else ls.clear(); // a demo tab clears only its own keys (demo-tab.js)
       try { sessionStorage.clear(); } catch (e) { /* ignore */ }
       // keep the rest of the link (e.g. ?reset=1&sheet=…&key=… sets the device up fresh)
       rq.delete("reset");
@@ -64,7 +64,7 @@ const Y2JStore = (() => {
   // Dropped when it joins or leaves the demo: shown stale they confuse, uploaded they pollute.
   const dropLocalData = () => {
     try {
-      Object.keys(ls).forEach((k) => { if (SHARED.includes(String(k).split("--c-")[0])) ls.removeItem(k); });
+      (window.FORGE_LS_KEYS ? window.FORGE_LS_KEYS() : Object.keys(ls)).forEach((k) => { if (SHARED.includes(String(k).split("--c-")[0])) ls.removeItem(k); });
     } catch (e) { /* ignore */ }
     rawSet(META_KEY, JSON.stringify({ keys: {}, pending: [] }));
   };
