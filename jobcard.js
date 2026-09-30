@@ -361,15 +361,22 @@ function renderJcOperator() {
   }));
   // only people who work on the shop floor (or already have job cards) see this panel
   const meU = typeof authCurrentUser === "function" ? authCurrentUser() : null;
-  const floor = !meU || meU.dept === "prod" || meU.role === "admin";
+  // line leads and planners may act on anyone's job card (jcAct) — give them the line's running work here too
+  const lead = jcCanPlan() && (!meU || meU.role === "admin" || meU.role === "plant" || ["prod", "plan"].includes(meU.dept));
+  const floor = !meU || meU.dept === "prod" || meU.role === "admin" || lead;
   if (!mine.length && !floor) { box.innerHTML = ""; return; }
+  const team = [];
+  if (lead) live.forEach((w) => (w.jobs || []).forEach((j, i) => {
+    if (j.status !== "done" && j.assignee && j.assignee !== me && !(j.status === "open" && w.jobs.slice(0, i).some((p) => p.status !== "done"))) team.push({ w, j, i });
+  }));
   const order = { wip: 0, hold: 1, open: 2 };
   mine.sort((a, b) => order[a.j.status] - order[b.j.status]);
+  team.sort((a, b) => order[a.j.status] - order[b.j.status]);
   const card = ({ w, j, i }) => {
     const openLog = (j.logs || []).find((l) => !l.to);
     const openDown = (j.downs || []).find((d) => !d.to);
     return `<div class="jc-op${j.status === "wip" ? " jc-op-wip" : ""}">
-      <div class="jc-op-head"><b>${jcEsc(j.op)}</b> ${jcPill(j.status)}</div>
+      <div class="jc-op-head"><b>${jcEsc(j.op)}</b> ${jcPill(j.status)}${j.assignee && j.assignee !== me ? ` <span class="muted-inline">👤 ${jcEsc(j.assignee)}</span>` : ""}</div>
       <div class="muted-inline">${jcEsc(w.wo)}${w.serial ? ` · ${jcEsc(w.serial)}` : ""} · ${jcEsc(w.model)} · สถานี ${jcEsc(j.station || "—")} · ${jcEsc(j.no)}</div>
       <div class="jc-op-time">${openLog ? `เริ่มรอบนี้ ${jcEsc(jcClock(openLog.from))} น. · ` : ""}ทำไปแล้ว ${jcFmtMins(jcMinutes(j))}${j.planMins ? ` / แผน ${jcFmtMins(j.planMins)}` : ""}${openDown ? ` · หยุด: ${jcEsc(openDown.reason)}` : ""}</div>
       <div class="jc-op-btns">${jcButtons(w, i, true)}</div></div>`;
@@ -377,6 +384,7 @@ function renderJcOperator() {
   box.innerHTML = `<div class="card"><div class="card-header"><h3>Job Card ของฉัน — ${jcEsc(me)}</h3>
       <p class="card-sub">กด ▶ เมื่อเริ่มทำ · ⏸ เมื่อต้องหยุด (เลือกสาเหตุ) · ✔ เมื่อเสร็จ ระบบจับเวลาให้เอง</p></div>
     <div class="card-body">${mine.length ? `<div class="jc-op-grid">${mine.map(card).join("")}</div>` : `<p class="muted-inline">ไม่มีงานที่มอบหมายให้คุณตอนนี้</p>`}
-    ${free.length ? `<div class="vis-group-title jc-free-t">งานที่ยังไม่มีคนรับ (${free.length})</div><div class="jc-op-grid">${free.slice(0, 8).map(card).join("")}</div>` : ""}</div></div>`;
+    ${free.length ? `<div class="vis-group-title jc-free-t">งานที่ยังไม่มีคนรับ (${free.length})</div><div class="jc-op-grid">${free.slice(0, 8).map(card).join("")}</div>` : ""}
+    ${team.length ? `<div class="vis-group-title jc-free-t">Job Card ในไลน์ตอนนี้ (${team.length}) — หัวหน้างานกดแทนได้ (โอนงาน / ทำแทน)</div><div class="jc-op-grid">${team.slice(0, 12).map(card).join("")}</div>${team.length > 12 ? `<p class="muted-inline">ดูทั้งหมดที่หน้าใบสั่งผลิต › Job Card</p>` : ""}` : ""}</div></div>`;
   jcWireButtons(box);
 }
