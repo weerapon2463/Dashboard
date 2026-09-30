@@ -12,5 +12,6 @@
   ["overview", ["u-demo-admin"]],
   ["orgchart", ["u-demo-admin"]],
   ["procurement", ["u-demo-admin"]],
-  ["mytasks", ["u-demo-admin", "u-demo-exec", "u-demo-ceo", "u-demo-prod", "u-demo-plan", "u-demo-qc", "u-demo-store", "u-demo-pur", "u-demo-rnd", "u-demo-sales", "u-demo-svc", "u-demo-mt", "u-demo-weld", "u-demo-paint", "u-demo-mc", "u-demo-op"]]
+  ["mytasks", ["u-demo-admin", "u-demo-exec", "u-demo-ceo", "u-demo-prod", "u-demo-plan", "u-demo-qc", "u-demo-store", "u-demo-pur", "u-demo-rnd", "u-demo-sales", "u-demo-svc", "u-demo-mt", "u-demo-weld", "u-demo-paint", "u-demo-mc", "u-demo-op"]],
+  ["inbox", ["u-demo-admin", "u-demo-exec", "u-demo-ceo", "u-demo-prod", "u-demo-plan", "u-demo-qc", "u-demo-store", "u-demo-pur", "u-demo-rnd", "u-demo-sales", "u-demo-svc", "u-demo-mt", "u-demo-weld", "u-demo-paint", "u-demo-mc", "u-demo-op"]]
 ]
